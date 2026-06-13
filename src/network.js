@@ -546,8 +546,14 @@ export const Network = {
                 this.game.showMapDirections = true;
                 this.game.grid.selectMap(data.selectedMap);
 
+                // Replicate map obstacles perfectly from host (solves tree/rock placement conflicts)
+                if (data.obstacles) {
+                    this.game.grid.obstacles = data.obstacles;
+                }
+
                 this.game.lives = data.isHardcore ? 20 : 100;
-                this.game.gold = data.playerWallets[window.myPlayerId] || (data.isHardcore ? 250 : 100);
+                // Safe lookup: assigns gold accurately from playerWallets map
+                this.game.gold = this.game.playerWallets[window.myPlayerId] || (data.isHardcore ? 250 : 100);
                 this.game.wave = 0;
                 this.game.waveInProgress = false;
                 this.game.speedMultiplier = 1;
@@ -661,10 +667,16 @@ export const Network = {
                         const EnemyClass = getEnemyClass(eData.name);
                         enemy = new EnemyClass(eData.x, eData.y);
                         enemy.id = eData.id;
+
+                        // Snap coordinate position immediately on first creation
+                        enemy.x = eData.x;
+                        enemy.y = eData.y;
                     }
 
-                    enemy.x = eData.x;
-                    enemy.y = eData.y;
+                    // Save coordinates as target vectors for smooth local interpolation
+                    enemy.targetX = eData.x;
+                    enemy.targetY = eData.y;
+
                     enemy.health = eData.health;
                     enemy.maxHealth = eData.maxHealth;
                     enemy.shield = eData.shield;

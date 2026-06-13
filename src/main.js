@@ -577,7 +577,8 @@ class Game {
         type: 'START',
         selectedMap: this.selectedMap,
         isHardcore: this.isHardcore,
-        playerWallets: this.playerWallets
+        playerWallets: this.playerWallets,
+        obstacles: this.grid.obstacles // <-- Synchronize generated obstacles!
       });
     }
 
@@ -878,11 +879,39 @@ class Game {
       this.smoothHoverPos.y += (this.targetHoverPos.y - this.smoothHoverPos.y) * 18 * dt;
     }
 
-    // Transmit client cursor vectors to the host
+    // Transmit client cursor vectors to the host & perform smooth client interpolation
     if (Network.mode === 'CLIENT') {
       Network.sendClientData();
       Network.checkHostHeartbeat();
       this.effectManager.update(dt);
+
+      // Frame-rate independent sliding interpolation for client-side enemies
+      for (const zombie of this.enemies) {
+        if (zombie.targetX !== undefined && zombie.targetY !== undefined) {
+          const lerpFactor = 1.0 - Math.exp(-18 * dt); 
+          zombie.x += (zombie.targetX - zombie.x) * lerpFactor;
+          zombie.y += (zombie.targetY - zombie.y) * lerpFactor;
+        }
+        if (zombie.hitFlashTimer > 0) {
+          zombie.hitFlashTimer -= dt;
+        }
+        if (!zombie.timeAccumulator) zombie.timeAccumulator = 0;
+        zombie.timeAccumulator += dt;
+      }
+
+      // Smooth visual tick updates for client-side towers
+      for (const tower of this.grid.towers.values()) {
+        if (!tower.timeAccumulator) tower.timeAccumulator = 0;
+        tower.timeAccumulator += dt;
+        if (tower.fireCooldown > 0) {
+          tower.fireCooldown -= dt;
+        }
+        if (tower.recoilOffset > 0) {
+          tower.recoilOffset -= dt * 30;
+          if (tower.recoilOffset < 0) tower.recoilOffset = 0;
+        }
+      }
+
       return; // Clients bypass authoritative loop calculations
     }
 
