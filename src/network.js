@@ -384,7 +384,7 @@ export const Network = {
                     if (!this.game.skipVotes) this.game.skipVotes = new Set();
                     this.game.skipVotes.add(c.playerId);
                     
-                    const required = Math.ceil((this.conns.length + 1) / 2);
+                    const required = Math.ceil((this.conns.filter(conn => conn && conn.open).length + 1) / 2);
                     if (this.game.skipVotes.size >= required) {
                         this.game.skipVotes.clear();
                         this.game.skipWave();
@@ -426,6 +426,14 @@ export const Network = {
         });
     },
 
+    broadcastGameOver: function(finalWave) {
+        this.broadcastToAll({
+            type: 'GAME_OVER',
+            finalWave: finalWave,
+            isVictory: this.game ? this.game.state === 'victory' : false
+        });
+    },
+
     broadcastState: function() {
         // Intercept loops dynamically if they aren't configured yet
         this.interceptEffects();
@@ -444,6 +452,9 @@ export const Network = {
             gold: this.game.gold,
             wave: this.game.wave,
             waveInProgress: this.game.waveInProgress,
+            speedMultiplier: this.game.speedMultiplier, // Added: Synchronizes game speed
+            skipVotesCount: this.game.skipVotes ? this.game.skipVotes.size : 0, // Added: Synchronizes current skip votes
+            skipVotesRequired: Math.ceil((this.conns.filter(c => c && c.open).length + 1) / 2), // Added: Synchronizes total required skip votes
             playerCursors: window.playerCursors,
             playerWallets: this.game.playerWallets || {},
             
@@ -588,6 +599,10 @@ export const Network = {
                 this.game.lives = data.lives;
                 this.game.wave = data.wave;
                 this.game.waveInProgress = data.waveInProgress;
+                this.game.speedMultiplier = data.speedMultiplier !== undefined ? data.speedMultiplier : 1; // Added: Replicates game speed
+                this.game.skipVotesCount = data.skipVotesCount !== undefined ? data.skipVotesCount : 0; // Added: Replicates active skip vote count
+                this.game.skipVotesRequired = data.skipVotesRequired !== undefined ? data.skipVotesRequired : 1; // Added: Replicates skip vote requirements
+
                 window.playerCursors = data.playerCursors || {};
                 
                 if (data.playerWallets && data.playerWallets[window.myPlayerId] !== undefined) {
@@ -737,7 +752,21 @@ export const Network = {
 
                 // --- CRITICAL HUD RE-RENDER ON THE CLIENT-SIDE ---
                 if (this.game.ui) {
+                    this.game.ui.updateSpeedButton(this.game.speedMultiplier); // Added: Reflect speed changes in UI
                     this.game.ui.updateHUD(this.game.lives, this.game.gold, this.game.wave, this.game.maxWaves);
+                }
+            }
+            else if (data.type === 'GAME_OVER') { // Added: Handles authoritative game-over screens
+                if (this.game) {
+                    this.game.state = data.isVictory ? 'victory' : 'gameover';
+                    if (this.game.ui) {
+                        this.game.ui.showMatchSummaryCard(data.isVictory);
+                    }
+                    if (data.isVictory) {
+                        soundManager.playVictory();
+                    } else {
+                        soundManager.playDefeat();
+                    }
                 }
             }
         });

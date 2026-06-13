@@ -444,6 +444,7 @@ export class UI {
     }
 
     this.btnSpeed.addEventListener('click', () => {
+      if (Network.mode === 'CLIENT') return; // Host authority guard
       this.game.toggleSpeed();
     });
 
@@ -767,19 +768,32 @@ export class UI {
       }
     });
 
-    // Skip wave vote progression indicator
+    // Skip wave vote progression indicator (synchronizes host and client counters)
     if (this.btnSkipWave) {
       const showSkip = this.game.waveInProgress && this.game.spawnQueue.length === 0 && this.game.wave < this.game.maxWaves;
       if (showSkip) {
         this.btnSkipWave.classList.remove('hidden');
-        if (this.game.skipVotes && this.game.skipVotes.size > 0) {
-          const required = Math.ceil((Network.conns.filter(c => c && c.open).length + 1) / 2);
-          this.btnSkipWave.textContent = `SKIP VOTE (${this.game.skipVotes.size}/${required})`;
+        const votesCount = Network.mode === 'CLIENT' ? (this.game.skipVotesCount || 0) : (this.game.skipVotes ? this.game.skipVotes.size : 0);
+        const votesReq = Network.mode === 'CLIENT' ? (this.game.skipVotesRequired || 1) : Math.ceil((Network.conns.filter(c => c && c.open).length + 1) / 2);
+        
+        if (votesCount > 0) {
+          this.btnSkipWave.textContent = `SKIP VOTE (${votesCount}/${votesReq})`;
         } else {
           this.btnSkipWave.textContent = "SKIP WAVE";
         }
       } else {
         this.btnSkipWave.classList.add('hidden');
+      }
+    }
+
+    // Restrict Speed Modifier adjustments on guest screens
+    if (this.btnSpeed) {
+      if (Network.mode === 'CLIENT') {
+        this.btnSpeed.disabled = true;
+        this.btnSpeed.style.opacity = '0.6';
+      } else {
+        this.btnSpeed.disabled = false;
+        this.btnSpeed.style.opacity = '1.0';
       }
     }
 
@@ -911,9 +925,15 @@ export class UI {
       this.btnNextWave.disabled = true;
       this.btnNextWave.style.opacity = '0.5';
     } else {
-      this.btnNextWave.textContent = "START WAVE";
-      this.btnNextWave.disabled = false;
-      this.btnNextWave.style.opacity = '1.0';
+      if (Network.mode === 'CLIENT') {
+        this.btnNextWave.textContent = "WAITING FOR HOST";
+        this.btnNextWave.disabled = true;
+        this.btnNextWave.style.opacity = '0.6';
+      } else {
+        this.btnNextWave.textContent = "START WAVE";
+        this.btnNextWave.disabled = false;
+        this.btnNextWave.style.opacity = '1.0';
+      }
     }
   }
 
@@ -941,15 +961,27 @@ export class UI {
   showAutoCountdown(seconds) {
     if (!this.btnNextWave) return;
     let remaining = seconds;
-    this.btnNextWave.textContent = `NEXT WAVE IN ${remaining}s...`;
-    this.btnNextWave.disabled = true;
-    this.btnNextWave.style.opacity = '0.7';
+    
+    if (Network.mode === 'CLIENT') {
+      this.btnNextWave.textContent = "WAITING FOR HOST";
+      this.btnNextWave.disabled = true;
+      this.btnNextWave.style.opacity = '0.6';
+    } else {
+      this.btnNextWave.textContent = `NEXT WAVE IN ${remaining}s...`;
+      this.btnNextWave.disabled = true;
+      this.btnNextWave.style.opacity = '0.7';
+    }
+
     const interval = setInterval(() => {
       remaining--;
       if (remaining <= 0) {
         clearInterval(interval);
       } else {
-        this.btnNextWave.textContent = `NEXT WAVE IN ${remaining}s...`;
+        if (Network.mode === 'CLIENT') {
+          this.btnNextWave.textContent = "WAITING FOR HOST";
+        } else {
+          this.btnNextWave.textContent = `NEXT WAVE IN ${remaining}s...`;
+        }
       }
     }, 1000);
   }
