@@ -685,6 +685,7 @@ body {
   text-align: left;
   transition: all 0.1s ease;
   box-shadow: 0 3px 0 var(--border-color);
+  flex-shrink: 0 !important; /* Ensure buttons never squish vertically */
 }
 
 .placement-btn:hover {
@@ -1623,7 +1624,7 @@ body {
     overflow-y: auto !important; /* Forces the entire right side panel to scroll cleanly */
     touch-action: pan-y !important; /* Explicitly tell browser we only pan-y inside here */
     -webkit-overflow-scrolling: touch !important;
-    padding: 8px !important;
+    padding: 8px 8px 80px 8px !important; /* Top, Right, Bottom, Left with generous bottom safety padding */
     gap: 8px !important;
   }
 
@@ -1632,14 +1633,17 @@ body {
   }
 
   #equipped-agents-list {
+    display: flex !important;
     max-height: none !important; /* Remove separate scrollbox constraints */
     overflow-y: visible !important; /* Delegate all scrolling completely to parent sidebar container */
-    flex-direction: column;
-    flex-wrap: nowrap;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    flex-shrink: 0 !important;
   }
 
   .placement-btn {
     width: 100%;
     flex-direction: row;
+    flex-shrink: 0 !important; /* Ensure buttons never squish vertically */
   }
 }
