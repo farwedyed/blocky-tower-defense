@@ -186,6 +186,7 @@ body {
   flex-direction: column;
   gap: 10px;
   width: 220px;
+  flex-shrink: 0;
 }
 
 .tab-btn {
@@ -419,6 +420,7 @@ body {
   cursor: pointer;
   box-shadow: 0 3px 0 var(--border-color);
   transition: all 0.15s ease;
+  position: relative;
 }
 
 .loadout-card:hover {
@@ -627,6 +629,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .placement-btn .info {
@@ -829,287 +832,7 @@ body {
   box-shadow: 0 4px 0 var(--primary-blue-dark), 0 4px 0 var(--border-color);
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   COMPONENT 2: MOBILE TOUCH & RESPONSIVE LAYOUT
-   Supports portrait phones, tablets, and small laptop screens
-═══════════════════════════════════════════════════════════════ */
-
-/* ── Shared: touch-friendly tap sizing ──────────────────────── */
-@media (pointer: coarse) {
-  .btn,
-  .placement-btn,
-  .tab-btn,
-  .map-card,
-  .shop-card,
-  .loadout-card {
-    min-height: 44px;
-    touch-action: manipulation;
-  }
-  canvas {
-    -webkit-tap-highlight-color: transparent;
-    touch-action: none;
-  }
-}
-
-/* ── Tablet / Small laptop  ≤ 1024px ───────────────────────── */
-@media (max-width: 1024px) {
-  #app-container {
-    width: 100vw;
-    height: 100vh;
-    max-width: none;
-    max-height: none;
-    border-radius: 0;
-    border: none;
-    box-shadow: none;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  #game-view {
-    flex-direction: column;
-  }
-
-  #game-wrapper {
-    width: 100%;
-    flex: none;
-  }
-
-  #game-canvas {
-    max-width: 100%;
-    max-height: calc(100vh - 180px);
-    width: auto;
-    height: auto;
-    object-fit: contain;
-    flex-shrink: 1;
-    display: block;
-    aspect-ratio: 4 / 3;
-  }
-
-  #game-sidebar {
-    width: 100%;
-    min-width: unset;
-    max-width: none;
-    height: auto;
-    border-top: 3px solid var(--border-color);
-    border-left: none;
-    border-radius: 0;
-    flex-direction: row;
-    flex-wrap: wrap;
-    padding: 8px;
-    gap: 6px;
-    overflow-y: auto;
-  }
-
-  #game-sidebar > header {
-    width: 100%;
-    flex-direction: row;
-    justify-content: space-between;
-    padding: 4px 8px;
-  }
-
-  #game-hud {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 6px;
-    width: 100%;
-  }
-
-  .hud-box {
-    flex: 1;
-    min-width: 90px;
-    padding: 4px 8px;
-    font-size: 0.78rem;
-  }
-
-  #game-controls {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 5px;
-    width: 100%;
-    padding: 4px 0;
-  }
-
-  #game-controls .btn {
-    flex: 1;
-    min-width: 80px;
-    font-size: 0.72rem;
-    padding: 6px 8px;
-  }
-
-  #placement-shop {
-    width: 100%;
-  }
-
-  #placement-shop h3 {
-    font-size: 0.82rem;
-    margin-bottom: 4px;
-  }
-
-  #equipped-agents-list {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 5px;
-    max-height: 150px;
-    overflow-y: auto;
-    padding-bottom: 4px;
-  }
-
-  .placement-btn {
-    flex: 0 0 auto;
-    flex-direction: column;
-    width: 68px;
-    padding: 6px 4px;
-    gap: 4px;
-  }
-
-  .placement-btn .icon canvas {
-    width: 40px !important;
-    height: 40px !important;
-  }
-
-  .placement-btn .info .name {
-    font-size: 0.62rem;
-  }
-
-  .placement-btn .info .cost {
-    font-size: 0.58rem;
-  }
-
-  #selection-panel {
-    width: 100%;
-    padding: 6px 8px;
-  }
-}
-
-/* ── Phone portrait  ≤ 600px ─────────────────────────────────── */
-@media (max-width: 600px) {
-  body {
-    overflow: auto;
-    align-items: flex-start;
-  }
-
-  #app-container {
-    height: auto;
-    min-height: 100vh;
-  }
-
-  #lobby-view {
-    padding: 10px;
-    gap: 12px;
-  }
-
-  #lobby-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 10px;
-  }
-
-  .blocky-title {
-    font-size: 1.6rem;
-  }
-
-  .player-meta-box {
-    width: 100%;
-    justify-content: space-between;
-    gap: 6px;
-  }
-
-  #lobby-tabs {
-    gap: 4px;
-  }
-
-  .tab-btn {
-    font-size: 0.7rem;
-    padding: 6px 10px;
-  }
-
-  .map-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-
-  .map-preview-canvas {
-    width: 90px !important;
-    height: 68px !important;
-  }
-
-  .shop-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-
-  .shop-card {
-    padding: 8px;
-  }
-
-  .agent-preview-canvas {
-    width: 48px !important;
-    height: 48px !important;
-  }
-
-  #game-canvas {
-    width: 100vw;
-    height: auto;
-  }
-
-  #game-sidebar {
-    padding: 6px;
-    gap: 4px;
-  }
-
-  .hud-box {
-    font-size: 0.7rem;
-    padding: 3px 6px;
-  }
-
-  #game-controls .btn {
-    font-size: 0.66rem;
-    padding: 5px 6px;
-  }
-
-  .placement-btn {
-    width: 60px;
-  }
-
-  .crate-opening-container {
-    width: 95vw;
-    height: auto;
-  }
-
-  #crate-opening-canvas {
-    width: 95vw;
-    height: auto;
-  }
-
-  #crate-reveal-card {
-    width: 80vw;
-  }
-}
-
-/* ── Landscape phone  ≤ 812px + short height ────────────────── */
-@media (max-width: 812px) and (orientation: landscape) {
-  #game-sidebar {
-    max-height: 38vh;
-    overflow-y: auto;
-  }
-
-  #game-canvas {
-    max-height: 62vh;
-    width: auto;
-  }
-
-  #equipped-agents-list {
-    max-height: 90px;
-  }
-}
-
-
-
-
+/* Icons styling helper */
 .tab-icon { width: 22px; height: 22px; vertical-align: middle; margin-right: 8px; }
 .header-icon { width: 24px; height: 24px; vertical-align: middle; margin-right: 4px; }
 .title-icon { width: 26px; height: 26px; vertical-align: middle; margin-right: 6px; }
@@ -1132,3 +855,691 @@ body {
   }
 }
 
+#btn-toggle-sidebar {
+  display: none;
+}
+
+/* Stunning gold glow animation */
+@keyframes pulseTutorialHighlight {
+  0% {
+    border-color: #f1c40f !important;
+    box-shadow: 0 0 10px #f1c40f, inset 0 0 5px rgba(241, 196, 15, 0.5) !important;
+  }
+  50% {
+    border-color: #f39c12 !important;
+    box-shadow: 0 0 25px #f1c40f, inset 0 0 12px rgba(241, 196, 15, 0.8) !important;
+  }
+  100% {
+    border-color: #f1c40f !important;
+    box-shadow: 0 0 10px #f1c40f, inset 0 0 5px rgba(241, 196, 15, 0.5) !important;
+  }
+}
+
+.tut-highlight {
+  animation: pulseTutorialHighlight 1.4s infinite !important;
+  border: 3px solid #f1c40f !important;
+  position: relative;
+  z-index: 9999 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   COMPREHENSIVE RESPONSIVE AND COLLAPSIBLE MOBILE LAYOUTS
+═══════════════════════════════════════════════════════════════ */
+
+/* Touch optimization global rule */
+@media (pointer: coarse) {
+  .btn,
+  .placement-btn,
+  .tab-btn,
+  .map-card,
+  .shop-card,
+  .loadout-card {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+  canvas {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+  }
+}
+
+/* ── Mobile & Compact Screens (Width <= 900px OR Height <= 600px) ── */
+@media (max-width: 900px), (max-height: 600px) {
+  #app-container {
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    overflow: hidden;
+  }
+
+  /* Compact, Transparent Stats Top-Bar (Brawl Stars & Clash Royale Style) */
+  #lobby-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    padding: 4px 12px;
+    background: rgba(0, 0, 0, 0.45); /* Dark translucent top bar */
+    border: none;
+    border-bottom: 2px solid var(--border-color);
+    border-radius: 0;
+    box-shadow: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 1000;
+  }
+
+  /* Hide massive titles and taglines completely on mobile, Clash Royale style */
+  .logo-area {
+    display: none !important;
+  }
+
+  /* Float profile on left, meta stats on right */
+  #cg-profile-widget {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    font-size: 0.8rem;
+    color: #fff !important;
+    gap: 6px;
+  }
+  
+  #cg-profile-widget #cg-username {
+    color: #fff !important;
+    font-size: 0.75rem;
+    font-weight: 800;
+  }
+
+  #cg-avatar {
+    width: 26px !important;
+    height: 26px !important;
+    border-color: #fff !important;
+  }
+
+  #btn-cg-auth {
+    font-size: 0.6rem !important;
+    padding: 1px 4px !important;
+  }
+
+  .player-meta-box {
+    margin-top: 0 !important;
+    width: auto !important;
+    gap: 8px !important;
+  }
+
+  .meta-item .label {
+    display: none !important; /* Hide label text like "LEVEL" or "COINS" to save space */
+  }
+
+  .badge {
+    font-size: 0.8rem !important;
+    padding: 2px 8px !important;
+    border-radius: 6px !important;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    box-shadow: none;
+  }
+
+  .xp-item {
+    width: 100px !important;
+  }
+
+  .xp-bar-container {
+    height: 18px !important;
+    border-radius: 4px !important;
+  }
+
+  .xp-text {
+    font-size: 0.6rem !important;
+  }
+
+  /* Content area holds Panels on top, Tabs on bottom */
+  #lobby-content {
+    display: flex;
+    flex-direction: column; /* Tabs at top, panels in center middle */
+    width: 100%;
+    height: calc(100% - 48px); /* Total height minus Top Bar (48px) */
+    position: absolute;
+    top: 48px;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    gap: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden;
+  }
+
+  /* Top Navigation Tabs Bar (Clash Royale Style) */
+  #lobby-tabs {
+    width: 100%;
+    height: 48px;
+    flex-direction: row !important;
+    display: flex !important;
+    background: #fff;
+    border-top: none !important;
+    border-bottom: 3px solid var(--border-color);
+    box-shadow: 0 3px 0 var(--border-color);
+    z-index: 1000;
+    gap: 0 !important;
+  }
+
+  .tab-btn {
+    flex: 1;
+    height: 100%;
+    border: none !important;
+    border-radius: 0 !important;
+    background: #f8fafc;
+    color: var(--text-dark);
+    font-size: 0.75rem !important;
+    font-weight: 900;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: none !important;
+    border-right: 1.5px solid var(--border-color) !important;
+    text-transform: uppercase;
+  }
+
+  .tab-btn:last-child {
+    border-right: none !important;
+  }
+
+  .tab-btn.active {
+    background: var(--primary-blue) !important;
+    color: #fff !important;
+    transform: none !important;
+  }
+
+  .tab-icon {
+    display: none !important; /* Hide tab icons entirely to secure text spacing layout like your sketch */
+  }
+
+  /* Expandable panels situated perfectly in the center viewport */
+  #lobby-panels {
+    flex: 1; /* Automatically expands to fill center area! */
+    width: 100%;
+    border: none !important;
+    border-radius: 0 !important;
+    background: #e4e9f0;
+    padding: 10px;
+    overflow-y: auto; /* Fully scrollable center maps area! */
+    box-shadow: none !important;
+    position: relative;
+  }
+
+  .lobby-panel h2 {
+    font-size: 1.15rem !important;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    text-align: center;
+  }
+
+  /* Custom Double Column Grid to match your exact Sketch 1 and 2 shapes - ONLY WHEN ACTIVE */
+  #panel-maps.active {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto auto;
+    gap: 10px !important;
+  }
+
+  #panel-maps.active h2 {
+    grid-column: 1 / span 2;
+    grid-row: 1;
+  }
+
+  /* Horizontal Swipe-able Map Deck (Brawl Stars & Bloons TD 6 Style) */
+  #panel-maps.active .map-grid:not([style*="display: none"]) {
+    grid-column: 1 / span 2;
+    grid-row: 2;
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    gap: 10px !important;
+    padding: 8px 4px !important;
+    white-space: nowrap !important;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    height: 120px !important; /* Extremely small map cards deck row! */
+    border-bottom: 2px dashed #bdc3c7;
+    margin-bottom: 5px;
+  }
+
+  .map-card {
+    flex: 0 0 100px !important; /* Very small cards to preserve landscape screen height! */
+    height: 105px !important;
+    scroll-snap-align: start;
+    padding: 4px !important;
+    background: #fff;
+    border: 2px solid var(--border-color) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 2px 0 var(--border-color) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    white-space: normal !important; /* Reset inherited nowrap property to allow labels */
+  }
+
+  .map-preview-canvas {
+    width: 85px !important;
+    height: 64px !important; /* Compact preview canvas height! */
+    border-radius: 6px;
+    display: block;
+    flex-shrink: 0 !important;
+  }
+
+  .map-info .name {
+    font-size: 0.65rem !important;
+    font-weight: 900;
+  }
+
+  .map-info .difficulty {
+    display: none !important; /* Hide redundant difficulty text to fit card nicely */
+  }
+
+  /* Left Deploy Button - Hidden unless active in map select state */
+  #btn-deploy:not([style*="display: none"]) {
+    grid-column: 1;
+    grid-row: 3;
+    font-size: 0.9rem !important;
+    padding: 8px !important;
+    margin-top: 0 !important;
+    height: 44px;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    background: #fff !important;
+    color: #27ae60 !important; /* Bold green outlined from Sketch 1! */
+    border: 3px solid #27ae60 !important;
+    box-shadow: 0 3px 0 #219653 !important;
+    border-radius: 8px !important;
+  }
+
+  /* Right Hardcore switch Toggle box - Hidden unless active in map select state */
+  #hardcore-toggle-container:not([style*="display: none"]) {
+    grid-column: 2;
+    grid-row: 3;
+    background: #fff !important;
+    border: 3px solid #e74c3c !important; /* Bold red outlined from Sketch 1! */
+    box-shadow: 0 3px 0 #c0392b !important;
+    border-radius: 8px !important;
+    padding: 4px 8px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    height: 44px;
+  }
+
+  #hardcore-toggle-container label {
+    color: #e74c3c !important;
+    font-size: 0.65rem !important;
+    font-weight: 900 !important;
+    text-transform: uppercase;
+    text-align: center;
+    margin: 0 !important;
+    line-height: 1.1;
+  }
+
+  #hardcore-toggle {
+    width: 16px !important;
+    height: 16px !important;
+    cursor: pointer;
+  }
+
+  /* Double Column Row for bottom boxes - Hidden unless active in map select state */
+  #panel-maps div[style*="display: flex; gap: 20px;"]:not([style*="display: none"]) {
+    grid-column: 1 / span 2;
+    grid-row: 4;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+    margin-top: 5px !important;
+  }
+
+  #leaderboard-box, #quests-box {
+    width: 100% !important;
+    flex: none !important;
+    height: 110px !important; /* Compact scroll box height! */
+    overflow-y: auto !important;
+    padding: 6px !important;
+    border-radius: 8px !important;
+    border-width: 2px !important;
+  }
+
+  #leaderboard-box h3, #quests-box h3 {
+    font-size: 0.7rem !important;
+    padding-bottom: 2px !important;
+    margin-bottom: 4px !important;
+  }
+
+  #leaderboard-list, #quests-list {
+    font-size: 0.65rem !important;
+  }
+
+  /* Splash Selection Mode Menu (Sketch 2 Play Solo & Coop Party) - Centered completely */
+  #lobby-splash-container:not([style*="display: none"]) {
+    grid-column: 1 / span 2 !important; /* Forces centered double-grid span to center Sketch 2 */
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 10px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 100%;
+    gap: 12px;
+  }
+
+  #lobby-splash-container h3, #lobby-splash-container p {
+    display: none !important; /* Hide long titles to follow Sketch 2 mockup perfectly */
+  }
+
+  #lobby-splash-container div {
+    display: flex;
+    flex-direction: row !important;
+    gap: 12px !important;
+    width: 100%;
+    max-width: 360px;
+    justify-content: center;
+  }
+
+  #btn-select-solo, #btn-select-coop {
+    flex: 1;
+    font-size: 0.9rem !important;
+    padding: 10px !important;
+    border: 3px solid var(--border-color) !important;
+    box-shadow: 0 4px 0 var(--border-color) !important;
+    border-radius: 8px !important;
+    background: #fff !important;
+    color: #111 !important;
+    text-transform: uppercase;
+  }
+
+  /* Combined Specificity Selector rules to force yellow pulsing glows on startup */
+  #btn-select-solo.tut-highlight, #btn-select-coop.tut-highlight {
+    border: 3px solid #f1c40f !important;
+    box-shadow: 0 0 18px #f1c40f, inset 0 0 8px rgba(241, 196, 15, 0.4) !important;
+    animation: pulseTutorialHighlight 1.4s infinite !important;
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  /* Auto-Flowing Sized Grids for Shop & Loadout to prevent stretching */
+  .shop-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .shop-card {
+    padding: 8px !important;
+    max-width: 130px !important;
+    margin: 0 auto !important;
+  }
+
+  .loadout-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .loadout-card {
+    max-width: 110px !important;
+    margin: 0 auto !important;
+    padding: 6px !important;
+  }
+
+  /* Crates panel */
+  #panel-crates .shop-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+  }
+
+  .crate-icon {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .crate-unlocks {
+    font-size: 0.65rem !important;
+  }
+
+  /* Game View Collapsible Drawer Layout */
+  #game-view {
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #game-wrapper {
+    flex: 1;
+    width: 100%;
+    min-height: 45vh;
+  }
+
+  #game-canvas {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    aspect-ratio: 4 / 3;
+    border-radius: 0;
+    border: none;
+  }
+
+  /* Absolute Sliding Sidebar Sheet Drawer */
+  #game-sidebar {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 52vh; /* Smoothly occupies bottom half of screen space */
+    border-left: none;
+    border-top: 4px solid var(--border-color);
+    border-radius: 14px 14px 0 0;
+    background: #eef2f7;
+    z-index: 999;
+    padding: 10px;
+    gap: 10px;
+    box-shadow: 0 -8px 25px rgba(0,0,0,0.35);
+    transform: translateY(100%); /* Hidden by default */
+    transition: transform 0.3s cubic-bezier(0.1, 0.9, 0.2, 1);
+  }
+
+  #game-sidebar.sidebar-open {
+    transform: translateY(0); /* Slide-up animation activation */
+  }
+
+  /* Toggle Sidebar Button */
+  #btn-toggle-sidebar {
+    display: block;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1000;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    background: var(--primary-blue);
+    color: #fff;
+    box-shadow: 0 3px 0 var(--primary-blue-dark), 0 3px 0 var(--border-color);
+  }
+
+  /* Compressed Game Stats HUD */
+  #game-hud {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .hud-box {
+    padding: 4px;
+  }
+
+  .hud-box .value {
+    font-size: 0.95rem;
+  }
+
+  .hud-box .label {
+    font-size: 0.6rem;
+  }
+
+  #game-controls {
+    gap: 4px;
+  }
+
+  .control-row {
+    gap: 4px;
+  }
+
+  .control-row .btn {
+    font-size: 0.75rem;
+    padding: 8px;
+  }
+
+  /* Compact Horizontal Flow Placements list inside Drawer */
+  #equipped-agents-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    overflow-y: visible;
+  }
+
+  .placement-btn {
+    flex: 1 1 calc(33% - 6px);
+    padding: 6px;
+    gap: 6px;
+  }
+
+  .placement-btn .icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .placement-btn .icon canvas {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .placement-btn .info .name {
+    font-size: 0.75rem;
+  }
+
+  .placement-btn .info .cost {
+    font-size: 0.7rem;
+  }
+
+  /* Upgrade Options modifications */
+  #selection-panel {
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .targeting-container {
+    padding: 3px 6px;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 6px;
+  }
+
+  .action-buttons .btn {
+    font-size: 0.8rem;
+    padding: 8px;
+  }
+
+  /* Compact yellow bordered tutorial box centered at the bottom of Sketch 2 */
+  #tutorial-hint-box {
+    position: fixed !important;
+    bottom: 12px !important; /* Renders centered on bottom as drawn in Sketch 2 */
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    padding: 8px 12px !important;
+    width: 90vw !important;
+    max-width: 440px !important;
+    border: 3px solid #f1c40f !important;
+    border-radius: 8px !important;
+    background: #fff !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+    display: flex !important;
+    gap: 8px !important;
+    z-index: 10000;
+  }
+
+  #tutorial-hint-box div[style*="font-size:2rem"] {
+    font-size: 1.3rem !important;
+  }
+
+  #tutorial-hint-box div[style*="font-size:1rem"] {
+    font-size: 0.8rem !important;
+    color: #d4ac0d !important; /* Contrast text coloring for the white bg */
+  }
+
+  #tutorial-hint-box div[style*="font-size:0.85rem"] {
+    font-size: 0.7rem !important;
+    color: #111 !important;
+    line-height: 1.25 !important;
+  }
+
+  #btn-dismiss-tutorial {
+    margin-top: 4px !important;
+    font-size: 0.68rem !important;
+    padding: 3px 8px !important;
+    background: #f1c40f !important;
+    color: #1a1a2e !important;
+  }
+}
+
+/* ── Height Constraint Specific rules (Small phone landscape) ── */
+@media (max-height: 480px) and (orientation: landscape) {
+  #game-view {
+    flex-direction: row;
+  }
+
+  #game-wrapper {
+    flex: 1.5;
+    height: 100%;
+  }
+
+  #game-sidebar {
+    width: 270px;
+    height: 100%;
+    border-top: none;
+    border-left: 4px solid var(--border-color);
+    transform: none !important; /* Forces solid landscape viewport side-panels */
+    position: relative;
+    box-shadow: none;
+  }
+
+  #btn-toggle-sidebar {
+    display: none !important; /* Sidebar remains visible naturally on horizontal viewports */
+  }
+
+  #equipped-agents-list {
+    max-height: 110px;
+    overflow-y: auto;
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+
+  .placement-btn {
+    width: 100%;
+    flex-direction: row;
+  }
+}

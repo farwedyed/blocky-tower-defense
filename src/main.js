@@ -8,6 +8,7 @@ import { Scout, Minigunner, Commander, DJUnit, Pyromancer, Farm, Gladiator, Sold
 import { soundManager } from './sound.js';
 import { uploadRecord, fetchTopRecords } from './firebase.js';
 import { Network } from './network.js';
+import { CrazyGamesManager } from './crazygames.js';
 
 class Game {
   constructor() {
@@ -58,6 +59,7 @@ class Game {
     this.state = 'lobby'; // 'lobby', 'playing', 'gameover', 'victory'
     this.selectedMap = 'grassland';
     this.waveInProgress = false;
+    this.hasRevivedThisMatch = false; // Limit players to 1 rewarded ad revive per match
 
     // Cooperative multiplayer wallets & skip votes
     this.playerWallets = {}; // key: player slot ('p1'...'p8'), value: cash balance
@@ -114,8 +116,48 @@ class Game {
       this.ui.showTutorialHint(0);
     }
 
+    // Initialize CrazyGames SDK Integration
+    CrazyGamesManager.init().then(() => {
+      CrazyGamesManager.onRoomJoinReceived((params) => {
+        if (params && params.roomId) {
+          this.handleCrazyGamesInvite(params.roomId);
+        }
+      });
+    });
+
     // Run core animation frame
     requestAnimationFrame((t) => this.loop(t));
+  }
+
+  /**
+   * Seamlessly redirects players into direct co-op lobbies via incoming invite parameters.
+   * @param {string} roomId 
+   */
+  handleCrazyGamesInvite(roomId) {
+    console.log('[CrazyGames] Executing automated squad connection sequence for:', roomId);
+    if (this.state === 'playing') {
+      this.quitToLobby();
+    }
+
+    // Switch to Map Selector / Setup View
+    const mapsTab = document.querySelector('.tab-btn[data-target="panel-maps"]');
+    if (mapsTab) mapsTab.click();
+
+    // Select CO-OP Party option
+    const btnSelectCoop = document.getElementById('btn-select-coop');
+    if (btnSelectCoop) btnSelectCoop.click();
+
+    // Insert room code into joining input field
+    const inputJoinCode = document.getElementById('input-join-code');
+    if (inputJoinCode) {
+      inputJoinCode.value = roomId.toUpperCase();
+    }
+
+    // Connect to room after visual states settle
+    setTimeout(() => {
+      const btnJoinCoop = document.getElementById('btn-join-coop');
+      if (btnJoinCoop) btnJoinCoop.click();
+    }, 400);
   }
 
   loadStatsFromStorage() {
@@ -275,7 +317,7 @@ class Game {
       { runners: 12, quicks: 12, slows: 8, hiddens: 10, leads: 2, shadows: 0, goliaths: 3, templars: 0, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.65 }, // Wave 12 Leads
       { runners: 15, quicks: 15, slows: 12, hiddens: 12, leads: 6, shadows: 0, goliaths: 4, templars: 0, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.6 },
       { runners: 10, quicks: 10, slows: 10, hiddens: 15, leads: 10, shadows: 0, goliaths: 5, templars: 0, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.55 },
-      { runners: 20, quicks: 20, slows: 15, hiddens: 15, leads: 12, shadows: 0, goliaths: 6, templars: 1, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.5 }, // Wave 15 Templar
+      { runners: 20, quicks: 20, slows: 15, hiddens: 15, leads: 12, shadows: 0, goliaths: 6, templars: 1, diggers: 0, titans: 1, guardians: 0, kings: 0, reavers: 0, rate: 0.5 }, // Wave 15 Templar
 
       // 16-20 (Armored swarms, Molten Titan)
       { runners: 15, quicks: 15, slows: 12, hiddens: 18, leads: 15, shadows: 0, goliaths: 6, templars: 2, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.5 },
@@ -286,7 +328,7 @@ class Game {
 
       // 21-25 (Shadow Swarms, Heavy Armors)
       { runners: 15, quicks: 15, slows: 15, hiddens: 20, leads: 20, shadows: 10, goliaths: 8, templars: 5, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.4 },
-      { runners: 20, quicks: 20, slows: 18, hiddens: 25, leads: 25, shadows: 12, goliaths: 10, templars: 6, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.38 },
+      { runners: 20, quicks: 20, slows: 18, hiddens: 25, leads: 25, shadows: 12, goliaths: 10, templars: 6, diggers: 0, titans: 0, goldReward: 10, rate: 0.38 },
       { runners: 25, quicks: 25, slows: 20, hiddens: 30, leads: 30, shadows: 15, goliaths: 12, templars: 8, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.35 },
       { runners: 30, quicks: 30, slows: 25, hiddens: 35, leads: 35, shadows: 18, goliaths: 15, templars: 10, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.32 },
       { runners: 25, quicks: 25, slows: 25, hiddens: 25, leads: 25, shadows: 15, goliaths: 12, templars: 12, diggers: 0, titans: 2, guardians: 0, kings: 0, reavers: 0, rate: 0.35 }, // Wave 25 Duel Titans
@@ -330,6 +372,12 @@ class Game {
     if (this.state !== 'playing') return;
     if (this.showMapDirections) {
       this.showMapDirections = false;
+      
+      // Tutorial hook: Upon the first canvas tap (which clears directions overlay), launch Step 1!
+      if (!this.tutorialCompleted && this.tutorialStep === 0) {
+        this.tutorialStep = 1;
+        this.ui.showTutorialHint(1);
+      }
       return;
     }
     const col = this.mouseGrid.col;
@@ -426,11 +474,29 @@ class Game {
 
   setSelectedShopTower(type) {
     this.selectedShopTower = type;
+    
+    // Clear sidebar pointing arrow when Scout is chosen in Step 1
+    if (!this.tutorialCompleted && this.tutorialStep === 1 && type === 'scout') {
+      this.ui.hidePointer();
+    }
   }
 
   setSelectedPlacedTower(agent) {
     this.selectedPlacedTower = agent;
     this.ui.updateSelectionPanel(agent);
+
+    // Tutorial hook: if they select the scout on Step 2, show pointer to upgrade button
+    if (!this.tutorialCompleted && this.tutorialStep === 2) {
+      if (agent && agent.gridX === 2 && agent.gridY === 1) {
+        const upgradeBtn = document.getElementById('btn-upgrade');
+        if (upgradeBtn && this.ui) {
+          this.ui.showPointerAt(upgradeBtn, 'left');
+          upgradeBtn.classList.add('tut-highlight');
+        }
+      } else {
+        if (this.ui) this.ui.hidePointer();
+      }
+    }
   }
 
   buyAgentFromShop(type) {
@@ -550,6 +616,7 @@ class Game {
     this.gold = this.isHardcore ? 250 : 400;
     this.wave = 0;
     this.waveInProgress = false;
+    this.hasRevivedThisMatch = false; // Reset revive usage for the new game
     this.speedMultiplier = 1;
     this.enemies = [];
     this.bullets = [];
@@ -560,7 +627,13 @@ class Game {
     this.grid.clear();
     this.effectManager.clear();
     this.setSelectedPlacedTower(null);
-    this.selectedShopTower = this.equippedAgents[0];
+
+    // Initial empty shop selection: Force player to tap sidebar Scout button
+    if (!this.tutorialCompleted) {
+      this.selectedShopTower = null;
+    } else {
+      this.selectedShopTower = this.equippedAgents[0];
+    }
 
     // Initialize individual wallets
     this.playerWallets = {};
@@ -594,22 +667,44 @@ class Game {
     this.ui.updateWaveButton(false);
     this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
 
-    if (!this.tutorialCompleted && this.tutorialStep === 0) {
-      this.tutorialStep = 1;
-      this.ui.showTutorialHint(1);
+    // Deployment tutorial: Wait for initial tap instead of showing immediately
+    if (!this.tutorialCompleted) {
+      this.tutorialStep = 0;
     }
   }
 
   quitToLobby() {
-    this.state = 'lobby';
-    this.ui.showLobbyLayout();
-    this.ui.updateLobbyMeta(this.playerLevel, this.playerXp, this.playerCoins);
-    this.ui.renderDailyQuests();
-    this.ui.renderLeaderboard(this.selectedMap);
+    // Request a CrazyGames midroll ad break when returning to lobby
+    CrazyGamesManager.requestMidgameAd(() => {
+      this.state = 'lobby';
+      this.ui.showLobbyLayout();
+      this.ui.updateLobbyMeta(this.playerLevel, this.playerXp, this.playerCoins);
+      this.ui.renderDailyQuests();
+      this.ui.renderLeaderboard(this.selectedMap);
 
-    if (!this.tutorialCompleted && this.tutorialStep === 0) {
-      this.ui.showTutorialHint(0);
-    }
+      if (!this.tutorialCompleted && this.tutorialStep === 0) {
+        this.ui.showTutorialHint(0);
+      }
+    });
+  }
+
+  /**
+   * Action trigger that revives the player with 50 Lives upon watching a rewarded video ad.
+   */
+  revivePlayer() {
+    this.state = 'playing';
+    this.lives = 50; // Restore half health
+    this.hasRevivedThisMatch = true;
+    this.waveInProgress = false; // Allow players to reform defense strategy
+
+    // Notify performance tracker
+    CrazyGamesManager.gameplayStart();
+
+    this.ui.updateWaveButton(false);
+    this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
+    
+    this.effectManager.spawnText(this.canvas.width / 2, this.canvas.height / 2, "REVIVED!", '#2ecc71');
+    this.effectManager.spawnPlacementSparks(this.canvas.width / 2, this.canvas.height / 2, 80);
   }
 
   getTowerCost(type) {
@@ -635,6 +730,14 @@ class Game {
   }
 
   placeShopAgent(col, row, ownerId = 'p1') {
+    // Restrict placement coordinates to target grid during onboarding phase
+    if (!this.tutorialCompleted && this.tutorialStep === 1) {
+      if (col !== 2 || row !== 1) {
+        this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "PLACE ON THE HIGHLIGHTED TILE", '#f1c40f');
+        return;
+      }
+    }
+
     let currentPlacedOfTypeCount = 0;
     for (const t of this.grid.towers.values()) {
       if (t.type === this.selectedShopTower) {
@@ -712,6 +815,12 @@ class Game {
         this.questProgress.cashSpent += cost;
         this.checkQuestCompletion();
 
+        // Advance onboarding state on placement
+        if (!this.tutorialCompleted && this.tutorialStep === 1) {
+          this.tutorialStep = 1.5;
+          this.ui.showTutorialHint(1.5);
+        }
+
         this.effectManager.spawnPlacementSparks(newAgent.x, newAgent.y, size);
         this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
       }
@@ -739,6 +848,7 @@ class Game {
         this.ui.updateSelectionPanel(this.selectedPlacedTower);
         this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
 
+        // Terminate tutorial upon completing first active upgrade
         if (!this.tutorialCompleted && this.tutorialStep === 2) {
           this.tutorialStep = 3;
           this.tutorialCompleted = true;
@@ -848,6 +958,14 @@ class Game {
     this.spawnTimer = 0;
 
     this.effectManager.spawnText(400, 300, `WAVE ${this.wave}`, '#f1c40f');
+
+    // Tutorial hook: if they start the wave on Step 1.5, progress to Step 2
+    if (!this.tutorialCompleted && this.tutorialStep === 1.5) {
+      this.tutorialStep = 2;
+      setTimeout(() => {
+        this.ui.showTutorialHint(2);
+      }, 600);
+    }
   }
 
   toggleSpeed() {
@@ -1164,6 +1282,12 @@ class Game {
 
       this.drawHoverVisuals();
       this.drawPlayerCursors(); // Draw other players' mouse vectors on canvas
+      
+      // Render target placement and bouncing guide only when Scout is selected
+      if (!this.tutorialCompleted && this.tutorialStep === 1 && this.selectedShopTower === 'scout') {
+        this.drawTutorialCanvasHighlight(this.ctx);
+      }
+
       this.effectManager.draw(this.ctx);
 
       if (this.showMapDirections) {
@@ -1276,6 +1400,55 @@ class Game {
     this.ctx.restore();
   }
 
+  /**
+   * Draws a glowing target tile overlay and bouncing indicator arrow on the canvas.
+   */
+  drawTutorialCanvasHighlight(ctx) {
+    const cellSize = this.grid.cellSize;
+    // Set target coordinate to Col 2, Row 1 (valid placement spot on Grassland)
+    const targetX = 2 * cellSize + cellSize / 2;
+    const targetY = 1 * cellSize + cellSize / 2;
+    
+    // Smooth bouncing factor
+    const bounce = Math.sin(Date.now() / 150) * 6;
+    
+    ctx.save();
+    ctx.translate(targetX, targetY);
+    
+    // Draw pulsating golden highlight border
+    const pulse = Math.abs(Math.sin(Date.now() / 200)) * 6;
+    ctx.strokeStyle = '#f1c40f';
+    ctx.lineWidth = 3.5 + pulse;
+    ctx.strokeRect(-cellSize / 2 + 2, -cellSize / 2 + 2, cellSize - 4, cellSize - 4);
+    
+    // Draw "PLACE HERE" guide text
+    ctx.fillStyle = '#f1c40f';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    ctx.font = "bold 13px 'Fredoka', 'Nunito', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.strokeText("PLACE HERE", 0, -cellSize / 2 - 25 + bounce);
+    ctx.fillText("PLACE HERE", 0, -cellSize / 2 - 25 + bounce);
+    
+    // Draw bouncing arrow pointing directly down onto the grid cell
+    ctx.fillStyle = '#f1c40f';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(-8, -cellSize / 2 - 15 + bounce);
+    ctx.lineTo(8, -cellSize / 2 - 15 + bounce);
+    ctx.lineTo(8, -cellSize / 2 - 8 + bounce);
+    ctx.lineTo(14, -cellSize / 2 - 8 + bounce);
+    ctx.lineTo(0, -cellSize / 2 + 2 + bounce);
+    ctx.lineTo(-14, -cellSize / 2 - 8 + bounce);
+    ctx.lineTo(-8, -cellSize / 2 - 8 + bounce);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.restore();
+  }
+
   drawHoverVisuals() {
     if (this.state !== 'playing' || !this.isMouseOnCanvas) return;
 
@@ -1381,7 +1554,7 @@ class Game {
       this.ctx.moveTo(cx, cy);
       this.ctx.lineTo(cx + 5, cy + 15);
       this.ctx.lineTo(cx + 10, cy + 10);
-      this.ctx.closePath();
+      this.closePath();
       this.ctx.fill();
       this.ctx.stroke();
 

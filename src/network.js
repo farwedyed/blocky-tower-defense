@@ -3,6 +3,7 @@
 import { Enemy, Runner, Quick, Slow, Hidden, Lead, Shadow, Goliath, Templar, GraveDigger, MoltenTitan, FallenGuardian, FallenKing, VoidReaver } from './enemy.js';
 import { Scout, Minigunner, Commander, DJUnit, Pyromancer, Farm, Gladiator, Soldier, Sniper, Medic, Rocketeer } from './tower.js';
 import { soundManager } from './sound.js';
+import { CrazyGamesManager } from './crazygames.js';
 
 if (!window.lobbyPlayers) {
     window.lobbyPlayers = { p1: "Host Survivor", p2: "", p3: "", p4: "", p5: "", p6: "", p7: "", p8: "" };
@@ -135,19 +136,8 @@ export const Network = {
             this.peerIds[window.myPlayerId] = id;
             onOpen(id); 
 
-            // Sync host room state to CrazyGames safely
-            if (window.CrazyGames && window.CrazyGames.SDK && window.crazyGamesInitialized && window.CrazyGames.SDK.game && typeof window.CrazyGames.SDK.game.updateRoom === 'function') {
-                console.log("Registering active room ID on CrazyGames:", id);
-                try {
-                    window.CrazyGames.SDK.game.updateRoom({ 
-                        roomId: id, 
-                        isJoinable: true, 
-                        inviteParams: { roomId: id } 
-                    });
-                } catch (e) {
-                    console.warn("Failed to update room state on CrazyGames:", e);
-                }
-            }
+            // Sync host room state to CrazyGames safely using our dedicated manager
+            CrazyGamesManager.updateRoomPresence(id.toLowerCase(), true);
         });
 
         this.peer.on('connection', (c) => {
@@ -232,18 +222,8 @@ export const Network = {
             if(onConnected) onConnected();
             this.setupClient();
 
-            // Sync client joined state to CrazyGames safely
-            if (window.CrazyGames && window.CrazyGames.SDK && window.crazyGamesInitialized && window.CrazyGames.SDK.game && typeof window.CrazyGames.SDK.game.updateRoom === 'function') {
-                try {
-                    window.CrazyGames.SDK.game.updateRoom({ 
-                        roomId: hostId, 
-                        isJoinable: true, 
-                        inviteParams: { roomId: hostId } 
-                    });
-                } catch (e) {
-                    console.warn("Failed to update client room state on CrazyGames:", e);
-                }
-            }
+            // Sync client joined state to CrazyGames safely using our dedicated manager
+            CrazyGamesManager.updateRoomPresence(hostId.toLowerCase(), true);
             
             try {
                 this.conn.send({ type: 'JOIN_LOBBY', name: playerName, level: this.game.playerLevel });
@@ -452,9 +432,9 @@ export const Network = {
             gold: this.game.gold,
             wave: this.game.wave,
             waveInProgress: this.game.waveInProgress,
-            speedMultiplier: this.game.speedMultiplier, // Added: Synchronizes game speed
-            skipVotesCount: this.game.skipVotes ? this.game.skipVotes.size : 0, // Added: Synchronizes current skip votes
-            skipVotesRequired: Math.ceil((this.conns.filter(c => c && c.open).length + 1) / 2), // Added: Synchronizes total required skip votes
+            speedMultiplier: this.game.speedMultiplier,
+            skipVotesCount: this.game.skipVotes ? this.game.skipVotes.size : 0,
+            skipVotesRequired: Math.ceil((this.conns.filter(c => c && c.open).length + 1) / 2),
             playerCursors: window.playerCursors,
             playerWallets: this.game.playerWallets || {},
             
@@ -599,9 +579,9 @@ export const Network = {
                 this.game.lives = data.lives;
                 this.game.wave = data.wave;
                 this.game.waveInProgress = data.waveInProgress;
-                this.game.speedMultiplier = data.speedMultiplier !== undefined ? data.speedMultiplier : 1; // Added: Replicates game speed
-                this.game.skipVotesCount = data.skipVotesCount !== undefined ? data.skipVotesCount : 0; // Added: Replicates active skip vote count
-                this.game.skipVotesRequired = data.skipVotesRequired !== undefined ? data.skipVotesRequired : 1; // Added: Replicates skip vote requirements
+                this.game.speedMultiplier = data.speedMultiplier !== undefined ? data.speedMultiplier : 1; 
+                this.game.skipVotesCount = data.skipVotesCount !== undefined ? data.skipVotesCount : 0; 
+                this.game.skipVotesRequired = data.skipVotesRequired !== undefined ? data.skipVotesRequired : 1; 
 
                 window.playerCursors = data.playerCursors || {};
                 
@@ -752,11 +732,11 @@ export const Network = {
 
                 // --- CRITICAL HUD RE-RENDER ON THE CLIENT-SIDE ---
                 if (this.game.ui) {
-                    this.game.ui.updateSpeedButton(this.game.speedMultiplier); // Added: Reflect speed changes in UI
+                    this.game.ui.updateSpeedButton(this.game.speedMultiplier); 
                     this.game.ui.updateHUD(this.game.lives, this.game.gold, this.game.wave, this.game.maxWaves);
                 }
             }
-            else if (data.type === 'GAME_OVER') { // Added: Handles authoritative game-over screens
+            else if (data.type === 'GAME_OVER') { 
                 if (this.game) {
                     this.game.state = data.isVictory ? 'victory' : 'gameover';
                     if (this.game.ui) {

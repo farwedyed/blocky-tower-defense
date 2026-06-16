@@ -2,6 +2,7 @@
 import { soundManager } from './sound.js';
 import { fetchTopRecords } from './firebase.js';
 import { Network } from './network.js';
+import { CrazyGamesManager } from './crazygames.js';
 
 export class UI {
   constructor(game) {
@@ -49,12 +50,211 @@ export class UI {
     this.overlayTitle = document.getElementById('overlay-title');
     this.overlaySubtitle = document.getElementById('overlay-subtitle');
 
+    // CrazyGames Profile DOM bindings
+    this.cgProfileWidget = document.getElementById('cg-profile-widget');
+    this.cgAvatar = document.getElementById('cg-avatar');
+    this.cgUsername = document.getElementById('cg-username');
+    this.btnCgAuth = document.getElementById('btn-cg-auth');
+
+    // Track active target element for real-time scroll updates
+    this.activePointerTarget = null;
+    this.activePointerDirection = 'down';
+
     this.injectCoopControls();
+    this.injectTutorialStyles();
     this.initEventListeners();
     this.drawAllStaticPreviews();
 
+    // Register login status changed callbacks
+    CrazyGamesManager.onAuthChanged((user) => {
+      this.updateCgProfileUI(user);
+    });
+
     // Default Lobby UI to clean Splash State
     this.showSplashState();
+
+    // Launch active pointer scroll-tracker frame loop
+    const updatePointerLoop = () => {
+      if (this.activePointerTarget) {
+        if (this.activePointerTarget.isConnected) {
+          this.repositionPointer(this.activePointerTarget, this.activePointerDirection);
+        } else {
+          this.hidePointer();
+        }
+      }
+      requestAnimationFrame(updatePointerLoop);
+    };
+    requestAnimationFrame(updatePointerLoop);
+  }
+
+  /**
+   * Injects dynamic glowing tutorial outline animations and pointer behaviors.
+   */
+  injectTutorialStyles() {
+    if (document.getElementById('tutorial-visual-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'tutorial-visual-styles';
+    style.textContent = `
+      @keyframes pulseTutorialHighlight {
+        0% { box-shadow: 0 0 0 0 rgba(241, 196, 15, 0.8); border-color: #f1c40f !important; }
+        70% { box-shadow: 0 0 0 12px rgba(241, 196, 15, 0); border-color: #f1c40f !important; }
+        100% { box-shadow: 0 0 0 0 rgba(241, 196, 15, 0); border-color: #f1c40f !important; }
+      }
+      @keyframes tutArrowBounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+      }
+      @keyframes tutArrowBounceLeft {
+        0%, 100% { transform: translateX(0) rotate(-90deg); }
+        50% { transform: translateX(-10px) rotate(-90deg); }
+      }
+      @keyframes tutArrowBounceRight {
+        0%, 100% { transform: translateX(0) rotate(90deg); }
+        50% { transform: translateX(10px) rotate(90deg); }
+      }
+      .tut-highlight {
+        animation: pulseTutorialHighlight 1.6s infinite !important;
+        border: 3px solid #f1c40f !important;
+        position: relative;
+        z-index: 9999 !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  /**
+   * Displays an absolute pointing indicator over targeted DOM elements.
+   */
+  showPointerAt(targetElement, direction = 'down') {
+    this.hidePointer();
+    if (!targetElement) return;
+
+    this.activePointerTarget = targetElement;
+    this.activePointerDirection = direction;
+
+    const arrow = document.createElement('div');
+    arrow.id = 'active-tut-arrow';
+    arrow.style.cssText = `
+      position: fixed;
+      z-index: 20000;
+      pointer-events: none;
+      width: 0;
+      height: 0;
+      border-left: 12px solid transparent;
+      border-right: 12px solid transparent;
+      border-top: 20px solid #f1c40f;
+      filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6));
+      transition: all 0.2s ease-out;
+    `;
+
+    document.body.appendChild(arrow);
+    this.repositionPointer(targetElement, direction);
+  }
+
+  /**
+   * Position pointer directly over the middle "CLICK ANYWHERE ON THE MAP" overlay banner.
+   */
+  showPointerAtCanvasCenter() {
+    this.hidePointer();
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return;
+
+    const arrow = document.createElement('div');
+    arrow.id = 'active-tut-arrow';
+    arrow.style.cssText = `
+      position: fixed;
+      z-index: 20000;
+      pointer-events: none;
+      width: 0;
+      height: 0;
+      border-left: 12px solid transparent;
+      border-right: 12px solid transparent;
+      border-top: 20px solid #f1c40f;
+      filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6));
+      transition: all 0.2s ease-out;
+    `;
+    document.body.appendChild(arrow);
+
+    const reposition = () => {
+      const rect = canvas.getBoundingClientRect();
+      arrow.style.animation = 'tutArrowBounce 0.6s infinite ease-in-out';
+      arrow.style.transform = 'none';
+      // Align cleanly above the horizontal center text banner
+      arrow.style.top = `${rect.top + rect.height / 2 - 45}px`;
+      arrow.style.left = `${rect.left + rect.width / 2 - 12}px`;
+    };
+
+    reposition();
+    window.addEventListener('resize', reposition);
+    arrow._cleanupResize = () => window.removeEventListener('resize', reposition);
+  }
+
+  /**
+   * Repositions the active pointer arrow correctly.
+   */
+  repositionPointer(targetElement, direction = 'down') {
+    const arrow = document.getElementById('active-tut-arrow');
+    if (!arrow || !targetElement) return;
+
+    const rect = targetElement.getBoundingClientRect();
+
+    if (direction === 'down') {
+      arrow.style.animation = 'tutArrowBounce 0.6s infinite ease-in-out';
+      arrow.style.transform = 'none';
+      arrow.style.top = `${rect.top - 28}px`;
+      arrow.style.left = `${rect.left + rect.width / 2 - 12}px`;
+    } else if (direction === 'left') {
+      arrow.style.animation = 'tutArrowBounceLeft 0.6s infinite ease-in-out';
+      arrow.style.transform = 'rotate(-90deg)';
+      arrow.style.top = `${rect.top + rect.height / 2 - 10}px`;
+      arrow.style.left = `${rect.right + 12}px`;
+    } else if (direction === 'right') {
+      arrow.style.animation = 'tutArrowBounceRight 0.6s infinite ease-in-out';
+      arrow.style.transform = 'rotate(90deg)';
+      arrow.style.top = `${rect.top + rect.height / 2 - 10}px`;
+      arrow.style.left = `${rect.left - 28}px`; // Sits comfortably on the left side pointing right
+    }
+  }
+
+  /**
+   * Hides the active tutorial pointer arrow.
+   */
+  hidePointer() {
+    this.activePointerTarget = null;
+    const arrow = document.getElementById('active-tut-arrow');
+    if (arrow) {
+      if (arrow._cleanupResize) {
+        arrow._cleanupResize();
+      }
+      arrow.remove();
+    }
+  }
+
+  /**
+   * Updates Profile Card Widget elements on user state shift.
+   */
+  updateCgProfileUI(user) {
+    if (user) {
+      if (this.cgUsername) this.cgUsername.textContent = user.username;
+      if (this.cgAvatar && user.profilePictureUrl) {
+        this.cgAvatar.src = user.profilePictureUrl;
+      }
+      if (this.btnCgAuth) {
+        this.btnCgAuth.style.display = 'none';
+      }
+      
+      // Auto-populate input forms
+      const nameInput = document.getElementById('input-player-name');
+      if (nameInput) {
+        nameInput.value = user.username;
+      }
+    } else {
+      if (this.cgUsername) this.cgUsername.textContent = "Guest Player";
+      if (this.cgAvatar) this.cgAvatar.src = "https://img.icons8.com/color/48/user-male-circle.png";
+      if (this.btnCgAuth) {
+        this.btnCgAuth.style.display = 'block';
+      }
+    }
   }
 
   injectCoopControls() {
@@ -129,7 +329,7 @@ export class UI {
       <!-- MANDATORY PLAYER NAME INPUT BOX -->
       <div id="username-container" style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;">
         <label for="input-player-name" style="font-size: 0.8rem; font-weight: 900; color: var(--text-muted);">PLAYER ACCOUNT NAME (REQUIRED TO PLAY CO-OP):</label>
-        <input type="text" id="input-player-name" placeholder="ENTER YOUR ACCOUNT NAME FIRST" style="
+        <input text="text" id="input-player-name" placeholder="ENTER YOUR ACCOUNT NAME FIRST" style="
           border: 3px solid var(--border-color);
           border-radius: 10px;
           padding: 8px 12px;
@@ -176,7 +376,7 @@ export class UI {
               align-items: center;
               justify-content: center;
               outline: none;
-            " title="Copy Room Code">
+            " title="Copy Platform Invitation Link">
               <img src="https://img.icons8.com/color/48/copy.png" style="width: 20px; height: 20px;" />
             </button>
           </div>
@@ -231,6 +431,29 @@ export class UI {
   }
 
   initEventListeners() {
+    // Auth login clicker for Profile card
+    if (this.btnCgAuth) {
+      this.btnCgAuth.addEventListener('click', () => {
+        CrazyGamesManager.promptAuth();
+      });
+    }
+
+    // Mobile Sidebar slide-out handler
+    const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+    const gameSidebar = document.getElementById('game-sidebar');
+    if (btnToggleSidebar && gameSidebar) {
+      btnToggleSidebar.addEventListener('click', () => {
+        gameSidebar.classList.toggle('sidebar-open');
+        if (gameSidebar.classList.contains('sidebar-open')) {
+          btnToggleSidebar.textContent = "✕ CLOSE MENU";
+          btnToggleSidebar.style.background = "var(--primary-red)";
+        } else {
+          btnToggleSidebar.textContent = "☰ SHOP & MENU";
+          btnToggleSidebar.style.background = "var(--primary-blue)";
+        }
+      });
+    }
+
     // 1. Lobby Navigation Tabs
     this.tabButtons.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -244,6 +467,10 @@ export class UI {
             panel.classList.add('active');
           }
         });
+
+        // Instantly clean up and hide all tutorial pointers and glow effects when changing tabs
+        this.hidePointer();
+        document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
 
         if (targetPanelId === 'panel-loadout') {
           this.renderLoadoutConfig();
@@ -326,6 +553,9 @@ export class UI {
           labelStatus.style.color = "var(--primary-green-dark)";
           this.updateCoopPlayerList();
           this.toggleSoloElements(true); // Host can see maps and deploy controls
+          
+          // Notify CrazyGames presence
+          CrazyGamesManager.updateRoomPresence(roomCode.toLowerCase(), true);
         } else {
           Network.init(this.game, (id) => {
             const roomCode = id.toUpperCase();
@@ -335,6 +565,9 @@ export class UI {
             labelStatus.style.color = "var(--primary-green-dark)";
             this.updateCoopPlayerList();
             this.toggleSoloElements(true); // Host can see maps and deploy controls
+            
+            // Notify CrazyGames presence
+            CrazyGamesManager.updateRoomPresence(roomCode.toLowerCase(), true);
           });
         }
       });
@@ -366,6 +599,9 @@ export class UI {
           labelStatus.style.color = "var(--primary-blue)";
           this.updateCoopPlayerList();
           this.toggleSoloElements(false); // Guest maps/deploy are cleanly hidden
+          
+          // Notify CrazyGames presence
+          CrazyGamesManager.updateRoomPresence(code, true);
         });
       });
     }
@@ -374,10 +610,13 @@ export class UI {
       btnCopyCode.addEventListener('click', () => {
         const rawCode = Network.peer ? Network.peer.id.toUpperCase() : "";
         if (rawCode) {
-          navigator.clipboard.writeText(rawCode).then(() => {
-            this.game.effectManager.spawnText(400, 260, "ROOM CODE COPIED!", '#2ecc71');
-          }).catch(err => {
-            console.error("Clipboard copy failed:", err);
+          // Generate a CrazyGames Invite link instead of copying raw code
+          CrazyGamesManager.getInviteLink(rawCode.toLowerCase()).then((inviteUrl) => {
+            navigator.clipboard.writeText(inviteUrl).then(() => {
+              this.game.effectManager.spawnText(400, 260, "SQUAD INVITE LINK COPIED!", '#2ecc71');
+            }).catch(err => {
+              console.error("Clipboard copy failed:", err);
+            });
           });
         }
       });
@@ -385,6 +624,7 @@ export class UI {
 
     if (btnDisconnect) {
       btnDisconnect.addEventListener('click', () => {
+        CrazyGamesManager.leaveRoomPresence();
         location.reload();
       });
     }
@@ -1000,6 +1240,16 @@ export class UI {
     this.lobbyView.classList.add('hidden');
     this.gameView.classList.remove('hidden');
     this.hudMapName.textContent = mapName.toUpperCase();
+    
+    // Notify CrazyGames gameplay active session
+    CrazyGamesManager.gameplayStart();
+
+    // Clean active lobby pointers
+    this.hidePointer();
+
+    if (!this.game.tutorialCompleted) {
+      this.showPointerAtCanvasCenter();
+    }
   }
 
   showLobbyLayout() {
@@ -1009,6 +1259,9 @@ export class UI {
     this.renderDailyQuests();
     this.renderLeaderboard(this.game.selectedMap);
     
+    // Notify CrazyGames gameplay finished
+    CrazyGamesManager.gameplayStop();
+
     // Return back to initial splash choices instead of showing active setups
     this.showSplashState();
   }
@@ -1303,13 +1556,14 @@ export class UI {
     ctx.restore();
   }
 
-  startUnboxingAnimation(crateType, chosenAgent, chosenRarity) {
+  startUnboxingAnimation(crateType, chosenAgent, chosenRarity, revealedSkinName) {
     const overlay = document.getElementById('crate-opening-overlay');
     const canvas = document.getElementById('crate-opening-canvas');
     const revealCard = document.getElementById('crate-reveal-card');
     const revealRarity = document.getElementById('crate-reveal-rarity');
     const revealAgentCanvas = document.getElementById('crate-reveal-agent-canvas');
     const revealName = document.getElementById('crate-reveal-name');
+    const revealText = document.getElementById('crate-reveal-unlocked');
 
     if (!overlay || !canvas) return;
 
@@ -1420,12 +1674,26 @@ export class UI {
           spawnConfetti(w / 2, targetY, chosenRarity);
           spawnSplinters(w / 2, targetY);
 
+          // CrazyGames feedback on rare unboxings
+          if (chosenRarity === 'epic' || chosenRarity === 'legendary') {
+            CrazyGamesManager.happytime();
+          }
+
           setTimeout(() => {
             state = 'revealed';
             revealCard.classList.remove('hidden');
             revealRarity.textContent = chosenRarity.toUpperCase();
             revealRarity.className = `rarity-${chosenRarity}`;
-            revealName.textContent = chosenAgent.toUpperCase();
+            
+            if (revealedSkinName) {
+              const baseName = chosenAgent.charAt(0).toUpperCase() + chosenAgent.slice(1);
+              const suffix = revealedSkinName.split('_')[1];
+              revealName.textContent = `${suffix.toUpperCase()} ${baseName.toUpperCase()}`;
+              if (revealText) revealText.textContent = "SKIN UNLOCKED & ADDED TO LOADOUT!";
+            } else {
+              revealName.textContent = chosenAgent.toUpperCase();
+              if (revealText) revealText.textContent = "UNLOCKED & ADDED TO LOADOUT!";
+            }
             
             if (revealAgentCanvas) {
               const prevCtx = revealAgentCanvas.getContext('2d');
@@ -1657,8 +1925,21 @@ export class UI {
   }
 
   showTutorialHint(step) {
+    this.dismissTutorial();
+
+    // Check if on mobile/small screen to completely remove the text box popup as requested
+    const isMobileSize = window.innerWidth <= 900 || window.innerHeight <= 600;
+    if (isMobileSize) {
+      // Clean start highlight and pointer arrow immediately on mobile without text box overlap
+      this.activateStepPointers(step);
+      return;
+    }
+
     const existing = document.getElementById('tutorial-hint-box');
     if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+
+    // Clear old visual highlights
+    document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
 
     const tutorialEl = document.createElement('div');
     tutorialEl.id = 'tutorial-hint-box';
@@ -1699,21 +1980,31 @@ export class UI {
       {
         icon: '👋',
         title: 'Welcome to Blocky TDS!',
-        body: 'Open <strong>Crates</strong> in the CRATES tab to unlock Agents. Equip them in <strong>LOADOUT</strong>, pick a map, then hit <strong>DEPLOY TO MATCH</strong>!'
+        body: 'Equip your loadout, select a map, and tap <strong style="color: #f1c40f;">PLAY SOLO</strong> or <strong style="color: #f1c40f;">DEPLOY</strong> to begin your defense!'
       },
       {
         icon: '🏗️',
-        title: 'Place Your First Agent!',
-        body: 'Click any <strong>green tile</strong> on the map canvas to place the selected agent from the sidebar. Avoid placing on the enemy path!'
+        title: 'Deploy Your First Scout!',
+        body: 'Select the <strong style="color: #f1c40f;">Scout</strong> in your sidebar placement panel, then tap the <strong style="color: #f1c40f;">glowing yellow tile</strong> on the map grid to place him!'
       },
       {
-        icon: '🏗️',
-        title: 'Upgrade Your Agent!',
-        body: 'Click a placed agent to select it, then press <strong>UPGRADE</strong> in the sidebar. Each level visually transforms your agent and boosts its stats!'
+        icon: '🌊',
+        title: 'Send in the Horde!',
+        body: 'Tap the <strong style="color: #f1c40f;">START WAVE</strong> button in your controls sidebar to summon the first wave of training zombies!'
+      },
+      {
+        icon: '🔼',
+        title: 'Upgrade Your Scout!',
+        body: 'Tap your placed Scout on the field to select him, then choose <strong style="color: #2ecc71;">UPGRADE</strong> in the modifications panel to increase his fire rate and damage!'
       }
     ];
 
-    const msg = messages[step];
+    let msgIndex = 0;
+    if (step === 0) msgIndex = 0;
+    else if (step === 1) msgIndex = 1;
+    else if (step === 1.5) msgIndex = 2;
+    else if (step === 2) msgIndex = 3;
+    const msg = messages[msgIndex];
     if (!msg) return;
 
     tutorialEl.innerHTML = `
@@ -1736,19 +2027,91 @@ export class UI {
       </div>
     `;
 
+    // Immediately activate button pointer arrows and highlight glow effects on text box load
+    this.activateStepPointers(step);
+
     const dismissBtn = document.getElementById('btn-dismiss-tutorial');
     if (dismissBtn) {
       dismissBtn.addEventListener('click', () => {
-        this.dismissTutorial();
-        if (!this.game.tutorialCompleted && this.game.tutorialStep === 0) {
-          this.game.tutorialCompleted = true;
-          this.game.saveStatsToStorage();
-        }
+        this.dismissTutorialHintOnly(); // Only hide text panel; keep highlight active!
       });
     }
   }
 
-  dismissTutorial() {
+  /**
+   * Triggers highly visual, bouncing direction arrows pointing to key buttons.
+   */
+  activateStepPointers(step) {
+    this.hidePointer();
+
+    if (step === 0) {
+      // Guide player to click "PLAY SOLO" first if they are on the central menu splash view
+      const playSoloBtn = document.getElementById('btn-select-solo');
+      if (playSoloBtn && document.getElementById('lobby-splash-container').style.display !== 'none') {
+        this.showPointerAt(playSoloBtn, 'down');
+        playSoloBtn.classList.add('tut-highlight');
+
+        // Watch for click transition
+        const onSoloClick = () => {
+          playSoloBtn.removeEventListener('click', onSoloClick);
+          playSoloBtn.classList.remove('tut-highlight');
+          this.hidePointer();
+
+          // Immediately point directly to deploy button
+          setTimeout(() => {
+            if (this.btnDeploy) {
+              this.showPointerAt(this.btnDeploy, 'down');
+              this.btnDeploy.classList.add('tut-highlight');
+            }
+          }, 350);
+        };
+        playSoloBtn.addEventListener('click', onSoloClick);
+      } else {
+        // If they already bypassed selection splash, point straight to deploy
+        if (this.btnDeploy) {
+          this.showPointerAt(this.btnDeploy, 'down');
+          this.btnDeploy.classList.add('tut-highlight');
+        }
+      }
+    } 
+    else if (step === 1) {
+      // Find the Scout selection button in sidebar and force selection first
+      const scoutBtn = this.equippedAgentsList.querySelector('.placement-btn[data-type="scout"]');
+      if (scoutBtn) {
+        this.showPointerAt(scoutBtn, 'right'); // Points cleanly rightwards from the left of the button
+        scoutBtn.classList.add('tut-highlight');
+
+        const onScoutSelect = () => {
+          scoutBtn.removeEventListener('click', onScoutSelect);
+          scoutBtn.classList.remove('tut-highlight');
+          this.hidePointer(); // Clear pointer, canvas overlay takes over visual guidance!
+        };
+        scoutBtn.addEventListener('click', onScoutSelect);
+      }
+    } 
+    else if (step === 1.5) {
+      // Point directly to wave starter trigger
+      const startWaveBtn = document.getElementById('btn-next-wave');
+      if (startWaveBtn) {
+        this.showPointerAt(startWaveBtn, 'down');
+        startWaveBtn.classList.add('tut-highlight');
+      }
+    }
+    else if (step === 2) {
+      // Guide the user to select the Scout at col 2, row 1 if it's not selected
+      if (this.game.selectedPlacedTower && this.game.selectedPlacedTower.gridX === 2 && this.game.selectedPlacedTower.gridY === 1) {
+        if (this.btnUpgrade) {
+          this.showPointerAt(this.btnUpgrade, 'right'); // Point cleanly from the left to upgrade panel
+          this.btnUpgrade.classList.add('tut-highlight');
+        }
+      } else {
+        // Float warning prompts onto screen guiding selection
+        this.game.effectManager.spawnText(400, 300, "TAP YOUR SCOUT TO SELECT!", '#f1c40f');
+      }
+    }
+  }
+
+  dismissTutorialHintOnly() {
     const tutorialEl = document.getElementById('tutorial-hint-box');
     if (tutorialEl) {
       tutorialEl.style.opacity = '0';
@@ -1758,6 +2121,13 @@ export class UI {
         if (tutorialEl.parentNode) tutorialEl.parentNode.removeChild(tutorialEl);
       }, 320);
     }
+  }
+
+  dismissTutorial() {
+    this.dismissTutorialHintOnly();
+    // Wipe remaining glowing highlights safely
+    document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
+    this.hidePointer();
   }
 
   showMatchSummaryCard(isVictory) {
@@ -1805,6 +2175,21 @@ export class UI {
       baseXP *= 3;
     }
 
+    // Embed the rewarded ad option into the summary layout if eligible
+    let reviveButtonHtml = '';
+    if (!isVictory && !this.game.hasRevivedThisMatch) {
+      reviveButtonHtml = `
+        <button id="btn-summary-revive" class="btn" style="
+          background: #27ae60;
+          color: #fff;
+          width: 100%;
+          font-size: 1.1rem;
+          margin-bottom: 8px;
+          box-shadow: 0 4px 0 #219653, 0 4px 0 var(--border-color);
+        ">📺 WATCH AD TO REVIVE (+50 LIVES)</button>
+      `;
+    }
+
     summaryCard.innerHTML = `
       <h2 style="font-family: var(--font-title); font-size: 1.8rem; margin-bottom: 8px; color: ${isVictory ? '#f1c40f' : '#e74c3c'}">${isVictory ? '🏆 VICTORY!' : '💀 DEFEATED'}</h2>
       <div style="font-size: 0.85rem; color: #7f8c8d; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 20px;">${mapName} ${isHc ? '<span style="color:#e74c3c; font-weight:900;">[HARDCORE]</span>' : ''}</div>
@@ -1828,6 +2213,8 @@ export class UI {
         </div>
       </div>
       
+      ${reviveButtonHtml}
+      
       <button id="btn-summary-close" style="
         background: ${isVictory ? '#f1c40f' : '#e74c3c'};
         color: #111;
@@ -1845,6 +2232,21 @@ export class UI {
     `;
 
     this.overlay.appendChild(summaryCard);
+
+    // Bind event handler for the rewarded ad button
+    const reviveBtn = document.getElementById('btn-summary-revive');
+    if (reviveBtn) {
+      reviveBtn.addEventListener('click', () => {
+        CrazyGamesManager.requestRewardedAd(() => {
+          // Successfully watched the ad, trigger base restore
+          this.game.revivePlayer();
+          summaryCard.remove();
+          this.overlay.classList.add('hidden');
+          this.overlayTitle.classList.remove('hidden');
+          this.overlaySubtitle.classList.remove('hidden');
+        });
+      });
+    }
 
     const closeBtn = document.getElementById('btn-summary-close');
     closeBtn.addEventListener('click', () => {
@@ -1874,6 +2276,11 @@ export class UI {
           clearInterval(waveTally);
           timeEl.textContent = durationStr;
           soundManager.playTick();
+
+          // Trigger achievement notifications for victory moments
+          if (isVictory) {
+            CrazyGamesManager.happytime();
+          }
 
           const coinsTally = setInterval(() => {
             if (currentCoins < baseCoins) {

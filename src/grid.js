@@ -169,7 +169,12 @@ export class Grid {
         row = Math.floor(Math.random() * this.rows);
         key = `${col},${row}`;
         attempts++;
-      } while ((this.pathTiles.has(key) || this.hasObstacleNear(col, row)) && attempts < 100);
+      } while (
+        (this.pathTiles.has(key) || 
+         this.hasObstacleNear(col, row) || 
+         (col === 2 && row === 1)) && // Explicitly exclude tutorial placement tile
+        attempts < 100
+      );
 
       if (attempts < 100) {
         const x = col * this.cellSize + this.cellSize / 2;

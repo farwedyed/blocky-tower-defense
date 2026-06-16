@@ -8,6 +8,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  
+  <!-- CrazyGames SDK v3 Import (Must load early) -->
+  <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
 </head>
 <body>
   <div id="app-container">
@@ -19,6 +22,16 @@
           <h1 class="blocky-title">BTD 2D</h1>
           <span class="tagline">SQUAD TACTICAL DEFENSE TERMINAL</span>
         </div>
+        
+        <!-- CrazyGames User Profile Display Widget -->
+        <div id="cg-profile-widget" style="display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.05); padding: 6px 12px; border-radius: 10px; border: 2px solid var(--border-color); font-weight: 800; font-size: 0.9rem;">
+          <img id="cg-avatar" src="https://img.icons8.com/color/48/user-male-circle.png" style="width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid var(--border-color);" />
+          <div style="display: flex; flex-direction: column; align-items: flex-start;">
+            <span id="cg-username" style="color: var(--text-dark);">Guest Player</span>
+            <button id="btn-cg-auth" class="btn" style="font-size: 0.65rem; padding: 2px 6px; margin-top: 2px; background: var(--primary-blue); color: #fff; border-width: 1.5px; border-radius: 4px; box-shadow: none;">LOG IN</button>
+          </div>
+        </div>
+
         <div class="player-meta-box">
           <div class="meta-item">
             <span class="label">LEVEL</span>
@@ -277,6 +290,8 @@
     <!-- 2. GAME / MATCH VIEW -->
     <div id="game-view" class="hidden">
       <div id="game-wrapper">
+        <!-- Mobile Toggle Menu Button -->
+        <button id="btn-toggle-sidebar" class="btn">☰ SHOP & MENU</button>
         <canvas id="game-canvas" width="800" height="600"></canvas>
         <div id="game-overlay" class="hidden">
           <div class="overlay-content">
