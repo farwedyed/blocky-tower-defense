@@ -563,6 +563,11 @@ body {
   overflow-y: auto;
 }
 
+/* Fix flexbox collapsing bug: prevent components from collapsing to 0 height */
+#game-sidebar > * {
+  flex-shrink: 0 !important;
+}
+
 #game-sidebar header {
   display: flex;
   justify-content: space-between;
