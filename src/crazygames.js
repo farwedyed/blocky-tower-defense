@@ -193,28 +193,49 @@ export const CrazyGamesManager = {
    * Automatically handles global game muting states during video playback.
    */
   requestMidgameAd: function(onFinished) {
+    let finishedCalled = false;
+    const safeFinish = () => {
+      if (finishedCalled) return;
+      finishedCalled = true;
+      if (onFinished) onFinished();
+    };
+
+    // Safety timeout: If the ad doesn't start/error out within 1.5 seconds, bypass it.
+    let safetyTimeout = setTimeout(() => {
+      console.warn('[CrazyGames] Midgame Ad request timed out or was blocked. Bypassing.');
+      safeFinish();
+    }, 1500);
+
     if (this.sdk && this.isInitialized && this.sdk.ad) {
       const originalSoundState = soundManager.enabled;
       
-      this.sdk.ad.requestAd("midgame", {
-        adStarted: () => {
-          soundManager.setEnabled(false); // Mute sound during ads
-          console.log('[CrazyGames] Midgame Ad started.');
-        },
-        adFinished: () => {
-          soundManager.setEnabled(originalSoundState); // Restore sound
-          console.log('[CrazyGames] Midgame Ad finished.');
-          if (onFinished) onFinished();
-        },
-        adError: (error) => {
-          soundManager.setEnabled(originalSoundState); // Restore sound
-          console.warn('[CrazyGames] Midgame Ad error:', error);
-          if (onFinished) onFinished(); // Proceed smoothly if ads fail to load
-        }
-      });
+      try {
+        this.sdk.ad.requestAd("midgame", {
+          adStarted: () => {
+            // Ad actually started playing, so clear the initial start safety timeout
+            clearTimeout(safetyTimeout);
+            soundManager.setEnabled(false); // Mute sound during ads
+            console.log('[CrazyGames] Midgame Ad started.');
+          },
+          adFinished: () => {
+            soundManager.setEnabled(originalSoundState); // Restore sound
+            console.log('[CrazyGames] Midgame Ad finished.');
+            safeFinish();
+          },
+          adError: (error) => {
+            soundManager.setEnabled(originalSoundState); // Restore sound
+            console.warn('[CrazyGames] Midgame Ad error:', error);
+            safeFinish(); // Proceed smoothly if ads fail to load
+          }
+        });
+      } catch (e) {
+        clearTimeout(safetyTimeout);
+        console.warn('[CrazyGames] Failed to request midgame ad:', e);
+        safeFinish();
+      }
     } else {
-      // Offline fallback
-      if (onFinished) onFinished();
+      clearTimeout(safetyTimeout);
+      safeFinish();
     }
   },
 
@@ -224,29 +245,48 @@ export const CrazyGamesManager = {
    * @param {function} onRewardEarned - Callback executed ONLY if user fully watches the video
    */
   requestRewardedAd: function(onRewardEarned) {
+    let finishedCalled = false;
+    const safeFinish = () => {
+      if (finishedCalled) return;
+      finishedCalled = true;
+      if (onRewardEarned) onRewardEarned();
+    };
+
+    // Safety timeout: If the ad fails to trigger within 2 seconds, treat as offline fallback
+    let safetyTimeout = setTimeout(() => {
+      console.warn('[CrazyGames] Rewarded Ad failed to start. Awarding fallback reward.');
+      safeFinish();
+    }, 2000);
+
     if (this.sdk && this.isInitialized && this.sdk.ad) {
       const originalSoundState = soundManager.enabled;
-      let rewardGiven = false;
 
-      this.sdk.ad.requestAd("rewarded", {
-        adStarted: () => {
-          soundManager.setEnabled(false); // Mute sound during ads
-          console.log('[CrazyGames] Rewarded Ad started.');
-        },
-        adFinished: () => {
-          soundManager.setEnabled(originalSoundState); // Restore sound
-          console.log('[CrazyGames] Rewarded Ad successfully finished.');
-          rewardGiven = true;
-          if (onRewardEarned) onRewardEarned();
-        },
-        adError: (error) => {
-          soundManager.setEnabled(originalSoundState); // Restore sound
-          console.warn('[CrazyGames] Rewarded Ad failed or skipped:', error);
-        }
-      });
+      try {
+        this.sdk.ad.requestAd("rewarded", {
+          adStarted: () => {
+            clearTimeout(safetyTimeout);
+            soundManager.setEnabled(false); // Mute sound during ads
+            console.log('[CrazyGames] Rewarded Ad started.');
+          },
+          adFinished: () => {
+            soundManager.setEnabled(originalSoundState); // Restore sound
+            console.log('[CrazyGames] Rewarded Ad successfully finished.');
+            safeFinish();
+          },
+          adError: (error) => {
+            soundManager.setEnabled(originalSoundState); // Restore sound
+            console.warn('[CrazyGames] Rewarded Ad failed or skipped:', error);
+            clearTimeout(safetyTimeout);
+          }
+        });
+      } catch (e) {
+        clearTimeout(safetyTimeout);
+        console.warn('[CrazyGames] Failed to request rewarded ad:', e);
+        safeFinish();
+      }
     } else {
-      // Offline fallback: Automatically award reward for testing
-      if (onRewardEarned) onRewardEarned();
+      clearTimeout(safetyTimeout);
+      safeFinish();
     }
   },
 
