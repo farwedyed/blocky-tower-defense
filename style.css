@@ -46,7 +46,8 @@ body {
   background-size: 40px 40px;
   color: var(--text-dark);
   font-size: 16px;
-  height: 100vh;
+  height: 100dvh;
+  height: 100vh; /* fallback */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -882,6 +883,15 @@ body {
   z-index: 9999 !important;
 }
 
+/* Force custom thin, visible scrollbars on mobile so they are recognizable */
+#game-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+#game-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    COMPREHENSIVE RESPONSIVE AND COLLAPSIBLE MOBILE LAYOUTS
 ═══════════════════════════════════════════════════════════════ */
@@ -903,11 +913,12 @@ body {
   }
 }
 
-/* ── Mobile & Compact Screens (Width <= 900px OR Height <= 600px) ── */
-@media (max-width: 900px), (max-height: 600px) {
+/* ── Mobile & Compact Screens (Width <= 1024px OR Height <= 600px) ── */
+@media (max-width: 1024px), (max-height: 600px) {
   #app-container {
     width: 100vw;
-    height: 100vh;
+    height: 100dvh !important; /* Resolves the dynamic address bar cutting off top and bottom items on mobile */
+    height: 100vh !important; /* fallback */
     max-width: none;
     max-height: none;
     border-radius: 0;
@@ -1525,6 +1536,10 @@ body {
     transform: none !important; /* Forces solid landscape viewport side-panels */
     position: relative;
     box-shadow: none;
+    overflow-y: auto !important; /* Forces the entire right side panel to scroll cleanly */
+    -webkit-overflow-scrolling: touch !important;
+    padding: 8px !important;
+    gap: 8px !important;
   }
 
   #btn-toggle-sidebar {
