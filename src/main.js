@@ -12,6 +12,7 @@ import { CrazyGamesManager } from './crazygames.js';
 
 class Game {
   constructor() {
+    window.game = this; // Expose globally so other modules can read difficulty settings
     this.canvas = document.getElementById('game-canvas');
     this.ctx = this.canvas.getContext('2d');
 
@@ -23,6 +24,32 @@ class Game {
     this.equippedAgents = ['scout'];
     this.ownedSkins = [];
     this.equippedSkins = {};
+
+    // Difficulty Settings Mapping (TDS Balancing)
+    this.selectedDifficulty = 'molten';
+    this.difficultySettings = {
+      easy: {
+        hpMultiplier: 0.75,
+        startGold: 600,
+        maxWaves: 30,
+        coinMultiplier: 1.0,
+        xpMultiplier: 1.0
+      },
+      molten: {
+        hpMultiplier: 1.15,
+        startGold: 600,
+        maxWaves: 40,
+        coinMultiplier: 1.5,
+        xpMultiplier: 1.5
+      },
+      fallen: {
+        hpMultiplier: 1.85,
+        startGold: 500,
+        maxWaves: 40,
+        coinMultiplier: 2.5,
+        xpMultiplier: 2.5
+      }
+    };
 
     // Daily Quests structure:
     this.questGoals = {
@@ -275,11 +302,19 @@ class Game {
     const minutes = Math.floor(this.matchTime / 60);
     const seconds = Math.floor(this.matchTime % 60);
     const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    
+    // Retrieve name from CrazyGames profile, fallback to localStorage input, fallback to "Guest"
+    const activeUsername = CrazyGamesManager.currentUser?.username 
+      || localStorage.getItem('tds_player_username') 
+      || "Guest";
+
     const entry = {
+      name: activeUsername,
       time: timeStr,
       timeRaw: this.matchTime,
       date: new Date().toLocaleDateString()
     };
+    
     if (!Array.isArray(this.leaderboard[this.selectedMap])) {
       this.leaderboard[this.selectedMap] = [];
     }
@@ -287,6 +322,7 @@ class Game {
     this.leaderboard[this.selectedMap].sort((a, b) => a.timeRaw - b.timeRaw);
     this.leaderboard[this.selectedMap] = this.leaderboard[this.selectedMap].slice(0, 5);
     this.saveStatsToStorage();
+    
     uploadRecord(this.selectedMap, entry).then(() => {
       return fetchTopRecords(this.selectedMap);
     }).then(records => {
@@ -608,13 +644,16 @@ class Game {
     
     this.grid.selectMap(this.selectedMap);
     
+    const diffConfig = this.difficultySettings[this.selectedDifficulty];
+
     const hcCheckbox = document.getElementById('hardcore-toggle');
     this.isHardcore = hcCheckbox ? hcCheckbox.checked : false;
     Enemy.hardcoreMode = this.isHardcore;
 
     this.lives = this.isHardcore ? 20 : 100;
-    this.gold = this.isHardcore ? 250 : 400;
+    this.gold = this.isHardcore ? 250 : diffConfig.startGold;
     this.wave = 0;
+    this.maxWaves = diffConfig.maxWaves;
     this.waveInProgress = false;
     this.hasRevivedThisMatch = false; // Reset revive usage for the new game
     this.speedMultiplier = 1;
@@ -738,6 +777,14 @@ class Game {
       }
     }
 
+    // STRICT TDS PLACEMENT LIMIT OF 40 TOTAL TOWERS
+    const totalPlacedTowers = this.grid.towers.size;
+    const maxTowersAllowed = 40;
+    if (totalPlacedTowers >= maxTowersAllowed) {
+      this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT REACHED (MAX 40 TOWERS)", '#e74c3c');
+      return;
+    }
+
     let currentPlacedOfTypeCount = 0;
     for (const t of this.grid.towers.values()) {
       if (t.type === this.selectedShopTower) {
@@ -755,6 +802,14 @@ class Game {
     }
     if (this.selectedShopTower === 'dj' && currentPlacedOfTypeCount >= 1) {
       this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 1 DJ UNIT)", '#e74c3c');
+      return;
+    }
+    if (this.selectedShopTower === 'medic' && currentPlacedOfTypeCount >= 3) {
+      this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 3 MEDICS)", '#e74c3c');
+      return;
+    }
+    if (this.selectedShopTower === 'rocketeer' && currentPlacedOfTypeCount >= 8) {
+      this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 8 ROCKETEERS)", '#e74c3c');
       return;
     }
 
@@ -891,7 +946,7 @@ class Game {
       const required = Math.ceil((Network.conns.filter(c => c && c.open).length + 1) / 2);
       if (this.skipVotes.size >= required) {
         this.skipVotes.clear();
-        this.game.skipWave();
+        this.skipWave();
       } else {
         this.effectManager.spawnText(400, 260, `SKIP VOTE: ${this.skipVotes.size}/${required}`, '#e67e22');
       }
@@ -1066,8 +1121,10 @@ class Game {
       }
 
       if (zombie.targetNodeIndex >= this.grid.pixelPath.length) {
-        this.lives--;
-        this.effectManager.spawnText(zombie.x, zombie.y, "-1 Life", '#e74c3c');
+        // Fetch proportional leakage damage based on the specific zombie class
+        const damage = zombie.baseDamage || 1;
+        this.lives -= damage;
+        this.effectManager.spawnText(zombie.x, zombie.y, `-${damage} Lives`, '#e74c3c');
         this.enemies.splice(i, 1);
         this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
 
@@ -1139,9 +1196,10 @@ class Game {
         this.gold += cashBonus;
       }
 
-      const multiplier = this.selectedMap === 'tundra' ? 1.5 : this.selectedMap === 'desert' ? 1.25 : 1.0;
-      let coinReward = Math.round((10 + this.wave * 5) * multiplier);
-      let xpReward = Math.round((15 + this.wave * 4) * multiplier);
+      // Read active difficulty coefficients instead of simple map checks
+      const diffConfig = this.difficultySettings[this.selectedDifficulty];
+      let coinReward = Math.round((10 + this.wave * 5) * diffConfig.coinMultiplier);
+      let xpReward = Math.round((15 + this.wave * 4) * diffConfig.xpMultiplier);
 
       if (this.wave >= this.maxWaves && this.isHardcore) {
         coinReward *= 3;
@@ -1436,13 +1494,13 @@ class Game {
     ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.moveTo(-8, -cellSize / 2 - 15 + bounce);
-    ctx.lineTo(8, -cellSize / 2 - 15 + bounce);
+    ctx.lineTo(8, -cellSize / 2 - 8 + bounce);
     ctx.lineTo(8, -cellSize / 2 - 8 + bounce);
     ctx.lineTo(14, -cellSize / 2 - 8 + bounce);
     ctx.lineTo(0, -cellSize / 2 + 2 + bounce);
     ctx.lineTo(-14, -cellSize / 2 - 8 + bounce);
     ctx.lineTo(-8, -cellSize / 2 - 8 + bounce);
-    ctx.closePath();
+    this.ctx.closePath();
     ctx.fill();
     ctx.stroke();
     
@@ -1554,7 +1612,7 @@ class Game {
       this.ctx.moveTo(cx, cy);
       this.ctx.lineTo(cx + 5, cy + 15);
       this.ctx.lineTo(cx + 10, cy + 10);
-      this.closePath();
+      this.ctx.closePath();
       this.ctx.fill();
       this.ctx.stroke();
 

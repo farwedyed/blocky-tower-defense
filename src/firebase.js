@@ -34,9 +34,37 @@ function initFirebase() {
 }
 
 /**
+ * Upload an optional, anonymous player feedback submission directly to Firestore.
+ * @param {string} text - The text comment provided by the player.
+ * @param {number} rating - Auto-generated context rating based on win/loss status.
+ * @param {object} metadata - Context data containing mapId, finalWave, and isVictory.
+ */
+export async function uploadFeedback(text, rating, metadata = {}) {
+  initFirebase();
+  if (isUsingFirebase && db) {
+    try {
+      await db.collection('feedback').add({
+        text: text,
+        rating: rating,
+        mapId: metadata.mapId || 'unknown',
+        finalWave: metadata.finalWave || 0,
+        isVictory: metadata.isVictory !== undefined ? metadata.isVictory : false,
+        playerName: localStorage.getItem('tds_player_username') || "Guest",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      console.log('[Firebase] Feedback uploaded successfully.');
+    } catch (e) {
+      console.error('[Firebase] Failed to send feedback:', e);
+    }
+  } else {
+    console.log('[Firebase Sandbox] Offline fallback. Feedback logged:', text, rating, metadata);
+  }
+}
+
+/**
  * Upload a speedrun record to Firestore (and always cache locally).
  * @param {string} mapId  - e.g. 'grassland', 'desert', 'tundra'
- * @param {object} entry  - { time, timeRaw, date }
+ * @param {object} entry  - { name, time, timeRaw, date }
  */
 export async function uploadRecord(mapId, entry) {
   initFirebase();
@@ -50,6 +78,7 @@ export async function uploadRecord(mapId, entry) {
         .doc(mapId)
         .collection('records')
         .add({
+          name: entry.name || "Guest",
           time: entry.time,
           timeRaw: entry.timeRaw,
           date: entry.date,
@@ -66,7 +95,7 @@ export async function uploadRecord(mapId, entry) {
  * Fetch the top 5 speedrun records for a given map.
  * Syncs local records up to Firestore if the online database is empty.
  * @param {string} mapId
- * @returns {Promise<Array>} sorted array of { time, timeRaw, date }
+ * @returns {Promise<Array>} sorted array of { name, time, timeRaw, date }
  */
 export async function fetchTopRecords(mapId) {
   initFirebase();
@@ -81,7 +110,12 @@ export async function fetchTopRecords(mapId) {
         .get();
       const records = snap.docs.map(doc => {
         const d = doc.data();
-        return { time: d.time, timeRaw: d.timeRaw, date: d.date };
+        return { 
+          name: d.name || "Guest",
+          time: d.time, 
+          timeRaw: d.timeRaw, 
+          date: d.date 
+        };
       });
       
       console.log('[Firebase] Fetched ' + records.length + ' record(s) online for "' + mapId + '".');
@@ -96,6 +130,7 @@ export async function fetchTopRecords(mapId) {
               .doc(mapId)
               .collection('records')
               .add({
+                name: entry.name || "Guest",
                 time: entry.time,
                 timeRaw: entry.timeRaw,
                 date: entry.date,

@@ -11,11 +11,16 @@ export class Enemy {
     // Assign a unique network ID for multiplayer tracking
     this.id = Enemy.nextId++;
 
-    // Apply Hardcore Mode multipliers at spawn time
-    const hpMult = Enemy.hardcoreMode ? 1.5 : 1.0;
+    // Retrieve active difficulty from globally exposed game instance
+    const activeDiff = (window.game && window.game.selectedDifficulty) ? window.game.selectedDifficulty : 'molten';
+    const diffConfig = window.game ? window.game.difficultySettings[activeDiff] : { hpMultiplier: 1.15 };
+    const diffHpMult = diffConfig.hpMultiplier;
+
+    // Apply Hardcore Mode and active Difficulty multipliers at spawn time
+    const hpMult = (Enemy.hardcoreMode ? 1.5 : 1.0) * diffHpMult;
     const spdMult = Enemy.hardcoreMode ? 1.2 : 1.0;
 
-    this.maxHealth = stats.maxHealth * hpMult;
+    this.maxHealth = Math.round(stats.maxHealth * hpMult);
     this.health = this.maxHealth;
     this.baseSpeed = stats.speed * spdMult;
     this.speed = this.baseSpeed;
@@ -23,6 +28,9 @@ export class Enemy {
     this.radius = stats.radius || 12;
     this.color = stats.color || '#fff';
     this.name = stats.name || 'Zombie';
+    
+    // Roblox TDS-style distinct leakage base damage values
+    this.baseDamage = stats.baseDamage || 1;
 
     // Armor and Status attributes
     this.isCamo = stats.isCamo || false;
@@ -32,7 +40,7 @@ export class Enemy {
     this.isFireImmune = stats.isFireImmune || false;
 
     // Energy Shield Pool
-    this.maxShield = (stats.maxShield || 0) * hpMult;
+    this.maxShield = Math.round((stats.maxShield || 0) * hpMult);
     this.shield = this.maxShield;
 
     // Path movement tracking
@@ -60,6 +68,7 @@ export class Enemy {
       this.enraged = true;
       this.slowDuration = 0; // Clear slows immediately
       this.slowFactor = 1.0;
+      this.speed = this.baseSpeed;
       effectManager.spawnText(this.x, this.y - 25, "RAGE!", '#e74c3c');
     }
 
@@ -134,7 +143,7 @@ export class Enemy {
   }
 
   takeDamage(amount, damageType, effectManager) {
-    // 1. Lead / Heavy Armor Resistance (Immune to light physical, takes 1 dmg)
+    // 1. Lead / Heavy Armor Resistance (Immune to physical, takes exactly 1 dmg)
     if (this.isLead && damageType === 'physical') {
       amount = 1;
       effectManager.spawnText(this.x, this.y - 18, "RESIST", '#95a5a6');
@@ -304,12 +313,13 @@ export class Enemy {
 export class Runner extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 50,
+      maxHealth: 15, // Roblox TDS aligned
       speed: 65,
       goldReward: 12,
       radius: 10,
       color: '#8e44ad',
-      name: 'Zombie'
+      name: 'Zombie',
+      baseDamage: 1
     });
   }
 }
@@ -318,12 +328,13 @@ export class Runner extends Enemy {
 export class Quick extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 30,
+      maxHealth: 12, // Roblox TDS aligned
       speed: 120,
       goldReward: 10,
       radius: 9,
       color: '#e74c3c',
-      name: 'Quick Zombie'
+      name: 'Quick Zombie',
+      baseDamage: 1
     });
   }
 }
@@ -332,12 +343,13 @@ export class Quick extends Enemy {
 export class Slow extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 150,
+      maxHealth: 40, // Roblox TDS aligned
       speed: 40,
       goldReward: 20,
       radius: 13,
       color: '#34495e',
-      name: 'Slow Zombie'
+      name: 'Slow Zombie',
+      baseDamage: 3
     });
   }
 }
@@ -346,13 +358,14 @@ export class Slow extends Enemy {
 export class Hidden extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 60,
+      maxHealth: 30, // Roblox TDS aligned
       speed: 95,
       goldReward: 18,
       radius: 10,
       isCamo: true,
       color: '#9b59b6',
-      name: 'Hidden'
+      name: 'Hidden',
+      baseDamage: 2
     });
   }
 }
@@ -361,13 +374,14 @@ export class Hidden extends Enemy {
 export class Lead extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 100,
+      maxHealth: 50, // Roblox TDS aligned
       speed: 40,
       goldReward: 20,
       radius: 11,
       isLead: true,
       color: '#7f8c8d',
-      name: 'Lead'
+      name: 'Lead',
+      baseDamage: 4
     });
   }
 
@@ -384,13 +398,14 @@ export class Lead extends Enemy {
 export class Shadow extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 180,
+      maxHealth: 80, // Roblox TDS aligned
       speed: 115,
       goldReward: 35,
       radius: 11,
       isCamo: true,
       color: '#1a1a2e',
-      name: 'Shadow'
+      name: 'Shadow',
+      baseDamage: 5
     });
   }
 }
@@ -399,12 +414,13 @@ export class Shadow extends Enemy {
 export class Goliath extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 650,
+      maxHealth: 800, // Roblox TDS aligned
       speed: 35,
       goldReward: 60,
       radius: 18,
       color: '#27ae60',
-      name: 'Toxic Giant'
+      name: 'Toxic Giant',
+      baseDamage: 15
     });
   }
 
@@ -433,14 +449,15 @@ export class Goliath extends Enemy {
 export class Templar extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 1200,
-      maxShield: 500,
+      maxHealth: 3000, // Roblox TDS aligned
+      maxShield: 1000, // Roblox TDS aligned
       speed: 30,
       goldReward: 100,
       radius: 19,
       isLead: true,
       color: '#bdc3c7',
-      name: 'Templar'
+      name: 'Templar',
+      baseDamage: 25
     });
   }
 
@@ -466,13 +483,14 @@ export class Templar extends Enemy {
 export class GraveDigger extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 2500,
+      maxHealth: 8000, // Roblox TDS aligned
       speed: 32,
       goldReward: 200,
       radius: 26,
       isBoss: true,
       color: '#34495e',
-      name: 'Grave Digger'
+      name: 'Grave Digger',
+      baseDamage: 40
     });
     this.summonTimer = 0;
   }
@@ -504,7 +522,7 @@ export class GraveDigger extends Enemy {
     ctx.strokeRect(this.x + r * 0.6, renderY - 12, 4, 25);
 
     ctx.fillStyle = '#27ae60';
-    ctx.fillRect(this.x - r * 0.6, renderY - r * 1.4, r * 1.2, r * 1.0);
+    ctx.fillRect(this.x - r * 0.6, renderY - r * 1.5, r * 1.2, r * 1.0);
     ctx.strokeRect(this.x - r * 0.6, renderY - r * 1.4, r * 1.2, r * 1.0);
   }
 }
@@ -513,14 +531,15 @@ export class GraveDigger extends Enemy {
 export class MoltenTitan extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 6000,
+      maxHealth: 35000, // Roblox TDS aligned
       speed: 30,
       goldReward: 350,
       radius: 28,
       isBoss: true,
       isFireImmune: true,
       color: '#d35400',
-      name: 'Molten Titan'
+      name: 'Molten Titan',
+      baseDamage: 60
     });
   }
 
@@ -544,14 +563,15 @@ export class MoltenTitan extends Enemy {
 export class FallenGuardian extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 14000,
+      maxHealth: 85000, // Roblox TDS aligned
       speed: 28,
       goldReward: 500,
       radius: 30,
       isBoss: true,
       isLead: true,
       color: '#2c3e50',
-      name: 'Fallen Guardian'
+      name: 'Fallen Guardian',
+      baseDamage: 80
     });
   }
 
@@ -574,13 +594,14 @@ export class FallenGuardian extends Enemy {
 export class FallenKing extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 32000,
+      maxHealth: 180000, // Roblox TDS aligned
       speed: 24,
       goldReward: 800,
       radius: 33,
       isBoss: true,
       color: '#f1c40f',
-      name: 'Fallen King'
+      name: 'Fallen King',
+      baseDamage: 100
     });
     this.slamTimer = 0;
   }
@@ -636,15 +657,16 @@ export class FallenKing extends Enemy {
 export class VoidReaver extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 55000,
-      maxShield: 15000,
+      maxHealth: 350000, // Roblox TDS aligned
+      maxShield: 100000, // Roblox TDS aligned
       speed: 22,
       goldReward: 1500,
       radius: 36,
       isBoss: true,
       isLead: true,
       color: '#2c003e',
-      name: 'Void Reaver'
+      name: 'Void Reaver',
+      baseDamage: 100
     });
     this.summonTimer = 0;
     this.stunTimer = 0;

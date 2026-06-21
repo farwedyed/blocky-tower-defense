@@ -466,7 +466,8 @@ export const Network = {
                 isFlying: e.isFlying,
                 enraged: e.enraged,
                 slowDuration: e.slowDuration,
-                burnDuration: e.burnDuration
+                burnDuration: e.burnDuration,
+                baseDamage: e.baseDamage // Synchronize TDS-style base damage properties to clients
             })),
 
             bullets: this.game.bullets.map(b => ({
@@ -487,10 +488,6 @@ export const Network = {
         this.conns.forEach(c => {
             if (c && c.open) {
                 try {
-                    const dc = c._dc || c.dataChannel;
-                    if (dc && dc.bufferedAmount > 65536) {
-                        return; 
-                    }
                     c.send(statePayload);
                 } catch(e) {
                     console.warn(`Failed to send state payload to ${c.playerId || "unknown guest"}:`, e);
@@ -683,6 +680,11 @@ export const Network = {
                     enemy.enraged = eData.enraged;
                     enemy.slowDuration = eData.slowDuration;
                     enemy.burnDuration = eData.burnDuration;
+                    
+                    // Sync the proportional leakage base damage on guest client devices
+                    if (eData.baseDamage !== undefined) {
+                        enemy.baseDamage = eData.baseDamage;
+                    }
 
                     updatedEnemies.push(enemy);
                 });

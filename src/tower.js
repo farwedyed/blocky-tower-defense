@@ -185,7 +185,7 @@ export class Agent {
 
   getUpgradeCost() {
     if (this.level >= 5) return 0; // Max level reached
-    const baseCost = Math.floor(this.cost * 0.85 * this.level);
+    const baseCost = Math.floor(this.cost * 0.95 * this.level);
     // DJ units at level 5 reduce upgrade costs by 15% (instead of 10%)
     const discount = this.djRangeBuffed ? (this.level >= 5 ? 0.85 : 0.90) : 1.0;
     return Math.floor(baseCost * discount);
@@ -194,7 +194,7 @@ export class Agent {
   getSellValue() {
     let invested = this.cost;
     for (let l = 1; l < this.level; l++) {
-      invested += Math.floor(this.cost * 0.85 * l);
+      invested += Math.floor(this.cost * 0.95 * l);
     }
     return Math.floor(invested * 0.65);
   }
@@ -301,9 +301,9 @@ export class Agent {
 export class Scout extends Agent {
   constructor(gridX, gridY, cellSize) {
     super(gridX, gridY, cellSize, {
-      range: 135,
-      damage: 10,
-      fireRate: 1.5,
+      range: 110,      // Reduced from 135
+      damage: 3,       // Heavily reduced from 10
+      fireRate: 1.0,   // Reduced from 1.5
       cost: 100,
       type: 'scout',
       color: '#3498db',
@@ -376,15 +376,15 @@ export class Scout extends Agent {
 export class Minigunner extends Agent {
   constructor(gridX, gridY, cellSize) {
     super(gridX, gridY, cellSize, {
-      range: 155,
-      damage: 6,
-      fireRate: 8.0,
+      range: 130,      // Reduced from 155
+      damage: 2,       // Reduced from 6
+      fireRate: 4.5,   // Reduced from 8.0
       cost: 250,
       type: 'minigunner',
       color: '#e67e22',
       name: 'Minigunner'
     });
-    this.spinUpTimer = 0.5;
+    this.spinUpTimer = 0.8; // Spin up takes slightly longer
     this.currentSpin = 0.0;
     this.idleTimer = 0;
   }
@@ -488,7 +488,7 @@ export class Minigunner extends Agent {
 export class Commander extends Agent {
   constructor(gridX, gridY, cellSize) {
     super(gridX, gridY, cellSize, {
-      range: 120,
+      range: 110,      // Reduced from 120
       damage: 0,
       fireRate: 0,
       cost: 350,
@@ -602,7 +602,7 @@ export class Commander extends Agent {
 export class DJUnit extends Agent {
   constructor(gridX, gridY, cellSize) {
     super(gridX, gridY, cellSize, {
-      range: 140,
+      range: 120,      // Reduced from 140
       damage: 0,
       fireRate: 0,
       cost: 400,
@@ -712,9 +712,9 @@ export class DJUnit extends Agent {
 export class Pyromancer extends Agent {
   constructor(gridX, gridY, cellSize) {
     super(gridX, gridY, cellSize, {
-      range: 105,
-      damage: 5,
-      fireRate: 4.5,
+      range: 90,       // Reduced from 105
+      damage: 2,       // Reduced from 5
+      fireRate: 3.0,   // Reduced from 4.5
       cost: 300,
       type: 'pyromancer',
       color: '#e67e22',
@@ -866,9 +866,9 @@ export class Farm extends Agent {
 export class Gladiator extends Agent {
   constructor(gridX, gridY, cellSize) {
     super(gridX, gridY, cellSize, {
-      range: 65,
-      damage: 25,
-      fireRate: 1.25,
+      range: 55,       // Reduced from 65
+      damage: 8,       // Heavily reduced from 25
+      fireRate: 1.1,   // Reduced from 1.25
       cost: 200,
       type: 'gladiator',
       color: '#7f8c8d',
@@ -1007,9 +1007,9 @@ export class Gladiator extends Agent {
 export class Soldier extends Agent {
   constructor(gridX, gridY, cellSize) {
     super(gridX, gridY, cellSize, {
-      range: 125,
-      damage: 8,
-      fireRate: 3.2,
+      range: 115,      // Reduced from 125
+      damage: 4,       // Reduced from 8
+      fireRate: 2.5,   // Reduced from 3.2
       cost: 150,
       type: 'soldier',
       color: '#27ae60',
@@ -1094,9 +1094,9 @@ export class Soldier extends Agent {
 export class Sniper extends Agent {
   constructor(gridX, gridY, cellSize) {
     super(gridX, gridY, cellSize, {
-      range: 220,
-      damage: 35,
-      fireRate: 0.35,
+      range: 180,      // Reduced from 220
+      damage: 15,      // Reduced from 35
+      fireRate: 0.25,  // Reduced from 0.35
       cost: 200,
       type: 'sniper',
       color: '#e67e22',
@@ -1173,9 +1173,9 @@ export class Sniper extends Agent {
 export class Medic extends Agent {
   constructor(gridX, gridY, cellSize) {
     super(gridX, gridY, cellSize, {
-      range: 110,
-      damage: 5,
-      fireRate: 1.0,
+      range: 100,      // Reduced from 110
+      damage: 3,       // Reduced from 5
+      fireRate: 0.8,   // Reduced from 1.0
       cost: 300,
       type: 'medic',
       color: '#e74c3c',
@@ -1321,9 +1321,9 @@ export class Medic extends Agent {
 export class Rocketeer extends Agent {
   constructor(gridX, gridY, cellSize) {
     super(gridX, gridY, cellSize, {
-      range: 120,
-      damage: 20,
-      fireRate: 0.45,
+      range: 110,      // Reduced from 120
+      damage: 12,      // Reduced from 20
+      fireRate: 0.35,  // Reduced from 0.45
       cost: 400,
       type: 'rocketeer',
       color: '#95a5a6',

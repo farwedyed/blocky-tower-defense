@@ -80,37 +80,47 @@
                 <canvas class="map-preview-canvas" width="120" height="90"></canvas>
                 <div class="map-info">
                   <span class="name">Grassland</span>
-                  <span class="difficulty easy">EASY (x1.0 Coins)</span>
+                  <span class="difficulty easy">x1.0 Coins / XP</span>
                 </div>
               </button>
               <button class="map-card" data-map-id="desert">
                 <canvas class="map-preview-canvas" width="120" height="90"></canvas>
                 <div class="map-info">
                   <span class="name">Desert Outpost</span>
-                  <span class="difficulty medium">MEDIUM (x1.25 Coins)</span>
+                  <span class="difficulty medium">x1.25 Coins / XP</span>
                 </div>
               </button>
               <button class="map-card" data-map-id="tundra">
                 <canvas class="map-preview-canvas" width="120" height="90"></canvas>
                 <div class="map-info">
                   <span class="name">Frost Tundra</span>
-                  <span class="difficulty hard">HARD (x1.5 Coins)</span>
+                  <span class="difficulty hard">x1.5 Coins / XP</span>
                 </div>
               </button>
               <button class="map-card" data-map-id="cyber_city">
                 <canvas class="map-preview-canvas" width="120" height="90"></canvas>
                 <div class="map-info">
                   <span class="name">Cyber City</span>
-                  <span class="difficulty hard" style="background: #9b59b6;">HARD (x1.5 Coins)</span>
+                  <span class="difficulty hard" style="background: #9b59b6;">x1.5 Coins / XP</span>
                 </div>
               </button>
               <button class="map-card" data-map-id="fallen_outpost">
                 <canvas class="map-preview-canvas" width="120" height="90"></canvas>
                 <div class="map-info">
                   <span class="name">Fallen Outpost</span>
-                  <span class="difficulty extreme" style="background: #962d2d; color:#fff;">EXPERT (x1.8 Coins)</span>
+                  <span class="difficulty extreme" style="background: #962d2d; color:#fff;">x1.8 Coins / XP</span>
                 </div>
               </button>
+            </div>
+
+            <!-- DIFFICULTY SELECTION COMPONENT (Roblox TDS Style) -->
+            <div id="difficulty-selector-container" style="margin: 10px 0; display: flex; flex-direction: column; gap: 8px; background: rgba(0,0,0,0.04); padding: 12px; border-radius: 12px; border: 2.5px solid var(--border-color);">
+              <span style="font-family: var(--font-title); font-size: 0.95rem; font-weight: 900; color: var(--text-dark); text-align: center; letter-spacing: 0.5px;">CHOOSE DIFFICULTY</span>
+              <div class="diff-btn-group" style="display: flex; gap: 8px; width: 100%;">
+                <button class="btn diff-btn" data-difficulty="easy" style="flex: 1; font-size: 0.82rem; padding: 8px 4px; background: var(--primary-green); color: #fff; box-shadow: 0 3px 0 var(--primary-green-dark), 0 3px 0 var(--border-color); min-height: 38px;">EASY (30 WAVES)</button>
+                <button class="btn diff-btn active" data-difficulty="molten" style="flex: 1; font-size: 0.82rem; padding: 8px 4px; background: var(--primary-orange); color: #fff; box-shadow: 0 3px 0 #d35400, 0 3px 0 var(--border-color); min-height: 38px;">MOLTEN (40 WAVES)</button>
+                <button class="btn diff-btn" data-difficulty="fallen" style="flex: 1; font-size: 0.82rem; padding: 8px 4px; background: var(--primary-red); color: #fff; box-shadow: 0 3px 0 var(--primary-red-dark), 0 3px 0 var(--border-color); min-height: 38px;">FALLEN (40 WAVES)</button>
+              </div>
             </div>
 
             <!-- Hardcore Mode Toggle -->
