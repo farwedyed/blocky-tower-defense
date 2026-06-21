@@ -26,7 +26,7 @@ class Game {
     this.equippedSkins = {};
 
     // Difficulty Settings Mapping (TDS Balancing)
-    this.selectedDifficulty = 'molten';
+    this.selectedDifficulty = 'easy'; // Changed default difficulty from 'molten' to 'easy'
     this.difficultySettings = {
       easy: {
         hpMultiplier: 0.75,
