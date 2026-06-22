@@ -23,7 +23,7 @@ export class GameUI {
     this.btnReturnLobby = document.getElementById('btn-return-lobby');
     this.equippedAgentsList = document.getElementById('equipped-agents-list');
 
-    // Selection controls
+    // Redesigned zero-scroll selection controls
     this.selectionPanel = document.getElementById('selection-panel');
     this.selectionInfo = document.getElementById('selection-info');
     this.selectTargeting = document.getElementById('select-targeting');
@@ -33,6 +33,12 @@ export class GameUI {
     this.overlay = document.getElementById('game-overlay');
     this.overlayTitle = document.getElementById('overlay-title');
     this.overlaySubtitle = document.getElementById('overlay-subtitle');
+
+    // Commander Dialog bindings
+    this.commanderWrapper = document.getElementById('commander-dialog-wrapper');
+    this.commanderFaceCanvas = document.getElementById('commander-face-canvas');
+    this.commanderText = document.getElementById('commander-dialog-text');
+    this.btnCommanderAction = document.getElementById('btn-commander-action');
 
     // Track active target element for real-time updates
     this.activePointerTarget = null;
@@ -113,6 +119,48 @@ export class GameUI {
     });
   }
 
+  drawCommanderFace() {
+    if (!this.commanderFaceCanvas) return;
+    const ctx = this.commanderFaceCanvas.getContext('2d');
+    const w = this.commanderFaceCanvas.width;
+    const h = this.commanderFaceCanvas.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.save();
+    
+    // Face base (Skin)
+    ctx.fillStyle = '#ffdbac';
+    ctx.fillRect(10, 10, 50, 50);
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(10, 10, 50, 50);
+
+    // Shades
+    ctx.fillStyle = '#111';
+    ctx.fillRect(14, 25, 17, 9);
+    ctx.fillRect(39, 25, 17, 9);
+    ctx.fillRect(31, 28, 8, 2);
+
+    // Mouth (Stern expression)
+    ctx.fillStyle = '#222';
+    ctx.fillRect(25, 48, 20, 3);
+
+    // Military Cap
+    ctx.fillStyle = '#c0392b';
+    ctx.fillRect(6, 6, 58, 12);
+    ctx.strokeRect(6, 6, 58, 12);
+    
+    // Gold trim band on cap
+    ctx.fillStyle = '#f1c40f';
+    ctx.fillRect(10, 14, 50, 4);
+
+    // Cap Peak visor
+    ctx.fillStyle = '#111';
+    ctx.fillRect(4, 16, 12, 4);
+    ctx.fillRect(54, 16, 12, 4);
+
+    ctx.restore();
+  }
+
   showPointerAt(targetElement, direction = 'down') {
     this.hidePointer();
     if (!targetElement) return;
@@ -173,6 +221,46 @@ export class GameUI {
     arrow._cleanupResize = () => window.removeEventListener('resize', reposition);
   }
 
+  showPointerAtCanvasTile(col, row) {
+    this.hidePointer();
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return;
+
+    const arrow = document.createElement('div');
+    arrow.id = 'active-tut-arrow';
+    arrow.style.cssText = `
+      position: fixed;
+      z-index: 20000;
+      pointer-events: none;
+      width: 0;
+      height: 0;
+      border-left: 12px solid transparent;
+      border-right: 12px solid transparent;
+      border-top: 20px solid #f1c40f;
+      filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6));
+      transition: all 0.2s ease-out;
+    `;
+    document.body.appendChild(arrow);
+
+    const reposition = () => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = rect.width / 800;
+      const scaleY = rect.height / 600;
+      
+      const tileX = (col * 40 + 20) * scaleX;
+      const tileY = (row * 40 + 20) * scaleY;
+
+      arrow.style.animation = 'tutArrowBounce 0.6s infinite ease-in-out';
+      arrow.style.transform = 'none';
+      arrow.style.top = `${rect.top + tileY - 45}px`;
+      arrow.style.left = `${rect.left + tileX - 12}px`;
+    };
+
+    reposition();
+    window.addEventListener('resize', reposition);
+    arrow._cleanupResize = () => window.removeEventListener('resize', reposition);
+  }
+
   repositionPointer(targetElement, direction = 'down') {
     const arrow = document.getElementById('active-tut-arrow');
     if (!arrow || !targetElement) return;
@@ -216,14 +304,14 @@ export class GameUI {
       btn.className = `placement-btn ${this.game.selectedShopTower === type ? 'active' : ''}`;
       btn.setAttribute('data-type', type);
 
-      let name = type.charAt(0).toUpperCase() + type.slice(1);
-      if (type === 'dj') name = 'DJ Unit';
+      let name = type.replace('_', ' ').toUpperCase();
+      if (type === 'dj') name = 'DJ Booth';
       const cost = this.game.getTowerCost(type);
 
       btn.innerHTML = `
         <div class="icon"><canvas width="45" height="45"></canvas></div>
         <div class="info">
-          <span class="name">${name}</span>
+          <span class="name" style="text-transform: uppercase;">${name}</span>
           <span class="cost">$${cost}</span>
         </div>
       `;
@@ -283,8 +371,10 @@ export class GameUI {
     });
 
     if (this.btnSkipWave) {
-      const showSkip = this.game.waveInProgress && this.game.spawnQueue.length === 0 && this.game.wave < this.game.maxWaves;
+      // Changed: skips are now stackable and always available inside valid waves [4]
+      const showSkip = this.game.waveInProgress && this.game.wave < this.game.maxWaves;
       if (showSkip) {
+        this.btnSkipWave.style.display = 'block';
         this.btnSkipWave.classList.remove('hidden');
         const votesCount = Network.mode === 'CLIENT' ? (this.game.skipVotesCount || 0) : (this.game.skipVotes ? this.game.skipVotes.size : 0);
         const votesReq = Network.mode === 'CLIENT' ? (this.game.skipVotesRequired || 1) : Math.ceil((Network.conns.filter(c => c && c.open).length + 1) / 2);
@@ -295,6 +385,7 @@ export class GameUI {
           this.btnSkipWave.textContent = "SKIP WAVE";
         }
       } else {
+        this.btnSkipWave.style.display = 'none';
         this.btnSkipWave.classList.add('hidden');
       }
     }
@@ -328,39 +419,59 @@ export class GameUI {
     const upgradeCost = agent.getUpgradeCost();
     const sellValue = agent.getSellValue();
 
+    let displayName = agent.name;
+    if (agent.type === 'crook_boss') displayName = 'Crook Boss';
+    else if (agent.type === 'military_base') displayName = 'Military Base';
+    else if (agent.type === 'dj') displayName = 'DJ Booth';
+
     let detailsHtml = `
-      <p class="unit-name">${agent.name} <span style="color: #f39c12">Lvl ${agent.level}</span></p>
+      <p class="unit-name" style="text-transform: uppercase;">${displayName} <span style="color: #f39c12">Lvl ${agent.level}</span></p>
       <p class="unit-stats">Damage: ${Math.round(agent.damage)} | Range: ${Math.round(agent.range * (agent.djRangeBuffed ? 1.15 : 1.0))}px | Rate: ${(agent.fireRate * (agent.commanderSpeedBuffed ? 1.35 : 1.0)).toFixed(1)}/s</p>
     `;
 
+    // Specialized Agent details description
     if (agent.type === 'commander') {
-      detailsHtml += `<p class="unit-stats" style="color: #e74c3c">Call to Arms: +35% Shoot Speed</p>`;
+      detailsHtml += `<p class="unit-stats" style="color: #e74c3c">Call to Arms: Active speed buffs for nearby agents.</p>`;
     } else if (agent.type === 'dj') {
-      detailsHtml += `<p class="unit-stats" style="color: #9b59b6">Plays Tracks: +15% Range & -10% Upgrades</p>`;
+      detailsHtml += `<p class="unit-stats" style="color: #9b59b6">Plays Tracks: Range expansion & upgrade cost discount inside aura.</p>`;
     } else if (agent.type === 'pyromancer') {
       const burnDps = 15 + agent.level * 4;
-      detailsHtml += `<p class="unit-stats" style="color: #e67e22">Fire Spray DoT: ${burnDps} Dmg/sec</p>`;
+      detailsHtml += `<p class="unit-stats" style="color: #e67e22">Fire Spray DoT: ${burnDps} Dmg/sec. Removes lead armors.</p>`;
     } else if (agent.type === 'farm') {
       const income = agent.getHarvestIncome();
       detailsHtml += `<p class="unit-stats" style="color: #2ecc71">Wave Harvest Income: +$${income}</p>`;
     } else if (agent.type === 'gladiator') {
-      detailsHtml += `<p class="unit-stats" style="color: #7f8c8d">Centurion Plume: Fast Centurion Sword swing</p>`;
+      detailsHtml += `<p class="unit-stats" style="color: #7f8c8d">Centurion Plume: Extreme fast melee cleave swings.</p>`;
     } else if (agent.type === 'soldier') {
-      detailsHtml += `<p class="unit-stats" style="color: #27ae60">Assault Rifle: Rapid 3/5 round bursts</p>`;
+      detailsHtml += `<p class="unit-stats" style="color: #27ae60">Assault Rifle: Rapid burst-fire configurations.</p>`;
     } else if (agent.type === 'sniper') {
-      detailsHtml += `<p class="unit-stats" style="color: #e67e22">Sniper Scope: Single high physical damage shot</p>`;
+      detailsHtml += `<p class="unit-stats" style="color: #e67e22">Sniper Scope: Heavy slow long-range armor-piercing tracer bullets.</p>`;
     } else if (agent.type === 'medic') {
-      detailsHtml += `<p class="unit-stats" style="color: #2ecc71">Syringe Gun: Heals base HP and targets status effects</p>`;
+      detailsHtml += `<p class="unit-stats" style="color: #2ecc71">Syringe Gun: Active heals base HP & cleanses active stun locks.</p>`;
     } else if (agent.type === 'rocketeer') {
-      detailsHtml += `<p class="unit-stats" style="color: #95a5a6">Rocket Launcher: Splash area impact damage</p>`;
+      detailsHtml += `<p class="unit-stats" style="color: #95a5a6">Rocket Launcher: Slow high-damage heavy explosive splash impact.</p>`;
+    } else if (agent.type === 'demoman') {
+      detailsHtml += `<p class="unit-stats" style="color: #e67e22">Demolition Grenades: Quick area splash explosions.</p>`;
+    } else if (agent.type === 'freezer') {
+      detailsHtml += `<p class="unit-stats" style="color: #3498db">Freezing Beams: Sells freeze slow effects to stun marching zombies.</p>`;
+    } else if (agent.type === 'shotgunner') {
+      detailsHtml += `<p class="unit-stats" style="color: #34495e">Shotgun Spread: Launches multiple pellets in close-range cones.</p>`;
+    } else if (agent.type === 'crook_boss') {
+      detailsHtml += `<p class="unit-stats" style="color: #d4ac0d">Reinforcements Call: Tommy gun fire and periodic guard deployments.</p>`;
+    } else if (agent.type === 'military_base') {
+      detailsHtml += `<p class="unit-stats" style="color: #27ae60">Heavy Assembly: Deploys heavy armored military vehicles along path.</p>`;
+    } else if (agent.type === 'ranger') {
+      detailsHtml += `<p class="unit-stats" style="color: #ff0055">Heavy Railgun: Massive single-target damage, but cannot detect Camo.</p>`;
+    } else if (agent.type === 'turret') {
+      detailsHtml += `<p class="unit-stats" style="color: #00ffe0">Laser Gatling: Blazing-fast rapid laser bullet output stream.</p>`;
     }
 
     const targetingContainer = document.querySelector('.targeting-container');
     if (targetingContainer) {
-      if (agent.type === 'farm') {
-        targetingContainer.classList.add('hidden');
+      if (agent.type === 'farm' || agent.type === 'military_base') {
+        targetingContainer.style.display = 'none';
       } else {
-        targetingContainer.classList.remove('hidden');
+        targetingContainer.style.display = 'flex';
       }
     }
 
@@ -406,13 +517,11 @@ export class GameUI {
         btnAbility.style.opacity = '0.5';
         btnAbility.style.background = '#7f8c8d';
       } else {
-        if (agent.type === 'commander') btnAbility.textContent = "ACTIVATE: CALL TO ARMS";
-        else if (agent.type === 'gladiator') btnAbility.textContent = "ACTIVATE: WARRIOR'S RAGE";
-        else btnAbility.textContent = "ACTIVATE: RESTORE INTEGRITY";
-        
+        btnAbility.textContent = "ABILITY";
         btnAbility.disabled = false;
         btnAbility.style.opacity = '1.0';
-        btnAbility.style.background = 'var(--primary-blue)';
+        btnAbility.style.background = '#f39c12';
+        btnAbility.style.color = '#fff';
       }
 
       btnAbility.onclick = () => {
@@ -518,13 +627,14 @@ export class GameUI {
     this.hidePointer();
 
     if (!this.game.tutorialCompleted) {
-      this.showPointerAtCanvasCenter();
+      this.showTutorialHint(0.5); // Starts at Step 0.5: Point arrow to Canvas to prompt overlay clearance [4]
     }
   }
 
   showLobbyLayout() {
     this.parentUI.gameView.classList.add('hidden');
     this.parentUI.lobbyView.classList.remove('hidden');
+    this.dismissCommanderDialog(); // Safely hide balloon
     
     if (this.parentUI.lobby) {
       this.parentUI.lobby.drawAllStaticPreviews();
@@ -538,146 +648,59 @@ export class GameUI {
   }
 
   showTutorialHint(step) {
-    this.dismissTutorial();
+    // Only hide balloon on step changes, leaving the physical bouncing pointers visible [4]
+    this.dismissCommanderDialog(); 
+    if (!this.commanderWrapper) return;
 
-    const isMobileSize = window.innerWidth <= 900 || window.innerHeight <= 600;
-    if (isMobileSize) {
-      this.activateStepPointers(step);
-      return;
+    this.commanderWrapper.classList.remove('hidden');
+    this.drawCommanderFace();
+
+    const messages = {
+      0.5: "Welcome to the battleground, rookie! I am your Commander. Tap anywhere on the map grid to clear the direction directives and ready up.",
+      1: "Let's set up a perimeter. Select the Scout from your troops panel on the right.",
+      1.5: "Excellent. Now, place your Scout on the highlighted yellow tile on the field.",
+      2: "Good job! Now, tap directly on the placed Scout to select him.",
+      2.5: "Great! Now press UPGRADE in your action panel to power him up before starting the wave.",
+      3: "Looking strong! Now, press 'START WAVE' to summon the training zombies!",
+      4: "Superb work, rookie. You've mastered the basics of Blocky tactical defenses. Dismissed!"
+    };
+
+    this.commanderText.textContent = messages[step] || "Awaiting operational instructions...";
+
+    if (step === 4) {
+      this.btnCommanderAction.textContent = "FINISH TUTORIAL ✓";
+      this.btnCommanderAction.onclick = () => {
+        this.game.tutorialCompleted = true;
+        this.game.saveStatsToStorage();
+        this.dismissTutorial(); // Closes dialog AND removes pointer highlights [4]
+      };
+    } else {
+      this.btnCommanderAction.textContent = "GOT IT ✓";
+      this.btnCommanderAction.onclick = () => {
+        this.dismissCommanderDialog(); // ONLY hides speech balloon, leaves pointers active! [4]
+      };
     }
-
-    const existing = document.getElementById('tutorial-hint-box');
-    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
-
-    document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
-
-    const tutorialEl = document.createElement('div');
-    tutorialEl.id = 'tutorial-hint-box';
-    tutorialEl.style.cssText = `
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 9000;
-      background: rgba(20, 30, 50, 0.97);
-      border: 2.5px solid #f1c40f;
-      border-radius: 14px;
-      padding: 14px 22px;
-      max-width: 480px;
-      width: 90vw;
-      box-shadow: 0 6px 30px rgba(0,0,0,0.6);
-      display: flex;
-      gap: 14px;
-      align-items: flex-start;
-      animation: tutorialSlideUp 0.35s cubic-bezier(0.34,1.56,0.64,1) both;
-      font-family: var(--font-body, 'Nunito', sans-serif);
-    `;
-    document.body.appendChild(tutorialEl);
-
-    if (!document.getElementById('tutorial-keyframe-style')) {
-      const style = document.createElement('style');
-      style.id = 'tutorial-keyframe-style';
-      style.textContent = `
-        @keyframes tutorialSlideUp {
-          from { opacity: 0; transform: translateX(-50%) translateY(30px); }
-          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-        }
-      `;
-      document.head.appendChild(style);
-    }
-
-    const messages = [
-      {
-        icon: '👋',
-        title: 'Welcome to Blocky TDS!',
-        body: 'Equip your loadout, select a map, and tap <strong style="color: #f1c40f;">PLAY SOLO</strong> or <strong style="color: #f1c40f;">DEPLOY</strong> to begin your defense!'
-      },
-      {
-        icon: '🏗️',
-        title: 'Deploy Your First Scout!',
-        body: 'Select the <strong style="color: #f1c40f;">Scout</strong> in your sidebar placement panel, then tap the <strong style="color: #f1c40f;">glowing yellow tile</strong> on the map grid to place him!'
-      },
-      {
-        icon: '🌊',
-        title: 'Send in the Horde!',
-        body: 'Tap the <strong style="color: #f1c40f;">START WAVE</strong> button in your controls sidebar to summon the first wave of training zombies!'
-      },
-      {
-        icon: '🔼',
-        title: 'Upgrade Your Scout!',
-        body: 'Tap your placed Scout on the field to select him, then choose <strong style="color: #2ecc71;">UPGRADE</strong> in the modifications panel to increase his fire rate and damage!'
-      }
-    ];
-
-    let msgIndex = 0;
-    if (step === 0) msgIndex = 0;
-    else if (step === 1) msgIndex = 1;
-    else if (step === 1.5) msgIndex = 2;
-    else if (step === 2) msgIndex = 3;
-    const msg = messages[msgIndex];
-    if (!msg) return;
-
-    tutorialEl.innerHTML = `
-      <div style="font-size:2rem;line-height:1;flex-shrink:0;">${msg.icon}</div>
-      <div style="flex:1;">
-        <div style="font-weight:900;font-size:1rem;color:#f1c40f;margin-bottom:4px;">${msg.title}</div>
-        <div style="font-size:0.85rem;color:#ecf0f1;line-height:1.5;">${msg.body}</div>
-        <button id="btn-dismiss-tutorial" style="
-          margin-top: 10px;
-          background: #f1c40f;
-          color: #1a1a2e;
-          border: none;
-          border-radius: 8px;
-          font-weight: 900;
-          font-size: 0.82rem;
-          padding: 5px 14px;
-          cursor: pointer;
-          letter-spacing: 0.04em;
-        ">GOT IT ✓</button>
-      </div>
-    `;
 
     this.activateStepPointers(step);
+  }
 
-    const dismissBtn = document.getElementById('btn-dismiss-tutorial');
-    if (dismissBtn) {
-      dismissBtn.addEventListener('click', () => {
-        this.dismissTutorialHintOnly();
-      });
-    }
+  showCommanderAnnouncement(msg) {
+    if (!this.commanderWrapper) return;
+    this.commanderWrapper.classList.remove('hidden');
+    this.drawCommanderFace();
+    this.commanderText.textContent = msg;
+    this.btnCommanderAction.textContent = "DISMISS ✓";
+    this.btnCommanderAction.onclick = () => {
+      this.dismissCommanderDialog();
+    };
   }
 
   activateStepPointers(step) {
     this.hidePointer();
 
-    if (step === 0) {
-      const playSoloBtn = document.getElementById('btn-select-solo');
-      if (playSoloBtn && document.getElementById('lobby-splash-container').style.display !== 'none') {
-        this.showPointerAt(playSoloBtn, 'down');
-        playSoloBtn.classList.add('tut-highlight');
-
-        const onSoloClick = () => {
-          playSoloBtn.removeEventListener('click', onSoloClick);
-          playSoloBtn.classList.remove('tut-highlight');
-          this.hidePointer();
-
-          setTimeout(() => {
-            if (this.parentUI.lobby && this.parentUI.lobby.btnDeploy) {
-              const deployBtn = this.parentUI.lobby.btnDeploy;
-              this.showPointerAt(deployBtn, 'down');
-              deployBtn.classList.add('tut-highlight');
-            }
-          }, 350);
-        };
-        playSoloBtn.addEventListener('click', onSoloClick);
-      } else {
-        if (this.parentUI.lobby && this.parentUI.lobby.btnDeploy) {
-          const deployBtn = this.parentUI.lobby.btnDeploy;
-          this.showPointerAt(deployBtn, 'down');
-          deployBtn.classList.add('tut-highlight');
-        }
-      }
-    } 
+    if (step === 0.5) {
+      this.showPointerAtCanvasCenter(); // Points arrow to the center of the canvas [4]
+    }
     else if (step === 1) {
       const scoutBtn = this.equippedAgentsList.querySelector('.placement-btn[data-type="scout"]');
       if (scoutBtn) {
@@ -688,45 +711,42 @@ export class GameUI {
           scoutBtn.removeEventListener('click', onScoutSelect);
           scoutBtn.classList.remove('tut-highlight');
           this.hidePointer();
+          this.game.tutorialStep = 1.5;
+          this.showTutorialHint(1.5);
         };
         scoutBtn.addEventListener('click', onScoutSelect);
       }
     } 
     else if (step === 1.5) {
-      const startWaveBtn = document.getElementById('btn-next-wave');
-      if (startWaveBtn) {
-        this.showPointerAt(startWaveBtn, 'down');
-        startWaveBtn.classList.add('tut-highlight');
-      }
+      this.showPointerAtCanvasTile(2, 1); // Points arrow directly to the glowing tile coordinates (2,1) [4]
     }
     else if (step === 2) {
-      if (this.game.selectedPlacedTower && this.game.selectedPlacedTower.gridX === 2 && this.game.selectedPlacedTower.gridY === 1) {
-        if (this.btnUpgrade) {
-          this.showPointerAt(this.btnUpgrade, 'right');
-          this.btnUpgrade.classList.add('tut-highlight');
-        }
-      } else {
-        this.game.effectManager.spawnText(400, 300, "TAP YOUR SCOUT TO SELECT!", '#f1c40f');
+      this.showPointerAtCanvasTile(2, 1); // Points arrow to placed Scout to select him [4]
+    }
+    else if (step === 2.5) {
+      if (this.btnUpgrade) {
+        this.showPointerAt(this.btnUpgrade, 'left');
+        this.btnUpgrade.classList.add('tut-highlight');
+      }
+    }
+    else if (step === 3) {
+      if (this.btnNextWave) {
+        this.showPointerAt(this.btnNextWave, 'down');
+        this.btnNextWave.classList.add('tut-highlight');
       }
     }
   }
 
-  dismissTutorialHintOnly() {
-    const tutorialEl = document.getElementById('tutorial-hint-box');
-    if (tutorialEl) {
-      tutorialEl.style.opacity = '0';
-      tutorialEl.style.transform = 'translateX(-50%) translateY(20px)';
-      tutorialEl.style.transition = 'opacity 0.3s, transform 0.3s';
-      setTimeout(() => {
-        if (tutorialEl.parentNode) tutorialEl.parentNode.removeChild(tutorialEl);
-      }, 320);
+  dismissCommanderDialog() {
+    if (this.commanderWrapper) {
+      this.commanderWrapper.classList.add('hidden'); // ONLY hides dialogue speech bubble, leaving arrows intact [4]
     }
   }
 
   dismissTutorial() {
-    this.dismissTutorialHintOnly();
     document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
     this.hidePointer();
+    this.dismissCommanderDialog(); // Fully hides dialogue overlay [4]
   }
 
   showMatchSummaryCard(isVictory) {
@@ -743,7 +763,7 @@ export class GameUI {
     summaryCard.style.cssText = `
       background: rgba(20, 30, 50, 0.98);
       border: 4px solid ${isVictory ? '#f1c40f' : '#e74c3c'};
-      box-shadow: 0 0 25px ${isVictory ? 'rgba(241,196,15,0.4)' : 'rgba(231,76,60,0.4)'};
+      box-shadow: 0 0 25px ${isVictory ? 'rgba(241,196,15,0.4)' : 'rgba(231, 76, 60, 0.4)'};
       border-radius: 16px;
       padding: 16px 20px 20px 20px;
       width: 360px;
@@ -819,83 +839,40 @@ export class GameUI {
             📝 HELP IMPROVE THE GAME! (SUGGESTIONS & BUGS)
           </label>
           <div style="display:flex; gap:6px; align-items: center;">
-            <input type="text" id="input-feedback-msg" placeholder="Type a suggestion or bug report..." style="
-              flex:1;
-              background: rgba(0, 0, 0, 0.35);
-              border: 2px solid var(--border-color);
-              border-radius: 8px;
-              color: #fff;
-              padding: 8px 12px;
-              font-size: 0.82rem;
-              font-weight: 700;
-              outline: none;
-              min-height: 38px;
-              box-sizing: border-box;
-              transition: border-color 0.2s;
-            " />
-            <button id="btn-submit-feedback" class="btn" style="
-              background: var(--primary-yellow);
-              color: #000;
-              font-family: var(--font-title);
+            <input type="text" id="input-feedback-msg" placeholder="Write feedback here..." style="
+              flex: 1;
               font-size: 0.8rem;
-              font-weight: 900;
-              padding: 0 14px;
-              height: 38px;
-              box-shadow: 0 3px 0 var(--primary-yellow-dark), 0 3px 0 var(--border-color);
-              border-radius: 8px;
-              border-width: 2px;
-              margin: 0;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              cursor: pointer;
-            ">SEND</button>
+              padding: 6px;
+              border: 2px solid var(--border-color);
+              border-radius: 6px;
+              outline: none;
+            "/>
+            <button id="btn-submit-feedback" class="btn btn-primary" style="font-size: 0.72rem; padding: 6px 12px; margin: 0; min-height: 32px;">SEND</button>
           </div>
         </div>
       `;
     }
 
     summaryCard.innerHTML = `
-      <h2 style="font-family: var(--font-title); font-size: 1.8rem; margin-bottom: 6px; color: ${isVictory ? '#f1c40f' : '#e74c3c'}">${isVictory ? '🏆 VICTORY!' : '💀 DEFEATED'}</h2>
-      <div style="font-size: 0.85rem; color: #7f8c8d; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px;">${mapName} ${isHc ? '<span style="color:#e74c3c; font-weight:900;">[HARDCORE]</span>' : ''}</div>
-      
-      <div style="display:flex; flex-direction:column; gap:8px; font-weight:800; font-size:0.95rem; margin-bottom: 12px;">
-        <div style="display:flex; justify-content:space-between; border-bottom: 1px dashed rgba(255,255,255,0.15); padding-bottom: 4px;">
-          <span>WAVES SURVIVED:</span>
-          <span style="color:#f1c40f" id="tally-wave">0</span>
+      <h2 style="font-family:var(--font-title); font-size:1.8rem; margin-bottom:15px; color:${isVictory ? 'var(--primary-yellow)' : 'var(--primary-red)'}">${isVictory ? '🏆 VICTORY' : '💀 DEFEAT'}</h2>
+      <div style="font-size:0.9rem; font-weight:800; margin-bottom:15px;">
+        <p>MAP: <span style="color:var(--primary-blue)">${mapName}</span></p>
+        <p>WAVES DEFENDED: <span style="color:var(--primary-yellow-dark)" id="tally-wave">0</span></p>
+        <p>TIME ELAPSED: <span style="color:#00ffe0" id="tally-time">--:--</span></p>
+      </div>
+      <div style="display:flex; gap:10px; justify-content:center; font-weight:900; margin-bottom:20px;">
+        <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px; border:2.5px solid var(--border-color); flex:1;">
+          <span style="font-size:0.75rem; color:var(--text-muted)">REWARD COINS</span>
+          <p style="font-size:1.3rem; color:var(--primary-yellow)" id="tally-coins">+🪙 0</p>
         </div>
-        <div style="display:flex; justify-content:space-between; border-bottom: 1px dashed rgba(255,255,255,0.15); padding-bottom: 6px;">
-          <span>TIME:</span>
-          <span style="color:#3498db" id="tally-time">--:--</span>
-        </div>
-        <div style="display:flex; justify-content:space-between; border-bottom: 1px dashed rgba(255,255,255,0.15); padding-bottom: 6px;">
-          <span>COINS REWARDED:</span>
-          <span style="color:#2ecc71" id="tally-coins">0</span>
-        </div>
-        <div style="display:flex; justify-content:space-between; border-bottom: 1px dashed rgba(255,255,255,0.15); padding-bottom: 6px;">
-          <span>XP GAINED:</span>
-          <span style="color:#e67e22" id="tally-xp">0</span>
+        <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px; border:2.5px solid var(--border-color); flex:1;">
+          <span style="font-size:0.75rem; color:var(--text-muted)">REWARD XP</span>
+          <p style="font-size:1.3rem; color:var(--primary-green)" id="tally-xp">+🌟 0</p>
         </div>
       </div>
-      
       ${reviveButtonHtml}
       ${feedbackFormHtml}
-      
-      <button id="btn-summary-close" style="
-        background: ${isVictory ? '#f1c40f' : '#e74c3c'};
-        color: #111;
-        border: none;
-        border-radius: 8px;
-        padding: 10px 24px;
-        font-family: var(--font-title);
-        font-weight: 900;
-        font-size: 1.1rem;
-        cursor: pointer;
-        box-shadow: 0 4px 0 rgba(0,0,0,0.3);
-        width: 100%;
-        margin-top: 10px;
-        transition: transform 0.1s;
-      ">RETURN TO LOBBY</button>
+      <button id="btn-summary-close" class="btn btn-primary" style="width:100%; font-size:1.1rem; padding:12px; margin-top:10px; box-shadow:0 4px 0 var(--primary-blue-dark), 0 4px 0 var(--border-color);">RETURN TO LOBBY</button>
     `;
 
     this.overlay.appendChild(summaryCard);
@@ -942,7 +919,7 @@ export class GameUI {
           btnSubmitFeedback.style.color = "#fff";
           inputFeedbackMsg.disabled = true;
           inputFeedbackMsg.value = "Thank you for the support!";
-        }).catch(err => console.warn('Failed to load firebase connection context:', err));
+        }).catch(err => console.warn('Failed to load firebase context:', err));
       });
     }
 

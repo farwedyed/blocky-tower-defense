@@ -8,16 +8,15 @@ export class Enemy {
     this.x = x;
     this.y = y;
     
-    // Assign a unique network ID for multiplayer tracking
+    // Assign unique network ID
     this.id = Enemy.nextId++;
 
-    // Retrieve active difficulty from globally exposed game instance
     const activeDiff = (window.game && window.game.selectedDifficulty) ? window.game.selectedDifficulty : 'molten';
-    const diffConfig = window.game ? window.game.difficultySettings[activeDiff] : { hpMultiplier: 1.15 };
-    const diffHpMult = diffConfig.hpMultiplier;
+    const diffConfig = window.game ? window.game.difficultySettings[activeDiff] : { hpMultiplier: 1.0 };
+    const diffPhMult = diffConfig.hpMultiplier;
 
-    // Apply Hardcore Mode and active Difficulty multipliers at spawn time
-    const hpMult = (Enemy.hardcoreMode ? 1.5 : 1.0) * diffHpMult;
+    // Apply Hardcore and active Difficulty multipliers
+    const hpMult = (Enemy.hardcoreMode ? 1.5 : 1.0) * diffPhMult;
     const spdMult = Enemy.hardcoreMode ? 1.2 : 1.0;
 
     this.maxHealth = Math.round(stats.maxHealth * hpMult);
@@ -29,7 +28,7 @@ export class Enemy {
     this.color = stats.color || '#fff';
     this.name = stats.name || 'Zombie';
     
-    // Roblox TDS-style distinct leakage base damage values
+    // Roblox TDS distinct leakage base damage values
     this.baseDamage = stats.baseDamage || 1;
 
     // Armor and Status attributes
@@ -127,7 +126,7 @@ export class Enemy {
   }
 
   applySlow(factor, duration) {
-    if (this.enraged) return; // Immune to crowd control during rage phase
+    if (this.enraged) return; 
     if (factor < this.slowFactor || (factor === this.slowFactor && duration > this.slowDuration)) {
       this.slowFactor = factor;
       this.slowDuration = duration;
@@ -179,12 +178,11 @@ export class Enemy {
     ctx.strokeStyle = '#222222';
     ctx.lineWidth = 3.5;
 
-    // Apply 50% opacity to Camo enemies to reflect invisibility
+    // Apply 50% opacity to Camo enemies
     if (this.isCamo) {
       ctx.globalAlpha = 0.55;
     }
 
-    // Offset altitude coordinates if the target is Flying
     let renderY = this.y;
     if (this.isFlying) {
       // Draw ground shadow first
@@ -193,7 +191,7 @@ export class Enemy {
       ctx.ellipse(this.x, this.y + 12, this.radius * 0.9, this.radius * 0.35, 0, 0, Math.PI * 2);
       ctx.fill();
       
-      // Elevate actual rendering model
+      // Elevate actual model
       renderY = this.y - 18;
     }
 
@@ -217,9 +215,9 @@ export class Enemy {
       this.drawBlockyZombieBody(ctx, renderY);
     }
 
-    // Draw floating wings/caps if flying
+    // Draw balloon details if flying
     if (this.isFlying) {
-      ctx.fillStyle = '#e67e22'; // Orange balloon details
+      ctx.fillStyle = '#e67e22'; 
       ctx.strokeStyle = '#222';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
@@ -232,7 +230,7 @@ export class Enemy {
       ctx.stroke();
     }
 
-    // Status effect ring indicators on ground
+    // Status effect ring indicators
     if (this.slowDuration > 0 && !this.enraged) {
       ctx.strokeStyle = 'rgba(0, 243, 255, 0.6)';
       ctx.lineWidth = 2;
@@ -252,11 +250,8 @@ export class Enemy {
     const barW = this.radius * 2.2;
     const barH = 5;
     const barX = this.x - barW / 2;
-    
-    // Position health stats above elevation
     const barY = renderY - this.radius - 12;
 
-    // 1. Draw base health frame
     ctx.fillStyle = '#222';
     ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
 
@@ -264,7 +259,7 @@ export class Enemy {
     ctx.fillStyle = healthPercent > 0.5 ? '#2ecc71' : healthPercent > 0.2 ? '#f1c40f' : '#e74c3c';
     ctx.fillRect(barX, barY, barW * healthPercent, barH);
 
-    // 2. Draw active blue Shield Bar above health bar
+    // Shield Bar
     if (this.maxShield > 0 && this.shield > 0) {
       const shieldY = barY - 6;
       ctx.fillStyle = '#222';
@@ -300,20 +295,18 @@ export class Enemy {
     ctx.fillRect(this.x - r * 0.6, renderY - r * 1.5, r * 1.2, r * 1.0);
     ctx.strokeRect(this.x - r * 0.6, renderY - r * 1.5, r * 1.2, r * 1.0);
 
-    // Simple blocky facial details
+    // Facial details
     ctx.fillStyle = '#111';
     ctx.fillRect(this.x - r * 0.4, renderY - r * 1.2, 2, 2);
     ctx.fillRect(this.x + r * 0.2, renderY - r * 1.2, 2, 2);
   }
 }
 
-// ─── EARLY MATCH ENEMIES ──────────────────────────────────────────────────
-
-// 1. Basic Zombie
+// ─── BASE MATCH ENEMIES (REBALANCED TO OFFICIAL ROBLOX TDS STATS) ───
 export class Runner extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 15, // Roblox TDS aligned
+      maxHealth: 10, // Rebalanced down from 15 to match TDS
       speed: 65,
       goldReward: 12,
       radius: 10,
@@ -324,11 +317,10 @@ export class Runner extends Enemy {
   }
 }
 
-// 2. Speedy Zombie
 export class Quick extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 12, // Roblox TDS aligned
+      maxHealth: 6, // Rebalanced down from 12 to match TDS Speedy
       speed: 120,
       goldReward: 10,
       radius: 9,
@@ -339,66 +331,54 @@ export class Quick extends Enemy {
   }
 }
 
-// 3. Tanky Heavy Zombie
 export class Slow extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 40, // Roblox TDS aligned
+      maxHealth: 25, // Rebalanced down from 40 to match TDS Slow
       speed: 40,
       goldReward: 20,
       radius: 13,
       color: '#34495e',
       name: 'Slow Zombie',
-      baseDamage: 3
+      baseDamage: 1
     });
   }
 }
 
-// 4. Invisible Hidden (Requires Camo Detection)
 export class Hidden extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 30, // Roblox TDS aligned
-      speed: 95,
-      goldReward: 18,
+      maxHealth: 10, // Rebalanced down from 15 to match TDS
+      speed: 80,
+      goldReward: 20,
       radius: 10,
-      isCamo: true,
-      color: '#9b59b6',
+      color: '#cbd5e1',
       name: 'Hidden',
-      baseDamage: 2
+      baseDamage: 1,
+      isCamo: true
     });
   }
 }
 
-// 5. Heavy Armored Lead (Immune to light physical bullets)
 export class Lead extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 50, // Roblox TDS aligned
-      speed: 40,
-      goldReward: 20,
+      maxHealth: 30, // Rebalanced down from 50 to match TDS
+      speed: 35,
+      goldReward: 25,
       radius: 11,
-      isLead: true,
       color: '#7f8c8d',
       name: 'Lead',
-      baseDamage: 4
+      baseDamage: 1,
+      isLead: true
     });
-  }
-
-  drawBlockyZombieBody(ctx, renderY) {
-    super.drawBlockyZombieBody(ctx, renderY);
-    ctx.fillStyle = '#555'; // Metallic face shield
-    ctx.fillRect(this.x - this.radius * 0.4, renderY - this.radius * 1.3, this.radius * 0.8, 4);
   }
 }
 
-// ─── MID MATCH ENEMIES ────────────────────────────────────────────────────
-
-// 6. Invisible Speedster (Shadow)
 export class Shadow extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 80, // Roblox TDS aligned
+      maxHealth: 50, // Rebalanced down from 80 to match TDS
       speed: 115,
       goldReward: 35,
       radius: 11,
@@ -410,11 +390,10 @@ export class Shadow extends Enemy {
   }
 }
 
-// 7. Toxic Giant (Goliath)
 export class Goliath extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 800, // Roblox TDS aligned
+      maxHealth: 200, // Rebalanced down from 400 to match TDS Normal Boss scale
       speed: 35,
       goldReward: 60,
       radius: 18,
@@ -445,12 +424,11 @@ export class Goliath extends Enemy {
   }
 }
 
-// 8. Shielded Armored heavy (Templar)
 export class Templar extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 3000, // Roblox TDS aligned
-      maxShield: 1000, // Roblox TDS aligned
+      maxHealth: 1500, // Rebalanced down from 3000 to scale with 2D singleplayer
+      maxShield: 500, 
       speed: 30,
       goldReward: 100,
       radius: 19,
@@ -477,20 +455,57 @@ export class Templar extends Enemy {
   }
 }
 
-// ─── BOSS ENEMIES ─────────────────────────────────────────────────────────
+// ─── THE SIX UNIQUE DIFFICULTIES BOSSES (SCALED FOR 2D BALANCING) ───
 
-// 9. Wave 10 Boss: Grave Digger
+// 1. EASY MODE BOSS: BRUTE
+export class Brute extends Enemy {
+  constructor(x, y) {
+    super(x, y, {
+      maxHealth: 1000, // Rebalanced down from 22000 to make Easy Mode fair for solo play
+      speed: 32,
+      goldReward: 150,
+      radius: 24,
+      isBoss: true,
+      color: '#1e8449',
+      name: 'Brute',
+      baseDamage: 20
+    });
+  }
+
+  drawBlockyZombieBody(ctx, renderY) {
+    const r = this.radius;
+    ctx.fillStyle = '#1e8449'; // Dark forest green chest
+    ctx.fillRect(this.x - r, renderY - 8, r * 2, r * 1.7);
+    ctx.strokeRect(this.x - r, renderY - 8, r * 2, r * 1.7);
+
+    ctx.fillStyle = '#27ae60'; // Heavy bulk shoulders
+    ctx.fillRect(this.x - r - 7, renderY - 10, 8, 12);
+    ctx.strokeRect(this.x - r - 7, renderY - 10, 8, 12);
+    ctx.fillRect(this.x + r - 1, renderY - 10, 8, 12);
+    ctx.strokeRect(this.x + r - 1, renderY - 10, 8, 12);
+
+    ctx.fillStyle = '#27ae60'; // Muscular green head
+    ctx.fillRect(this.x - r * 0.6, renderY - r * 1.4, r * 1.2, r * 1.0);
+    ctx.strokeRect(this.x - r * 0.6, renderY - r * 1.4, r * 1.2, r * 1.0);
+
+    ctx.fillStyle = '#ff3131'; // Red raging eye slits
+    ctx.fillRect(this.x - r * 0.3, renderY - r * 1.1, 4, 3);
+    ctx.fillRect(this.x + r * 0.1, renderY - r * 1.1, 4, 3);
+  }
+}
+
+// 2. CASUAL MODE BOSS: GRAVE DIGGER
 export class GraveDigger extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 8000, // Roblox TDS aligned
-      speed: 32,
-      goldReward: 200,
+      maxHealth: 2000, // Rebalanced down from 40000 
+      speed: 30,
+      goldReward: 250,
       radius: 26,
       isBoss: true,
-      color: '#34495e',
+      color: '#2c3e50',
       name: 'Grave Digger',
-      baseDamage: 40
+      baseDamage: 30
     });
     this.summonTimer = 0;
   }
@@ -498,9 +513,9 @@ export class GraveDigger extends Enemy {
   update(pixelPath, effectManager, dt, allEnemies, towers) {
     super.update(pixelPath, effectManager, dt, allEnemies, towers);
     
-    // Spawns support runners every 7 seconds
+    // Periodically summons reinforcements
     this.summonTimer += dt;
-    if (this.summonTimer >= 7.0 && this.health > 0) {
+    if (this.summonTimer >= 8.0 && this.health > 0) {
       this.summonTimer = 0;
       allEnemies.push(new Runner(this.x - 12, this.y));
       allEnemies.push(new Quick(this.x + 12, this.y));
@@ -510,60 +525,113 @@ export class GraveDigger extends Enemy {
 
   drawBlockyZombieBody(ctx, renderY) {
     const r = this.radius;
-    ctx.fillStyle = '#2c3e50'; // Trenchcoat
+    ctx.fillStyle = '#2f3542'; // Dark Robe
     ctx.fillRect(this.x - r, renderY - 8, r * 2, r * 1.6);
     ctx.strokeRect(this.x - r, renderY - 8, r * 2, r * 1.6);
 
-    ctx.fillStyle = '#7f8c8d'; // Spade shovel
-    ctx.fillRect(this.x + r * 0.5, renderY - 22, 12, 10);
-    ctx.strokeRect(this.x + r * 0.5, renderY - 22, 12, 10);
+    ctx.fillStyle = '#7f8c8d'; // Spade shovel weapon
+    ctx.fillRect(this.x + r * 0.5, renderY - 24, 12, 10);
+    ctx.strokeRect(this.x + r * 0.5, renderY - 24, 12, 10);
     ctx.fillStyle = '#784212';
-    ctx.fillRect(this.x + r * 0.6, renderY - 12, 4, 25);
-    ctx.strokeRect(this.x + r * 0.6, renderY - 12, 4, 25);
+    ctx.fillRect(this.x + r * 0.6, renderY - 14, 4, 25);
+    ctx.strokeRect(this.x + r * 0.6, renderY - 14, 4, 25);
 
-    ctx.fillStyle = '#27ae60';
-    ctx.fillRect(this.x - r * 0.6, renderY - r * 1.5, r * 1.2, r * 1.0);
-    ctx.strokeRect(this.x - r * 0.6, renderY - r * 1.4, r * 1.2, r * 1.0);
+    ctx.fillStyle = '#1e272e'; // Dark Hood
+    ctx.fillRect(this.x - r * 0.6, renderY - r * 1.5, r * 1.2, r * 1.1);
+    ctx.strokeRect(this.x - r * 0.6, renderY - r * 1.5, r * 1.2, r * 1.1);
+
+    ctx.fillStyle = '#9b59b6'; // Glowing purple slits
+    ctx.fillRect(this.x - r * 0.25, renderY - r * 1.1, 3, 3);
+    ctx.fillRect(this.x + r * 0.1, renderY - r * 1.1, 3, 3);
   }
 }
 
-// 10. Wave 20 Boss: Molten Titan
-export class MoltenTitan extends Enemy {
+// 3. INTERMEDIATE BOSS: HAZARD GIANT
+export class HazardGiant extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 35000, // Roblox TDS aligned
-      speed: 30,
+      maxHealth: 3500, // Rebalanced down from 55000
+      maxShield: 1000,
+      speed: 28,
       goldReward: 350,
       radius: 28,
       isBoss: true,
-      isFireImmune: true,
-      color: '#d35400',
-      name: 'Molten Titan',
-      baseDamage: 60
+      color: '#f1c40f',
+      name: 'Hazard Giant',
+      baseDamage: 40
     });
   }
 
   drawBlockyZombieBody(ctx, renderY) {
     const r = this.radius;
-    ctx.fillStyle = '#111'; // Dark magma crust
-    ctx.fillRect(this.x - r, renderY - 8, r * 2, r * 1.6);
-    ctx.strokeRect(this.x - r, renderY - 8, r * 2, r * 1.6);
+    ctx.fillStyle = '#f1c40f'; // Neon Hazmat Yellow suit
+    ctx.fillRect(this.x - r, renderY - 8, r * 2, r * 1.7);
+    ctx.strokeRect(this.x - r, renderY - 8, r * 2, r * 1.7);
 
-    ctx.fillStyle = '#ff6700'; // Lava cracks
-    ctx.fillRect(this.x - r * 0.5, renderY - 4, 3, 10);
-    ctx.fillRect(this.x + r * 0.2, renderY - 6, 4, 8);
+    ctx.fillStyle = '#2ecc71'; // Radioactive barrels strapped on shoulders
+    ctx.fillRect(this.x - r - 6, renderY - 12, 6, 14);
+    ctx.strokeRect(this.x - r - 6, renderY - 12, 6, 14);
+    ctx.fillRect(this.x + r, renderY - 12, 6, 14);
+    ctx.strokeRect(this.x + r, renderY - 12, 6, 14);
 
-    ctx.fillStyle = '#e67e22';
-    ctx.fillRect(this.x - r * 0.6, renderY - r * 1.3, r * 1.2, r * 1.0);
-    ctx.strokeRect(this.x - r * 0.6, renderY - r * 1.3, r * 1.2, r * 1.0);
+    ctx.fillStyle = '#f1c40f'; // Dome visor head
+    ctx.fillRect(this.x - r * 0.6, renderY - r * 1.4, r * 1.2, r * 1.0);
+    ctx.strokeRect(this.x - r * 0.6, renderY - r * 1.4, r * 1.2, r * 1.0);
+
+    ctx.fillStyle = '#2ecc71'; // Toxic glowing green glass window
+    ctx.fillRect(this.x - r * 0.35, renderY - r * 1.15, r * 0.7, 4);
   }
 }
 
-// 11. Wave 30 Boss: Fallen Guardian
+// 4. MOLTEN BOSS: MOLTEN TITAN
+export class MoltenTitan extends Enemy {
+  constructor(x, y) {
+    super(x, y, {
+      maxHealth: 5000, // Rebalanced down from 80000 
+      speed: 30,
+      goldReward: 450,
+      radius: 30,
+      isBoss: true,
+      isFireImmune: true,
+      color: '#d35400',
+      name: 'Molten Titan',
+      baseDamage: 50
+    });
+  }
+
+  drawBlockyZombieBody(ctx, renderY) {
+    const r = this.radius;
+    ctx.fillStyle = '#1e272e'; // Obsidian/Magma crust body
+    ctx.fillRect(this.x - r, renderY - 8, r * 2, r * 1.6);
+    ctx.strokeRect(this.x - r, renderY - 8, r * 2, r * 1.6);
+
+    ctx.fillStyle = '#ff6b6b'; // Active molten lava veins
+    ctx.fillRect(this.x - r * 0.5, renderY - 4, 3, 10);
+    ctx.fillRect(this.x + r * 0.2, renderY - 6, 4, 8);
+
+    ctx.fillStyle = '#1e272e'; // Molten volcanic head
+    ctx.fillRect(this.x - r * 0.6, renderY - r * 1.3, r * 1.2, r * 1.0);
+    ctx.strokeRect(this.x - r * 0.6, renderY - r * 1.3, r * 1.2, r * 1.0);
+
+    // Volcano spark crest crown
+    ctx.fillStyle = '#e67e22';
+    ctx.beginPath();
+    ctx.moveTo(this.x - r * 0.6, renderY - r * 1.3);
+    ctx.lineTo(this.x - r * 0.45, renderY - r * 1.6);
+    ctx.lineTo(this.x - r * 0.2, renderY - r * 1.3);
+    ctx.lineTo(this.x, renderY - r * 1.8);
+    ctx.lineTo(this.x + r * 0.2, renderY - r * 1.3);
+    ctx.lineTo(this.x + r * 0.45, renderY - r * 1.6);
+    ctx.lineTo(this.x + r * 0.6, renderY - r * 1.3);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+}
+
+// 5. MID-BOSS: FALLEN GUARDIAN
 export class FallenGuardian extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 85000, // Roblox TDS aligned
+      maxHealth: 4000, // Rebalanced down from 85000 
       speed: 28,
       goldReward: 500,
       radius: 30,
@@ -577,24 +645,24 @@ export class FallenGuardian extends Enemy {
 
   drawBlockyZombieBody(ctx, renderY) {
     const r = this.radius;
-    ctx.fillStyle = '#2c3e50'; // Dark iron plates
+    ctx.fillStyle = '#2c3e50'; 
     ctx.fillRect(this.x - r, renderY - 8, r * 2, r * 1.7);
     ctx.strokeRect(this.x - r, renderY - 8, r * 2, r * 1.7);
 
-    ctx.fillStyle = '#00ffe0'; // Glowing core
+    ctx.fillStyle = '#00ffe0'; 
     ctx.fillRect(this.x - 4, renderY - 4, 8, 8);
 
-    ctx.fillStyle = '#7f8c8d'; // Heavy shoulder pads
+    ctx.fillStyle = '#7f8c8d'; 
     ctx.fillRect(this.x - r - 4, renderY - 12, 6, 10);
     ctx.fillRect(this.x + r - 2, renderY - 12, 6, 10);
   }
 }
 
-// 12. Wave 40 Boss: Fallen King
+// 6. FALLEN BOSS: FALLEN KING
 export class FallenKing extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 180000, // Roblox TDS aligned
+      maxHealth: 8000, // Rebalanced down from 150000 
       speed: 24,
       goldReward: 800,
       radius: 33,
@@ -620,7 +688,7 @@ export class FallenKing extends Enemy {
         for (const tower of towers.values()) {
           const dist = Math.hypot(tower.x - this.x, tower.y - this.y);
           if (dist <= 125) {
-            tower.fireCooldown = Math.max(tower.fireCooldown, 3.0); // Stun for 3 seconds
+            tower.fireCooldown = Math.max(tower.fireCooldown, 3.0); 
             effectManager.spawnText(tower.x, tower.y - 15, "STUNNED", '#9b59b6');
           }
         }
@@ -630,11 +698,11 @@ export class FallenKing extends Enemy {
 
   drawBlockyZombieBody(ctx, renderY) {
     const r = this.radius;
-    ctx.fillStyle = '#f1c40f'; // Golden plate armor
+    ctx.fillStyle = '#f1c40f'; // Golden Royal plate armor
     ctx.fillRect(this.x - r, renderY - 8, r * 2, r * 1.7);
     ctx.strokeRect(this.x - r, renderY - 8, r * 2, r * 1.7);
 
-    ctx.fillStyle = '#8e44ad'; // Purple royal sword
+    ctx.fillStyle = '#8e44ad'; // Purple Greatsword
     ctx.fillRect(this.x + r * 0.6, renderY - 30, 8, 26);
     ctx.strokeRect(this.x + r * 0.6, renderY - 30, 8, 26);
 
@@ -653,12 +721,73 @@ export class FallenKing extends Enemy {
   }
 }
 
-// 13. Wave 40 Ultimate Final Boss: Void Reaver
+// 7. FROST BOSS: FROST SPIRIT (REQ. LEVEL 60 ACCESS)
+export class FrostSpirit extends Enemy {
+  constructor(x, y) {
+    super(x, y, {
+      maxHealth: 12000, // Rebalanced down from 280000 
+      maxShield: 3000,
+      speed: 20,
+      goldReward: 1200,
+      radius: 36,
+      isBoss: true,
+      color: '#d4e6f1',
+      name: 'Frost Spirit',
+      baseDamage: 100
+    });
+    this.blizzardTimer = 0;
+  }
+
+  update(pixelPath, effectManager, dt, allEnemies, towers) {
+    super.update(pixelPath, effectManager, dt, allEnemies, towers);
+
+    // Periodically summons deep freeze blizzard across all defensive grids (stuns 1 random tower map-wide)
+    this.blizzardTimer += dt;
+    if (this.blizzardTimer >= 6.0 && this.health > 0) {
+      this.blizzardTimer = 0;
+      effectManager.spawnText(this.x, this.y - 30, "GLACIAL AURA!", '#74b9ff');
+      
+      if (towers && towers.size > 0) {
+        const activeTowers = Array.from(towers.values());
+        const target = activeTowers[Math.floor(Math.random() * activeTowers.length)];
+        target.fireCooldown = Math.max(target.fireCooldown, 4.0); // Global global ice freeze slow stuns target for 4 seconds
+        effectManager.spawnText(target.x, target.y - 15, "FROZEN", '#0984e3');
+        effectManager.spawnImpact(target.x, target.y, '#74b9ff', 6, 0.7);
+      }
+    }
+  }
+
+  drawBlockyZombieBody(ctx, renderY) {
+    const r = this.radius;
+    ctx.fillStyle = '#ebf5fb'; // Pale ice body
+    ctx.fillRect(this.x - r, renderY - 8, r * 2, r * 1.8);
+    ctx.strokeRect(this.x - r, renderY - 8, r * 2, r * 1.8);
+
+    ctx.fillStyle = '#00ffe0'; // Cyan core lines
+    ctx.fillRect(this.x - 4, renderY, 8, 8);
+
+    ctx.fillStyle = '#74b9ff'; // Glacier shoulder shield crystals
+    ctx.fillRect(this.x - r - 6, renderY - 12, 6, 12);
+    ctx.strokeRect(this.x - r - 6, renderY - 12, 6, 12);
+    ctx.fillRect(this.x + r, renderY - 12, 6, 12);
+    ctx.strokeRect(this.x + r, renderY - 12, 6, 12);
+
+    ctx.fillStyle = '#ebf5fb'; // Glacier head
+    ctx.fillRect(this.x - r * 0.6, renderY - r * 1.5, r * 1.2, r * 1.0);
+    ctx.strokeRect(this.x - r * 0.6, renderY - r * 1.5, r * 1.2, r * 1.0);
+
+    ctx.fillStyle = '#5dade2'; // Frozen horns
+    ctx.fillRect(this.x - r * 0.6 - 3, renderY - r * 1.7, 3, 6);
+    ctx.fillRect(this.x + r * 0.6, renderY - r * 1.7, 3, 6);
+  }
+}
+
+// 8. FINAL VOID REAVER EXTRA
 export class VoidReaver extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 350000, // Roblox TDS aligned
-      maxShield: 100000, // Roblox TDS aligned
+      maxHealth: 15000, // Rebalanced down from 350000 
+      maxShield: 5000, 
       speed: 22,
       goldReward: 1500,
       radius: 36,
@@ -677,7 +806,6 @@ export class VoidReaver extends Enemy {
 
     if (this.health <= 0) return;
 
-    // Summons fast Shadows from void portal gates
     this.summonTimer += dt;
     if (this.summonTimer >= 8.5) {
       this.summonTimer = 0;
@@ -686,7 +814,6 @@ export class VoidReaver extends Enemy {
       effectManager.spawnText(this.x, this.y - 30, "VOID SUMMON!", '#9b59b6');
     }
 
-    // Targets and stuns random towers
     this.stunTimer += dt;
     if (this.stunTimer >= 5.0) {
       this.stunTimer = 0;
@@ -702,21 +829,21 @@ export class VoidReaver extends Enemy {
 
   drawBlockyZombieBody(ctx, renderY) {
     const r = this.radius;
-    ctx.fillStyle = '#2c003e'; // Cosmic purple dark void coat
+    ctx.fillStyle = '#2c003e'; 
     ctx.fillRect(this.x - r, renderY - 8, r * 2, r * 1.8);
     ctx.strokeRect(this.x - r, renderY - 8, r * 2, r * 1.8);
 
-    ctx.fillStyle = '#ff0080'; // Dual glowing pink blades
+    ctx.fillStyle = '#ff0080'; 
     ctx.fillRect(this.x + r * 0.6, renderY - 32, 6, 26);
     ctx.strokeRect(this.x + r * 0.6, renderY - 32, 6, 26);
     ctx.fillRect(this.x - r * 0.8, renderY - 32, 6, 26);
     ctx.strokeRect(this.x - r * 0.8, renderY - 32, 6, 26);
 
-    ctx.fillStyle = '#ff0080'; // Glowing eyes
+    ctx.fillStyle = '#ff0080'; 
     ctx.fillRect(this.x - r * 0.3, renderY - r * 1.0, 5, 4);
     ctx.fillRect(this.x + r * 0.1, renderY - r * 1.0, 5, 4);
   }
 }
 
-// ─── SAFE fallback aliases for compilation during module transit ───
+// Visual asset maps fallback aliases
 export { MoltenTitan as MoltenBoss, GraveDigger as BossZombie };

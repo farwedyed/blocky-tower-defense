@@ -383,20 +383,6 @@ body {
   box-shadow: 0 4px 0 var(--primary-green);
 }
 
-.map-thumb {
-  font-size: 3rem;
-  line-height: 1;
-  padding: 10px;
-  background: #fff;
-  border: 2px solid var(--border-color);
-  border-radius: 10px;
-  width: 70px;
-  height: 70px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .map-info {
   text-align: center;
 }
@@ -415,26 +401,176 @@ body {
 .medium { color: var(--primary-orange); }
 .hard { color: var(--primary-red); }
 
-/* Difficulty Selection Buttons Visual Selection States (Roblox Style feedback) */
-.diff-btn {
-  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
-  opacity: 0.45 !important;
-  filter: grayscale(70%) !important;
-  transform: translateY(2px) !important;
-  box-shadow: 0 1px 0 var(--border-color) !important;
+/* WIZARD FLOW CONTAINERS */
+.wizard-step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  animation: wizardFadeIn 0.3s ease-out;
+}
+.wizard-step-content.hidden {
+  display: none !important;
 }
 
-.diff-btn:hover {
-  opacity: 0.7 !important;
-  filter: grayscale(30%) !important;
+@keyframes wizardFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.diff-btn.active {
-  opacity: 1 !important;
-  filter: none !important;
-  transform: translateY(-3px) scale(1.04) !important;
-  border: 3.5px solid #ffffff !important;
-  box-shadow: 0 5px 0 var(--border-color), 0 0 15px rgba(255, 255, 255, 0.3) !important;
+/* ─── STUNNING DIFFICULTIES CARDS (ROBLOX TDS INSPIRED) ─── */
+.difficulty-wizard-deck {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 10px 0;
+}
+
+.diff-wizard-card {
+  background: #ffffff;
+  border: 3px solid var(--border-color);
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  box-shadow: 0 4px 0 var(--border-color);
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  text-align: left;
+}
+
+.diff-wizard-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 0 var(--border-color);
+}
+
+.diff-wizard-card.active {
+  border-color: var(--primary-blue);
+  box-shadow: 0 4px 0 var(--primary-blue), 0 0 15px rgba(0, 136, 255, 0.4);
+  transform: scale(1.03);
+}
+
+/* Difficulty Card Headers with TDS Gradients */
+.diff-card-header {
+  padding: 10px 8px;
+  text-align: center;
+  color: white;
+  font-family: var(--font-title);
+  border-bottom: 2.5px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.diff-title {
+  font-size: 1.2rem;
+  font-weight: 900;
+  text-shadow: 1.5px 1.5px 0 rgba(0,0,0,0.5);
+  letter-spacing: 0.5px;
+}
+
+.diff-sub {
+  font-size: 0.65rem;
+  opacity: 0.9;
+  font-family: var(--font-body);
+  font-weight: 800;
+  margin-top: 1px;
+}
+
+.diff-bg-easy { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+.diff-bg-casual { background: linear-gradient(135deg, #7f8c8d, #34495e); }
+.diff-bg-intermediate { background: linear-gradient(135deg, #00b894, #009432); }
+.diff-bg-molten { background: linear-gradient(135deg, #f1c40f, #e67e22, #e74c3c); }
+.diff-bg-fallen { background: linear-gradient(135deg, #9b59b6, #8e44ad, #1a1a2e); }
+
+/* Difficulty Card Stats & Boss canvas */
+.diff-card-body {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  background: #fdfefe;
+}
+
+.diff-boss-preview {
+  background: #f1f2f6;
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
+  width: 80px;
+  height: 80px;
+  margin-bottom: 4px;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.diff-metric {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-size: 0.75rem;
+  font-weight: 900;
+  color: var(--text-dark);
+}
+
+.diff-metric-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.diff-metric-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.text-boss { color: #e74c3c; font-size: 0.72rem; font-weight: 900; }
+.text-coins { color: #b8860b; }
+
+/* Navigation buttons */
+.wizard-nav-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.btn-wizard-back {
+  background: #7f8c8d;
+  color: white;
+  box-shadow: 0 4px 0 #5c6266, 0 4px 0 var(--border-color);
+}
+.btn-wizard-back:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #5c6266, 0 6px 0 var(--border-color);
+}
+
+.btn-wizard-next {
+  background: var(--primary-blue);
+  color: white;
+  font-size: 1.1rem;
+  padding: 12px 24px;
+  box-shadow: 0 4px 0 var(--primary-blue-dark), 0 4px 0 var(--border-color);
+  border: 3px solid var(--border-color);
+  border-radius: 10px;
+  font-family: var(--font-title);
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  text-transform: uppercase;
+}
+.btn-wizard-next:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 var(--primary-blue-dark), 0 6px 0 var(--border-color);
+}
+.btn-wizard-next:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 var(--primary-blue-dark), 0 2px 0 var(--border-color);
 }
 
 /* Agent Shop Cards */
@@ -456,19 +592,6 @@ body {
   text-align: center;
   box-shadow: 0 4px 0 var(--border-color);
   position: relative;
-}
-
-.agent-avatar {
-  font-size: 2.5rem;
-  background: #fff;
-  border: 2px solid var(--border-color);
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .shop-card .name {
@@ -530,93 +653,80 @@ body {
 }
 
 .equipped-indicator {
+  font-size: 0.65rem;
+  background: var(--primary-blue);
+  color: white;
+  padding: 1px 6px;
+  border-radius: 4px;
   position: absolute;
   top: 6px;
   right: 6px;
-  background: var(--primary-green);
-  color: white;
-  font-size: 0.65rem;
   font-weight: 900;
-  padding: 2px 6px;
-  border-radius: 10px;
 }
 
-/* GAMEPLAY VIEW LAYOUT */
+/* GAME / MATCH VIEW */
 #game-view {
   display: flex;
-  flex-direction: row;
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  position: relative;
 }
 
 #game-wrapper {
-  flex: 1;
   position: relative;
+  flex-grow: 1;
+  background-color: var(--bg-game);
   display: flex;
-  align-items: center;
   justify-content: center;
-  background: #252836;
-  overflow: hidden;
+  align-items: center;
+  height: 100%;
 }
 
 #game-canvas {
-  display: block;
-  background: #85c1e9; /* Sky blue background for the cartoon field */
-  border-radius: 12px;
+  background-color: #fff;
   border: 4px solid var(--border-color);
-  box-shadow: 0 8px 0 var(--border-color);
-  max-width: 100%;
-  max-height: 100%;
-  height: auto;
-  width: auto;
-  object-fit: contain;
-  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+  display: block;
 }
 
-/* In-game Sidebar */
 #game-sidebar {
-  width: 360px;
-  background: #eef2f7;
+  width: 320px;
+  background-color: var(--panel-light);
   border-left: 4px solid var(--border-color);
-  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  padding: 20px;
+  gap: 20px;
   overflow-y: auto;
-}
-
-/* Fix flexbox collapsing bug: prevent components from collapsing to 0 height */
-#game-sidebar > * {
-  flex-shrink: 0 !important;
+  flex-shrink: 0;
 }
 
 #game-sidebar header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 2px solid rgba(0,0,0,0.1);
-  padding-bottom: 10px;
+  border-bottom: 2px dashed #e2e8f0;
+  padding-bottom: 12px;
 }
 
 .current-map-badge {
-  background: #fff;
-  border: 2px solid var(--border-color);
-  padding: 4px 10px;
-  border-radius: 6px;
   font-family: var(--font-title);
-  font-size: 0.95rem;
-  font-weight: 800;
+  font-size: 1.1rem;
+  font-weight: 900;
   color: var(--text-dark);
 }
 
 .btn-exit {
-  font-size: 0.8rem;
   background: var(--primary-red);
-  color: #fff;
+  color: white;
+  font-size: 0.75rem;
+  padding: 6px 12px;
   box-shadow: 0 3px 0 var(--primary-red-dark), 0 3px 0 var(--border-color);
 }
 
-/* Match Stats HUD */
+/* HUD Statistics */
 #game-hud {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -653,29 +763,24 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  width: 100%;
 }
 
 .control-row {
   display: flex;
   gap: 8px;
-  width: 100%;
 }
 
 .control-row .btn {
   flex: 1;
-  margin: 0;
 }
 
 .btn-primary {
-  flex: 2;
   background: var(--primary-green);
   color: #fff;
   box-shadow: 0 4px 0 var(--primary-green-dark), 0 4px 0 var(--border-color);
 }
 
 .btn-secondary {
-  flex: 1;
   background: #fff;
   color: var(--text-dark);
   box-shadow: 0 4px 0 var(--border-color);
@@ -689,10 +794,12 @@ body {
   margin-bottom: 6px;
 }
 
-.shop-grid-vertical {
+#equipped-agents-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* Add safe padding at the bottom on PC so placement list never scrolls under absolute upgrade panel [4] */
+  padding-bottom: 180px;
 }
 
 .placement-btn {
@@ -753,26 +860,41 @@ body {
   font-weight: 900;
 }
 
-/* Dynamic Upgrade Options panel */
+/* ─── DETACHED ZERO-SCROLL UPGRADE MENU (DESKTOP DEFAULT) ─── */
 #selection-panel {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 280px; /* Aligns inside the 320px wide sidebar with 20px padding on each side [4] */
+  z-index: 10;
   background: #fff8e1;
   border: 3px solid var(--primary-yellow-dark);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 12px;
+  box-shadow: 0 4px 0 var(--primary-yellow-dark);
+}
+
+.selection-panel-inner {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: auto;
-  box-shadow: 0 3px 0 var(--primary-yellow-dark);
 }
 
-#selection-panel h3 {
+#selection-info .unit-name {
   font-family: var(--font-title);
-  font-size: 0.85rem;
+  font-size: 1rem;
+  font-weight: 900;
   color: var(--primary-orange);
+  text-transform: uppercase;
+  margin-bottom: 2px;
 }
 
-/* Targeting Selector */
+#selection-info .unit-stats {
+  font-size: 0.75rem;
+  color: var(--text-dark);
+  font-weight: 800;
+}
+
 .targeting-container {
   display: flex;
   align-items: center;
@@ -782,10 +904,12 @@ body {
   border-radius: 6px;
   padding: 4px 8px;
 }
-.targeting-container .label {
+
+.targeting-container label {
   font-size: 0.75rem;
   font-weight: 900;
 }
+
 .styled-select {
   border: none;
   font-size: 0.8rem;
@@ -796,20 +920,25 @@ body {
   background: transparent;
 }
 
-.btn-upgrade {
-  flex: 1;
-  background: var(--primary-green);
-  color: #fff;
-  box-shadow: 0 3px 0 var(--primary-green-dark), 0 3px 0 var(--border-color);
-}
-.btn-sell {
-  background: var(--primary-red);
-  color: #fff;
-  box-shadow: 0 3px 0 var(--primary-red-dark), 0 3px 0 var(--border-color);
+.selection-actions {
+  display: flex;
+  gap: 8px;
 }
 
-.hidden {
-  display: none !important;
+.selection-actions .btn {
+  flex: 1;
+}
+
+#btn-upgrade {
+  background: var(--primary-green);
+  color: white;
+  box-shadow: 0 3px 0 var(--primary-green-dark), 0 3px 0 var(--border-color);
+}
+
+#btn-sell {
+  background: var(--primary-red);
+  color: white;
+  box-shadow: 0 3px 0 var(--primary-red-dark), 0 3px 0 var(--border-color);
 }
 
 /* Game Over Overlay Screen */
@@ -997,6 +1126,127 @@ body {
   border-radius: 4px;
 }
 
+/* ─── "THE COMMANDER" TUTORIAL DIALOG WRAPPERS ─── */
+#commander-dialog-wrapper {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  z-index: 2000;
+  pointer-events: auto;
+  font-family: var(--font-body);
+  max-width: 420px;
+  width: 85vw;
+  animation: commanderSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes commanderSlideIn {
+  from { opacity: 0; transform: translateY(40px) scale(0.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.commander-avatar-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #2c3e50;
+  border: 3px solid var(--border-color);
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 4px 0 var(--border-color);
+  flex-shrink: 0;
+}
+
+#commander-face-canvas {
+  background: #ffdbac;
+  border-radius: 8px;
+  width: 60px;
+  height: 60px;
+}
+
+.commander-name-tag {
+  font-family: var(--font-title);
+  font-size: 0.65rem;
+  font-weight: 900;
+  color: white;
+  background: #e74c3c;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+  letter-spacing: 0.5px;
+}
+
+.commander-speech-balloon {
+  background: #ffffff;
+  border: 3px solid var(--border-color);
+  border-radius: 12px 12px 12px 0px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 0 var(--border-color);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.commander-speech-balloon::before {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: -12px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 12px 12px 0;
+  border-color: transparent var(--border-color) transparent transparent;
+}
+
+.commander-speech-balloon::after {
+  content: '';
+  position: absolute;
+  bottom: 0px;
+  left: -7px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 9px 9px 0;
+  border-color: transparent #ffffff transparent transparent;
+}
+
+#commander-dialog-text {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--text-dark);
+  line-height: 1.35;
+}
+
+#btn-commander-action {
+  align-self: flex-end;
+  font-size: 0.72rem;
+  padding: 4px 10px;
+  background: var(--primary-yellow);
+  color: black;
+  box-shadow: 0 2px 0 var(--primary-yellow-dark), 0 2px 0 var(--border-color);
+  border-width: 2px;
+  margin: 0;
+}
+
+/* ─── TUTORIAL ARROW PHYSICAL ANIMATIONS ─── */
+@keyframes tutArrowBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes tutArrowBounceLeft {
+  0%, 100% { transform: translateX(0) rotate(-90deg); }
+  50% { transform: translateX(-10px) rotate(-90deg); }
+}
+@keyframes tutArrowBounceRight {
+  0%, 100% { transform: translateX(0) rotate(90deg); }
+  50% { transform: translateX(10px) rotate(90deg); }
+}
+
 /* ═══════════════════════════════════════════════════════════════
    COMPREHENSIVE RESPONSIVE AND COLLAPSIBLE MOBILE LAYOUTS
 ═══════════════════════════════════════════════════════════════ */
@@ -1022,8 +1272,7 @@ body {
 @media (max-width: 1024px), (max-height: 600px) {
   #app-container {
     width: 100vw;
-    height: 100dvh !important; /* Resolves the dynamic address bar cutting off top and bottom items on mobile */
-    height: 100vh !important; /* fallback */
+    height: 100dvh !important;
     max-width: none;
     max-height: none;
     border-radius: 0;
@@ -1032,7 +1281,7 @@ body {
     overflow: hidden;
   }
 
-  /* Compact, Transparent Stats Top-Bar (Brawl Stars & Clash Royale Style) */
+  /* Compact, Transparent Stats Top-Bar */
   #lobby-header {
     position: absolute;
     top: 0;
@@ -1040,7 +1289,7 @@ body {
     right: 0;
     height: 48px;
     padding: 4px 12px;
-    background: rgba(0, 0, 0, 0.45); /* Dark translucent top bar */
+    background: rgba(0, 0, 0, 0.45);
     border: none;
     border-bottom: 2px solid var(--border-color);
     border-radius: 0;
@@ -1051,12 +1300,12 @@ body {
     z-index: 1000;
   }
 
-  /* Hide massive titles and taglines completely on mobile, Clash Royale style */
+  /* Hide logo area to save space */
   .logo-area {
     display: none !important;
   }
 
-  /* Float profile on left, meta stats on right */
+  /* Profile on left, stats on right */
   #cg-profile-widget {
     background: transparent !important;
     border: none !important;
@@ -1090,7 +1339,7 @@ body {
   }
 
   .meta-item .label {
-    display: none !important; /* Hide label text like "LEVEL" or "COINS" to save space */
+    display: none !important;
   }
 
   .badge {
@@ -1119,9 +1368,9 @@ body {
   /* Content area holds Panels on top, Tabs on bottom */
   #lobby-content {
     display: flex;
-    flex-direction: column; /* Tabs at top, panels in center middle */
+    flex-direction: column;
     width: 100%;
-    height: calc(100% - 48px); /* Total height minus Top Bar (48px) */
+    height: calc(100% - 48px);
     position: absolute;
     top: 48px;
     bottom: 0;
@@ -1133,7 +1382,7 @@ body {
     overflow: hidden;
   }
 
-  /* Top Navigation Tabs Bar (Clash Royale Style) */
+  /* Top Navigation Tabs Bar */
   #lobby-tabs {
     width: 100%;
     height: 48px;
@@ -1178,18 +1427,18 @@ body {
   }
 
   .tab-icon {
-    display: none !important; /* Hide tab icons entirely to secure text spacing layout like your sketch */
+    display: none !important;
   }
 
   /* Expandable panels situated perfectly in the center viewport */
   #lobby-panels {
-    flex: 1; /* Automatically expands to fill center area! */
+    flex: 1;
     width: 100%;
     border: none !important;
     border-radius: 0 !important;
     background: #e4e9f0;
     padding: 10px;
-    overflow-y: auto; /* Fully scrollable center maps area! */
+    overflow-y: auto;
     box-shadow: none !important;
     position: relative;
   }
@@ -1201,23 +1450,8 @@ body {
     text-align: center;
   }
 
-  /* Custom Double Column Grid to match your exact Sketch 1 and 2 shapes - ONLY WHEN ACTIVE */
-  #panel-maps.active {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto auto auto;
-    gap: 10px !important;
-  }
-
-  #panel-maps.active h2 {
-    grid-column: 1 / span 2;
-    grid-row: 1;
-  }
-
-  /* Horizontal Swipe-able Map Deck (Brawl Stars & Bloons TD 6 Style) */
-  #panel-maps.active .map-grid:not([style*="display: none"]) {
-    grid-column: 1 !important; /* Changed from 1 / span 2 to only column 1 */
-    grid-row: 2;
+  /* ─── ZERO-SCROLL HORIZONTAL SWIPEABLE DIFFICULTIES DECK (MOBILE LANDSCAPE) ─── */
+  .difficulty-wizard-deck {
     display: flex !important;
     flex-direction: row !important;
     overflow-x: auto !important;
@@ -1226,31 +1460,87 @@ body {
     padding: 4px !important;
     white-space: nowrap !important;
     scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    height: 120px !important; /* Extremely small map cards deck row! */
-    border: none !important; /* Removed separate bottom border layout */
+    height: 160px !important; /* Zero scrolling: card heights tightly constrained [4] */
+    margin: 5px 0 !important;
+  }
+
+  .diff-wizard-card {
+    flex: 0 0 130px !important; /* Extremely compact cards to ensure 100% visibility on mobile landscapes [4] */
+    height: 150px !important;
+    scroll-snap-align: start;
+    padding: 0 !important;
     margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .diff-card-header {
+    padding: 6px 4px !important;
+    border-bottom: 2px solid var(--border-color) !important;
+  }
+
+  .diff-title {
+    font-size: 0.85rem !important;
+  }
+
+  .diff-sub {
+    font-size: 0.55rem !important;
+    margin-top: 0;
+  }
+
+  .diff-card-body {
+    padding: 6px !important;
+    gap: 4px !important;
+  }
+
+  .diff-boss-preview {
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 6px !important;
+    margin-bottom: 0 !important;
+  }
+
+  .diff-metric {
+    font-size: 0.6rem !important;
+    gap: 4px !important;
+  }
+
+  .diff-metric-icon {
+    width: 12px !important;
+    height: 12px !important;
+  }
+
+  /* Map Select Grid inside Wizard Step 1 */
+  #panel-maps .map-grid {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    gap: 10px !important;
+    padding: 4px !important;
+    white-space: nowrap !important;
+    scroll-snap-type: x mandatory;
+    height: 115px !important;
   }
 
   .map-card {
-    flex: 0 0 100px !important; /* Very small cards to preserve landscape screen height! */
-    height: 105px !important;
+    flex: 0 0 110px !important;
+    height: 100px !important;
     scroll-snap-align: start;
     padding: 4px !important;
     background: #fff;
     border: 2px solid var(--border-color) !important;
-    border-radius: 10px !important;
     box-shadow: 0 2px 0 var(--border-color) !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
     justify-content: space-between !important;
-    white-space: normal !important; /* Reset inherited nowrap property to allow labels */
+    white-space: normal !important;
   }
 
   .map-preview-canvas {
-    width: 85px !important;
-    height: 64px !important; /* Compact preview canvas height! */
+    width: 90px !important;
+    height: 60px !important;
     border-radius: 6px;
     display: block;
     flex-shrink: 0 !important;
@@ -1262,116 +1552,11 @@ body {
   }
 
   .map-info .difficulty {
-    display: none !important; /* Hide redundant difficulty text to fit card nicely */
+    display: none !important;
   }
 
-  /* Difficulty Selection Container - Moved side-by-side with Maps on Column 2 on Mobile */
-  #difficulty-selector-container:not([style*="display: none"]) {
-    grid-column: 2 !important; /* Positioned directly on Col 2 */
-    grid-row: 2 !important;    /* Resides on Row 2 next to Maps */
-    background: #f8fafc !important;
-    border: 3px solid var(--border-color) !important;
-    border-radius: 12px !important;
-    box-shadow: 0 4px 0 var(--border-color) !important;
-    padding: 6px !important;
-    display: flex !important; /* Safe to use with the :not style selector */
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 6px !important;
-    height: 120px !important; /* Perfectly matches Map-Grid height alignment */
-    margin: 0 !important;
-    box-sizing: border-box !important;
-  }
-
-  #difficulty-selector-container span {
-    font-family: var(--font-title) !important;
-    font-size: 0.72rem !important;
-    font-weight: 900 !important;
-    color: var(--text-dark) !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.5px !important;
-    margin-bottom: 2px !important;
-  }
-
-  #difficulty-selector-container .diff-btn-group {
-    display: flex !important;
-    flex-direction: row !important;
-    gap: 6px !important;
-    width: 100% !important;
-  }
-
-  #difficulty-selector-container .diff-btn-group .btn {
-    flex: 1 !important;
-    font-size: 0.62rem !important; /* Reduced for narrow compact screens */
-    font-weight: 800 !important;
-    padding: 4px 2px !important;
-    min-height: 48px !important;
-    height: 48px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    text-align: center !important;
-    white-space: normal !important; /* Allows line wrapping */
-    line-height: 1.15 !important;
-    border-radius: 8px !important;
-  }
-
-  /* Left Deploy Button - Hidden unless active in map select state */
-  #btn-deploy:not([style*="display: none"]) {
-    grid-column: 1;
-    grid-row: 3;
-    font-size: 0.9rem !important;
-    padding: 8px !important;
-    margin-top: 0 !important;
-    height: 44px;
-    display: flex !important;
-    align-items: center;
-    justify-content: center;
-    background: #fff !important;
-    color: #27ae60 !important; /* Bold green outlined from Sketch 1! */
-    border: 3px solid #27ae60 !important;
-    box-shadow: 0 3px 0 #219653 !important;
-    border-radius: 8px !important;
-  }
-
-  /* Right Hardcore switch Toggle box - Hidden unless active in map select state */
-  #hardcore-toggle-container:not([style*="display: none"]) {
-    grid-column: 2;
-    grid-row: 3;
-    background: #fff !important;
-    border: 3px solid #e74c3c !important; /* Bold red outlined from Sketch 1! */
-    box-shadow: 0 3px 0 #c0392b !important;
-    border-radius: 8px !important;
-    padding: 4px 8px !important;
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 6px !important;
-    height: 44px;
-  }
-
-  #hardcore-toggle-container label {
-    color: #e74c3c !important;
-    font-size: 0.65rem !important;
-    font-weight: 900 !important;
-    text-transform: uppercase;
-    text-align: center;
-    margin: 0 !important;
-    line-height: 1.1;
-  }
-
-  #hardcore-toggle {
-    width: 16px !important;
-    height: 16px !important;
-    cursor: pointer;
-  }
-
-  /* Double Column Row for bottom boxes - Hidden unless active in map select state */
-  #panel-maps div[style*="display: flex; gap: 20px;"]:not([style*="display: none"]) {
-    grid-column: 1 / span 2;
-    grid-row: 4;
+  /* Double Column Row for bottom boxes */
+  #panel-maps div[style*="display: flex; gap: 20px;"] {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
     gap: 10px !important;
@@ -1381,7 +1566,7 @@ body {
   #leaderboard-box, #quests-box {
     width: 100% !important;
     flex: none !important;
-    height: 110px !important; /* Compact scroll box height! */
+    height: 110px !important;
     overflow-y: auto !important;
     padding: 6px !important;
     border-radius: 8px !important;
@@ -1398,57 +1583,7 @@ body {
     font-size: 0.65rem !important;
   }
 
-  /* Splash Selection Mode Menu (Play Solo & Coop Party) - Centered completely */
-  #lobby-splash-container:not([style*="display: none"]) {
-    grid-column: 1 / span 2 !important; /* Forces centered double-grid span to center Sketch 2 */
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    margin: 0 !important;
-    padding: 10px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    height: 100%;
-    gap: 12px;
-  }
-
-  #lobby-splash-container h3, #lobby-splash-container p {
-    display: none !important; /* Hide long titles to follow Sketch 2 mockup perfectly */
-  }
-
-  #lobby-splash-container div {
-    display: flex;
-    flex-direction: row !important;
-    gap: 12px !important;
-    width: 100%;
-    max-width: 360px;
-    justify-content: center;
-  }
-
-  #btn-select-solo, #btn-select-coop {
-    flex: 1;
-    font-size: 0.9rem !important;
-    padding: 10px !important;
-    border: 3px solid var(--border-color) !important;
-    box-shadow: 0 4px 0 var(--border-color) !important;
-    border-radius: 8px !important;
-    background: #fff !important;
-    color: #111 !important;
-    text-transform: uppercase;
-  }
-
-  /* Combined Specificity Selector rules to force yellow pulsing glows on startup */
-  #btn-select-solo.tut-highlight, #btn-select-coop.tut-highlight {
-    border: 3px solid #f1c40f !important;
-    box-shadow: 0 0 18px #f1c40f, inset 0 0 8px rgba(241, 196, 15, 0.4) !important;
-    animation: pulseTutorialHighlight 1.4s infinite !important;
-    background: #fff !important;
-    color: #111 !important;
-  }
-
-  /* Auto-Flowing Sized Grids for Shop & Loadout to prevent stretching */
+  /* Auto-Flowing Sized Grids for Shop & Loadout */
   .shop-grid {
     display: grid !important;
     grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)) !important;
@@ -1511,7 +1646,7 @@ body {
     border: none;
   }
 
-  /* Absolute Sliding Sidebar Sheet Drawer */
+  /* Absolute Sliding Sidebar Drawer */
   #game-sidebar {
     position: absolute;
     left: 0;
@@ -1528,7 +1663,7 @@ body {
     box-shadow: 0 -8px 25px rgba(0,0,0,0.35);
     transform: translateY(100%); /* Hidden by default */
     transition: transform 0.3s cubic-bezier(0.1, 0.9, 0.2, 1);
-    touch-action: pan-y !important; /* Explicit vertical panning allowed on mobile absolute drawer */
+    touch-action: pan-y !important; /* Explicit vertical panning allowed */
     overflow-y: auto !important;
   }
 
@@ -1565,7 +1700,7 @@ body {
   }
 
   .hud-box .label {
-    font-size: 0.6;
+    font-size: 0.6rem;
   }
 
   #game-controls {
@@ -1588,6 +1723,7 @@ body {
     flex-wrap: wrap;
     gap: 6px;
     overflow-y: visible;
+    padding-bottom: 0 !important; /* No extra padding on mobile [4] */
   }
 
   .placement-btn {
@@ -1614,30 +1750,73 @@ body {
     font-size: 0.7rem;
   }
 
-  /* Upgrade Options modifications */
+  /* ─── FLOATING ZERO-SCROLL DETACHED UPGRADE MODIFIER (MOBILE VIEWPORT) ─── */
   #selection-panel {
-    padding: 8px;
-    gap: 6px;
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90vw;
+    max-width: 460px;
+    z-index: 1000;
+    background: #fffde7;
+    border: 3px solid var(--primary-yellow);
+    border-radius: 14px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 4px 0 var(--primary-yellow-dark);
+    padding: 8px 12px;
+    margin-top: 0 !important;
+  }
+
+  .selection-panel-inner {
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  #selection-info {
+    flex: 1.2;
+    text-align: left;
+  }
+
+  #selection-info .unit-name {
+    font-size: 0.85rem !important;
+    font-weight: 900;
+    margin-bottom: 0;
+  }
+
+  #selection-info .unit-stats {
+    font-size: 0.65rem !important;
+    line-height: 1.2;
   }
 
   .targeting-container {
+    flex: 0.8;
     padding: 3px 6px;
+    border-radius: 6px;
+    border: 2px solid var(--border-color);
   }
 
-  .action-buttons {
-    display: flex;
-    gap: 6px;
+  .targeting-container label {
+    font-size: 0.65rem !important;
   }
 
-  .action-buttons .btn {
-    font-size: 0.8rem;
-    padding: 8px;
+  .selection-actions {
+    flex: 1;
+    flex-direction: column !important;
+    gap: 4px;
   }
 
-  /* Compact yellow bordered tutorial box centered at the bottom of Sketch 2 */
+  .selection-actions .btn {
+    font-size: 0.7rem !important;
+    padding: 4px 8px;
+    min-height: 28px;
+  }
+
+  /* Compact yellow bordered tutorial box centered at the bottom */
   #tutorial-hint-box {
     position: fixed !important;
-    bottom: 12px !important; /* Renders centered on bottom as drawn in Sketch 2 */
+    bottom: 12px !important;
     left: 50% !important;
     transform: translateX(-50%) !important;
     padding: 8px 12px !important;
@@ -1658,7 +1837,7 @@ body {
 
   #tutorial-hint-box div[style*="font-size:1rem"] {
     font-size: 0.8rem !important;
-    color: #d4ac0d !important; /* Contrast text coloring for the white bg */
+    color: #d4ac0d !important;
   }
 
   #tutorial-hint-box div[style*="font-size:0.85rem"] {
@@ -1692,24 +1871,24 @@ body {
     height: 100%;
     border-top: none;
     border-left: 4px solid var(--border-color);
-    transform: none !important; /* Forces solid landscape viewport side-panels */
+    transform: none !important; /* Forces solid landscape side-panel */
     position: relative;
     box-shadow: none;
-    overflow-y: auto !important; /* Forces the entire right side panel to scroll cleanly */
-    touch-action: pan-y !important; /* Explicitly tell browser we only pan-y inside here */
+    overflow-y: auto !important;
+    touch-action: pan-y !important;
     -webkit-overflow-scrolling: touch !important;
-    padding: 8px 8px 80px 8px !important; /* Top, Right, Bottom, Left with generous bottom safety padding */
+    padding: 8px 8px 80px 8px !important;
     gap: 8px !important;
   }
 
   #btn-toggle-sidebar {
-    display: none !important; /* Sidebar remains visible naturally on horizontal viewports */
+    display: none !important;
   }
 
   #equipped-agents-list {
     display: flex !important;
-    max-height: none !important; /* Remove separate scrollbox constraints */
-    overflow-y: visible !important; /* Delegate all scrolling completely to parent sidebar container */
+    max-height: none !important;
+    overflow-y: visible !important;
     flex-direction: column !important;
     flex-wrap: nowrap !important;
     flex-shrink: 0 !important;
@@ -1718,6 +1897,6 @@ body {
   .placement-btn {
     width: 100%;
     flex-direction: row;
-    flex-shrink: 0 !important; /* Ensure buttons never squish vertically */
+    flex-shrink: 0 !important;
   }
 }

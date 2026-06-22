@@ -1,5 +1,5 @@
 // src/lobby-ui.js
-// Sub-controller handling the Main Menu, Progression, Shop, Crates, and Loadouts
+// Sub-controller handling the Main Menu, Progression, Shop, Crates, Loadouts, and selection Wizards
 
 import { soundManager } from './sound.js';
 import { fetchTopRecords } from './firebase.js';
@@ -8,10 +8,21 @@ import { CrazyGamesManager } from './crazygames.js';
 
 export class LobbyUI {
   constructor(game, parentUI) {
+    window.lobbyPlayers = window.lobbyPlayers || { p1: "", p2: "", p3: "", p4: "", p5: "", p6: "", p7: "", p8: "" };
+    window.myPlayerId = window.myPlayerId || "p1";
     this.game = game;
-    this.parentUI = parentUI; // Reference back to the parent orchestrator
+    this.parentUI = parentUI;
 
-    // Cache Lobby DOM Elements
+    // Cache Wizard steps
+    this.stepMaps = document.getElementById('wizard-step-maps');
+    this.stepDiff = document.getElementById('wizard-step-diff');
+    this.stepPrep = document.getElementById('wizard-step-prep');
+
+    this.btnNextMaps = document.getElementById('btn-wizard-next-maps');
+    this.btnBackDiff = document.getElementById('btn-wizard-back-diff');
+    this.btnNextDiff = document.getElementById('btn-wizard-next-diff');
+    this.btnBackPrep = document.getElementById('btn-wizard-back-prep');
+
     this.lobbyView = document.getElementById('lobby-view');
     this.playerLevel = document.getElementById('player-level');
     this.playerCoins = document.getElementById('player-coins');
@@ -36,8 +47,8 @@ export class LobbyUI {
     this.injectCoopControls();
     this.injectTutorialStyles();
     
-    // Cache Difficulty Buttons
-    this.diffButtons = document.querySelectorAll('.diff-btn');
+    // Cache Wizard Difficulty Cards
+    this.diffWizardCards = document.querySelectorAll('.diff-wizard-card');
 
     this.initEventListeners();
     this.drawAllStaticPreviews();
@@ -128,8 +139,6 @@ export class LobbyUI {
       document.head.appendChild(style);
     }
 
-    const h2 = parentPanel.querySelector('h2');
-    
     const splashContainer = document.createElement('div');
     splashContainer.id = 'lobby-splash-container';
     splashContainer.style.cssText = `
@@ -234,41 +243,67 @@ export class LobbyUI {
       </div>
     `;
 
-    if (h2) {
-      h2.insertAdjacentElement('afterend', splashContainer);
-      splashContainer.insertAdjacentElement('afterend', coopPanel);
-    } else {
-      parentPanel.prepend(coopPanel);
-      parentPanel.prepend(splashContainer);
-    }
+    // Force prepend as direct top-level children of #panel-maps so that
+    // toggling the Wizard step slides does not hide the splash screen.
+    parentPanel.prepend(coopPanel);
+    parentPanel.prepend(splashContainer);
   }
 
   showSplashState() {
     document.getElementById('lobby-splash-container').style.display = 'flex';
     document.getElementById('coop-matchmaking-panel').classList.add('hidden');
     this.toggleSoloElements(false);
+
+    // Tutorial Step 0: Point to PLAY SOLO button
+    if (!this.game.tutorialCompleted) {
+      this.parentUI.hidePointer();
+      setTimeout(() => {
+        const playSoloBtn = document.getElementById('btn-select-solo');
+        if (playSoloBtn) {
+          this.parentUI.showPointerAt(playSoloBtn, 'down');
+          playSoloBtn.classList.add('tut-highlight');
+        }
+      }, 400);
+    }
   }
 
   toggleSoloElements(visible) {
     const parentPanel = document.getElementById('panel-maps');
     if (!parentPanel) return;
 
-    const grid = parentPanel.querySelector('.map-grid');
-    const diffSelector = document.getElementById('difficulty-selector-container');
-    const hc = document.getElementById('hardcore-toggle-container');
-    const deploy = document.getElementById('btn-deploy');
-    const leaderboard = document.getElementById('leaderboard-box');
-    const bottomBoxes = leaderboard ? leaderboard.parentElement : null;
+    const mapsStep = document.getElementById('wizard-step-maps');
+    const diffStep = document.getElementById('wizard-step-diff');
+    const prepStep = document.getElementById('wizard-step-prep');
 
-    const displayStyle = visible ? 'grid' : 'none';
-    const flexStyle = visible ? 'flex' : 'none';
-    const blockStyle = visible ? 'block' : 'none';
+    if (!visible) {
+      if (mapsStep) mapsStep.classList.add('hidden');
+      if (diffStep) diffStep.classList.add('hidden');
+      if (prepStep) prepStep.classList.add('hidden');
+    } else {
+      // Direct reset to Map Select Slide (Step 1)
+      if (mapsStep) {
+        mapsStep.classList.remove('hidden');
+        mapsStep.classList.add('active');
+        
+        // Point directly to Next button in Step 1 (do not tell them to choose a map)
+        this.triggerStep1Pointer();
+      }
+      if (diffStep) diffStep.classList.add('hidden');
+      if (prepStep) prepStep.classList.add('hidden');
+    }
+  }
 
-    if (grid) grid.style.display = displayStyle;
-    if (diffSelector) diffSelector.style.display = flexStyle;
-    if (hc) hc.style.display = flexStyle;
-    if (deploy) deploy.style.display = blockStyle;
-    if (bottomBoxes) bottomBoxes.style.display = flexStyle;
+  triggerStep1Pointer() {
+    if (!this.game.tutorialCompleted) {
+      this.parentUI.hidePointer();
+      document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
+      
+      const nextMapsBtn = document.getElementById('btn-wizard-next-maps');
+      if (nextMapsBtn) {
+        this.parentUI.showPointerAt(nextMapsBtn, 'down');
+        nextMapsBtn.classList.add('tut-highlight');
+      }
+    }
   }
 
   initEventListeners() {
@@ -278,12 +313,93 @@ export class LobbyUI {
       });
     }
 
-    // Difficulty Button Click Listener
-    this.diffButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.diffButtons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const diff = btn.getAttribute('data-difficulty');
+    // Wizard Step 1: Next (Choose Difficulty)
+    if (this.btnNextMaps) {
+      this.btnNextMaps.addEventListener('click', () => {
+        soundManager.playTick();
+        this.stepMaps.classList.add('hidden');
+        this.stepDiff.classList.remove('hidden');
+        this.stepDiff.classList.add('active');
+        
+        // Redraw boss previews to ensure crisp canvases
+        this.drawAllBossPreviews();
+
+        // Tutorial Step 2: Point directly to PREPARATION button
+        if (!this.game.tutorialCompleted) {
+          this.parentUI.hidePointer();
+          document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
+          
+          const nextDiffBtn = document.getElementById('btn-wizard-next-diff');
+          if (nextDiffBtn) {
+            this.parentUI.showPointerAt(nextDiffBtn, 'down');
+            nextDiffBtn.classList.add('tut-highlight');
+          }
+        }
+      });
+    }
+
+    // Wizard Step 2: Back to Maps
+    if (this.btnBackDiff) {
+      this.btnBackDiff.addEventListener('click', () => {
+        soundManager.playTick();
+        this.stepDiff.classList.add('hidden');
+        this.stepMaps.classList.remove('hidden');
+        this.stepMaps.classList.add('active');
+
+        this.triggerStep1Pointer();
+      });
+    }
+
+    // Wizard Step 2: Next (Squad Prep)
+    if (this.btnNextDiff) {
+      this.btnNextDiff.addEventListener('click', () => {
+        soundManager.playTick();
+        this.stepDiff.classList.add('hidden');
+        this.stepPrep.classList.remove('hidden');
+        this.stepPrep.classList.add('active');
+
+        // Tutorial Step 3: Point to DEPLOY TO MATCH button
+        if (!this.game.tutorialCompleted) {
+          this.parentUI.hidePointer();
+          document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
+          
+          const deployBtn = document.getElementById('btn-deploy');
+          if (deployBtn) {
+            this.parentUI.showPointerAt(deployBtn, 'down');
+            deployBtn.classList.add('tut-highlight');
+          }
+        }
+      });
+    }
+
+    // Wizard Step 3: Back to Difficulty
+    if (this.btnBackPrep) {
+      this.btnBackPrep.addEventListener('click', () => {
+        soundManager.playTick();
+        this.stepPrep.classList.add('hidden');
+        this.stepDiff.classList.remove('hidden');
+        this.stepDiff.classList.add('active');
+
+        if (!this.game.tutorialCompleted) {
+          this.parentUI.hidePointer();
+          document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
+          
+          const nextDiffBtn = document.getElementById('btn-wizard-next-diff');
+          if (nextDiffBtn) {
+            this.parentUI.showPointerAt(nextDiffBtn, 'down');
+            nextDiffBtn.classList.add('tut-highlight');
+          }
+        }
+      });
+    }
+
+    // Wizard Difficulty Card Selector
+    this.diffWizardCards.forEach(card => {
+      card.addEventListener('click', () => {
+        this.diffWizardCards.forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        
+        const diff = card.getAttribute('data-difficulty');
         this.game.selectedDifficulty = diff;
         soundManager.playTick();
       });
@@ -437,6 +553,25 @@ export class LobbyUI {
       });
     }
 
+    // Delegated Purchase listener for Direct-Buy elements in Shop Panel
+    const shopPanel = document.getElementById('panel-shop');
+    if (shopPanel) {
+      shopPanel.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-shop-action');
+        if (!btn || btn.disabled) return;
+
+        const card = btn.closest('.shop-card');
+        if (!card) return;
+
+        const type = card.getAttribute('data-agent-type');
+        const cost = parseInt(btn.getAttribute('data-cost')) || 0;
+
+        if (type && cost > 0) {
+          this.game.buyAgentFromShopDirect(type, cost);
+        }
+      });
+    }
+
     this.mapCards.forEach(card => {
       card.addEventListener('click', () => {
         this.mapCards.forEach(c => c.classList.remove('active'));
@@ -444,6 +579,18 @@ export class LobbyUI {
         const mapId = card.getAttribute('data-map-id');
         this.game.setSelectedMap(mapId);
         this.renderLeaderboard(mapId);
+
+        // Highlight "NEXT" button in Step 1 map select
+        if (!this.game.tutorialCompleted) {
+          this.parentUI.hidePointer();
+          document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
+          
+          const nextMapsBtn = document.getElementById('btn-wizard-next-maps');
+          if (nextMapsBtn) {
+            this.parentUI.showPointerAt(nextMapsBtn, 'down');
+            nextMapsBtn.classList.add('tut-highlight');
+          }
+        }
       });
     });
 
@@ -575,9 +722,12 @@ export class LobbyUI {
       }
     }
 
+    // Refresh and process the shop state for all TDS-structured categorizations
+    this.shopCards = document.querySelectorAll('.shop-card');
     this.shopCards.forEach(card => {
       const type = card.getAttribute('data-agent-type');
       if (!type) return;
+      
       const isUnlocked = this.game.unlockedAgents.includes(type);
       const btn = card.querySelector('.btn-shop-action');
       const costText = card.querySelector('.cost-text');
@@ -586,25 +736,41 @@ export class LobbyUI {
         card.classList.remove('locked');
         card.classList.add('purchased');
         if (costText) {
-          costText.textContent = "UNLOCKED";
+          costText.textContent = (type === 'scout') ? "STARTER" : "UNLOCKED";
           costText.style.color = "var(--primary-green-dark)";
         }
         if (btn) {
           btn.textContent = "UNLOCKED";
           btn.disabled = true;
-          btn.style.opacity = '1.0';
+          btn.style.opacity = '0.6';
+          btn.style.background = '#bdc3c7';
+          btn.style.borderColor = 'var(--border-color)';
+          btn.style.boxShadow = 'none';
         }
       } else {
         card.classList.add('locked');
         card.classList.remove('purchased');
+        const cost = parseInt(btn ? btn.getAttribute('data-cost') : '0') || 0;
+        
         if (costText) {
-          costText.textContent = "LOCKED - UNBOX TO UNLOCK";
-          costText.style.color = "#e74c3c";
+          costText.innerHTML = `<img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> ${cost.toLocaleString()}`;
+          costText.style.color = "var(--primary-orange)";
         }
         if (btn) {
-          btn.textContent = "LOCKED";
-          btn.disabled = true;
-          btn.style.opacity = '0.5';
+          btn.textContent = "BUY";
+          btn.disabled = false;
+          if (coins < cost) {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.style.background = '#e74c3c';
+            btn.style.borderColor = 'var(--border-color)';
+            btn.style.boxShadow = 'none';
+          } else {
+            btn.style.opacity = '1.0';
+            btn.style.background = 'var(--primary-green)';
+            btn.style.borderColor = 'var(--border-color)';
+            btn.style.boxShadow = '0 3px 0 var(--primary-green-dark)';
+          }
         }
       }
     });
@@ -630,7 +796,12 @@ export class LobbyUI {
 
   renderLoadoutConfig() {
     this.loadoutGrid.innerHTML = '';
-    const allAgentTypes = ['scout', 'minigunner', 'commander', 'dj', 'pyromancer', 'farm', 'soldier', 'gladiator', 'sniper', 'medic', 'rocketeer'];
+    const allAgentTypes = [
+      'scout', 'soldier', 'sniper', 'demoman',
+      'farm', 'medic', 'pyromancer', 'rocketeer', 'freezer', 'shotgunner', 'crook_boss', 'military_base',
+      'minigunner', 'commander', 'dj', 'ranger', 'turret',
+      'gladiator'
+    ];
 
     allAgentTypes.forEach(type => {
       const isUnlocked = this.game.unlockedAgents.includes(type);
@@ -695,6 +866,7 @@ export class LobbyUI {
       }
     });
 
+    this.shopCards = document.querySelectorAll('.shop-card');
     this.shopCards.forEach(card => {
       const canvas = card.querySelector('.agent-preview-canvas');
       const type = card.getAttribute('data-agent-type');
@@ -702,6 +874,134 @@ export class LobbyUI {
         this.drawAgentPreview(canvas, type);
       }
     });
+
+    this.drawAllBossPreviews();
+  }
+
+  drawAllBossPreviews() {
+    const bossPreviews = document.querySelectorAll('.diff-boss-preview');
+    bossPreviews.forEach(canvas => {
+      const bossType = canvas.getAttribute('data-boss');
+      if (bossType) {
+        this.drawBossPreview(canvas, bossType);
+      }
+    });
+  }
+
+  drawBossPreview(canvas, bossType) {
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.save();
+    
+    // Scale and position the head model centered
+    ctx.translate(w / 2, h / 2 + 10);
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 3;
+
+    // Draw baseline character pedestal shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath();
+    ctx.ellipse(0, 16, 18, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (bossType === 'brute') {
+      // Brute Boss Model
+      ctx.fillStyle = '#1e8449'; // Forest Green Torso
+      ctx.fillRect(-12, -8, 24, 24);
+      ctx.strokeRect(-12, -8, 24, 24);
+      // Giant fists
+      ctx.fillStyle = '#27ae60';
+      ctx.fillRect(-17, 2, 8, 8);
+      ctx.strokeRect(-17, 2, 8, 8);
+      ctx.fillRect(9, 2, 8, 8);
+      ctx.strokeRect(9, 2, 8, 8);
+      // Head
+      ctx.fillStyle = '#27ae60';
+      ctx.fillRect(-8, -21, 16, 13);
+      ctx.strokeRect(-8, -21, 16, 13);
+      // Glowing red eyes
+      ctx.fillStyle = '#e74c3c';
+      ctx.fillRect(-4, -16, 2.5, 2.5);
+      ctx.fillRect(2.5, -16, 2.5, 2.5);
+    } 
+    else if (bossType === 'grave_digger') {
+      // Grave Digger Model
+      ctx.fillStyle = '#2f3542'; // Dark Robe
+      ctx.fillRect(-10, -6, 20, 22);
+      ctx.strokeRect(-10, -6, 20, 22);
+      // Shovel pole
+      ctx.strokeStyle = '#747d8c';
+      ctx.lineWidth = 3.5;
+      ctx.beginPath(); ctx.moveTo(14, -18); ctx.lineTo(14, 18); ctx.stroke();
+      ctx.fillStyle = '#a4b0be';
+      ctx.fillRect(10, -22, 8, 5);
+      // Head and Hood
+      ctx.fillStyle = '#1e272e';
+      ctx.fillRect(-8, -20, 16, 14);
+      ctx.strokeRect(-8, -20, 16, 14);
+      // Glowing Purple Eyes
+      ctx.fillStyle = '#9b59b6';
+      ctx.fillRect(-3, -15, 2, 2);
+      ctx.fillRect(1.5, -15, 2, 2);
+    } 
+    else if (bossType === 'hazard_giant') {
+      // Hazard Giant
+      ctx.fillStyle = '#f1c40f'; // Toxic yellow body
+      ctx.fillRect(-12, -8, 24, 22);
+      ctx.strokeRect(-12, -8, 24, 22);
+      // Back canisters
+      ctx.fillStyle = '#2ecc71';
+      ctx.fillRect(-16, -4, 5, 12);
+      ctx.strokeRect(-16, -4, 5, 12);
+      // Hazmat Dome Helmet
+      ctx.fillStyle = '#f1c40f';
+      ctx.fillRect(-8, -20, 16, 12);
+      ctx.strokeRect(-8, -20, 16, 12);
+      ctx.fillStyle = '#2ecc71'; // Glowing bio visor
+      ctx.fillRect(-5, -16, 10, 4);
+    } 
+    else if (bossType === 'molten_titan') {
+      // Molten Titan
+      ctx.fillStyle = '#1e272e'; // Dark magma frame
+      ctx.fillRect(-12, -8, 24, 22);
+      ctx.strokeRect(-12, -8, 24, 22);
+      ctx.fillStyle = '#ff6b6b'; // Veins
+      ctx.fillRect(-8, -4, 3, 12);
+      ctx.fillRect(5, -2, 3, 8);
+      // Head
+      ctx.fillStyle = '#1e272e';
+      ctx.fillRect(-8, -20, 16, 12);
+      ctx.strokeRect(-8, -20, 16, 12);
+      // Fire crest crown
+      ctx.fillStyle = '#e67e22';
+      ctx.beginPath();
+      ctx.moveTo(-8, -20); ctx.lineTo(-6, -24); ctx.lineTo(-3, -20);
+      ctx.lineTo(0, -26); ctx.lineTo(3, -20); ctx.lineTo(6, -24); ctx.lineTo(8, -20);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    } 
+    else if (bossType === 'fallen_king') {
+      // Fallen King
+      ctx.fillStyle = '#2c3e50'; // Royal Obsidian Plate
+      ctx.fillRect(-12, -8, 24, 22);
+      ctx.strokeRect(-12, -8, 24, 22);
+      ctx.fillStyle = '#8e44ad'; // Purple Crest Cloak
+      ctx.fillRect(-14, -8, 3, 22);
+      ctx.fillRect(11, -8, 3, 22);
+      // Head and Helmet
+      ctx.fillStyle = '#2c3e50';
+      ctx.fillRect(-8, -20, 16, 12);
+      ctx.strokeRect(-8, -20, 16, 12);
+      // Gold Spiked Crown
+      ctx.fillStyle = '#f1c40f';
+      ctx.beginPath();
+      ctx.moveTo(-8, -20); ctx.lineTo(-5, -23); ctx.lineTo(-2, -20);
+      ctx.lineTo(0, -25); ctx.lineTo(2, -20); ctx.lineTo(5, -23); ctx.lineTo(8, -20);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+
+    ctx.restore();
   }
 
   drawMapPreview(canvas, mapId) {
@@ -715,7 +1015,7 @@ export class LobbyUI {
 
     let terrainColor = '#7dcd40';
     let pathColor = '#dfc39e';
-    let borderOutlineColor = '#222';
+    let borderOutlineColor = '#22';
     if (mapId === 'desert') {
       terrainColor = '#f9e79f';
       pathColor = '#e5c494';
@@ -834,6 +1134,12 @@ export class LobbyUI {
     else if (agentType === 'sniper') torsoColor = '#e67e22';
     else if (agentType === 'medic') torsoColor = '#e74c3c';
     else if (agentType === 'rocketeer') torsoColor = '#95a5a6';
+    else if (agentType === 'demoman') torsoColor = '#34495e';
+    else if (agentType === 'freezer') torsoColor = '#3498db';
+    else if (agentType === 'shotgunner') torsoColor = '#2c3e50';
+    else if (agentType === 'crook_boss') torsoColor = '#f5f6fa';
+    else if (agentType === 'ranger') torsoColor = '#1a1a2e';
+    else if (agentType === 'turret') torsoColor = '#1e293b';
 
     const equippedSkin = this.game.equippedSkins[agentType] || 'default';
     if (equippedSkin.endsWith('_Golden')) {
@@ -844,9 +1150,21 @@ export class LobbyUI {
       torsoColor = '#2ecc71';
     }
 
-    ctx.fillStyle = torsoColor;
-    ctx.fillRect(-8, -8, 16, 16);
-    ctx.strokeRect(-8, -8, 16, 16);
+    if (agentType === 'military_base') {
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 3;
+      ctx.fillStyle = '#27ae60'; 
+      ctx.fillRect(-15, -15, 30, 30);
+      ctx.strokeRect(-15, -15, 30, 30);
+      ctx.fillStyle = '#1e3d2f'; 
+      ctx.fillRect(-8, -2, 16, 16);
+      ctx.strokeRect(-8, -2, 16, 16);
+      ctx.fillStyle = '#fff'; 
+      ctx.fillRect(-6, 2, 4, 10);
+      ctx.fillRect(2, 2, 4, 10);
+      ctx.restore();
+      return;
+    }
 
     if (agentType === 'farm') {
       ctx.strokeStyle = '#222';
@@ -970,6 +1288,45 @@ export class LobbyUI {
       ctx.fillRect(-6, -6, 12, 12);
       ctx.fillStyle = '#34495e';
       ctx.fillRect(4, -3, 16, 6);
+    } else if (agentType === 'demoman') {
+      ctx.fillStyle = '#7f8c8d'; 
+      ctx.fillRect(-6, -6, 12, 12);
+      ctx.fillStyle = '#d35400'; 
+      ctx.fillRect(-3, -8, 6, 16);
+      ctx.fillStyle = '#111'; 
+      ctx.fillRect(6, 1, 10, 4);
+    } else if (agentType === 'freezer') {
+      ctx.fillStyle = '#2980b9'; 
+      ctx.fillRect(-6, -6, 12, 12);
+      ctx.fillStyle = '#00ffe0'; 
+      ctx.fillRect(3, -4, 2, 8);
+      ctx.fillStyle = '#5dade2'; 
+      ctx.fillRect(6, 1, 10, 4);
+    } else if (agentType === 'shotgunner') {
+      ctx.fillStyle = '#34495e'; 
+      ctx.fillRect(-6, -6, 12, 12);
+      ctx.fillStyle = '#111'; 
+      ctx.fillRect(6, 1, 12, 5);
+    } else if (agentType === 'crook_boss') {
+      ctx.fillStyle = '#c0392b'; 
+      ctx.fillRect(-2, -4, 4, 12);
+      ctx.fillStyle = '#2f3640'; 
+      ctx.fillRect(-8, -8, 3, 16);
+      ctx.fillRect(5, -8, 3, 16);
+      ctx.fillStyle = '#111'; 
+      ctx.fillRect(6, 1, 14, 4);
+    } else if (agentType === 'ranger') {
+      ctx.fillStyle = '#2c3e50'; 
+      ctx.fillRect(-6, -6, 12, 12);
+      ctx.fillStyle = '#34495e'; 
+      ctx.fillRect(6, -2, 16, 5);
+    } else if (agentType === 'turret') {
+      ctx.fillStyle = '#7f8c8d'; 
+      ctx.fillRect(-10, -4, 20, 8);
+      ctx.fillStyle = '#2c3e50'; 
+      ctx.fillRect(0, -6, 18, 12);
+      ctx.fillStyle = '#e74c3c'; 
+      ctx.fillRect(18, -1, 4, 2);
     }
 
     ctx.restore();
@@ -1050,7 +1407,7 @@ export class LobbyUI {
 
     const loop = (timestamp) => {
       if (!startTime) startTime = timestamp;
-      const dt = Math.min(0.1, (timestamp - startTime) / 1000.0);
+      const dt = Math.min(0.1, (timestamp - startTime) / 1000.0) * this.speedMultiplier;
       startTime = timestamp;
 
       ctx.clearRect(0, 0, w, h);

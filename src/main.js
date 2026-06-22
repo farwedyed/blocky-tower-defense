@@ -3,20 +3,24 @@
 import { Grid } from './grid.js';
 import { UI } from './ui.js';
 import { EffectManager } from './particle.js';
-import { Enemy, Runner, Quick, Slow, Hidden, Lead, Shadow, Goliath, Templar, GraveDigger, MoltenTitan, FallenGuardian, FallenKing, VoidReaver } from './enemy.js';
-import { Scout, Minigunner, Commander, DJUnit, Pyromancer, Farm, Gladiator, Soldier, Sniper, Medic, Rocketeer } from './tower.js';
+import { Enemy, Runner, Quick, Slow, Hidden, Lead, Shadow, Goliath, Templar, GraveDigger, MoltenTitan, FallenGuardian, FallenKing, VoidReaver, Brute } from './enemy.js';
+import { Scout, Minigunner, Commander, DJUnit, Pyromancer, Farm, Gladiator, Soldier, Sniper, Medic, Rocketeer, Demoman, Freezer, Shotgunner, CrookBoss, MilitaryBase, Ranger, Turret } from './tower.js';
 import { soundManager } from './sound.js';
 import { uploadRecord, fetchTopRecords } from './firebase.js';
 import { Network } from './network.js';
 import { CrazyGamesManager } from './crazygames.js';
 
+window.lobbyPlayers = window.lobbyPlayers || { p1: "Host Survivor", p2: "", p3: "", p4: "", p5: "", p6: "", p7: "", p8: "" };
+window.myPlayerId = window.myPlayerId || "p1";
+window.playerCursors = window.playerCursors || {};
+
 class Game {
   constructor() {
-    window.game = this; // Expose globally so other modules can read difficulty settings
+    window.game = this;
     this.canvas = document.getElementById('game-canvas');
     this.ctx = this.canvas.getContext('2d');
 
-    // 1. Meta Progression (loaded from localStorage or initialized defaults)
+    // 1. Meta Progression
     this.playerLevel = 1;
     this.playerXp = 0;
     this.playerCoins = 150;
@@ -25,29 +29,43 @@ class Game {
     this.ownedSkins = [];
     this.equippedSkins = {};
 
-    // Difficulty Settings Mapping (TDS Balancing)
-    this.selectedDifficulty = 'easy'; // Changed default difficulty from 'molten' to 'easy'
+    // Five Active Difficulty Settings Mappings (Balanced to match Roblox TDS)
+    this.selectedDifficulty = 'easy';
     this.difficultySettings = {
       easy: {
-        hpMultiplier: 0.75,
-        startGold: 600,
+        hpMultiplier: 0.80, // Generates fair, proportional health scaling
+        startGold: 600,     // Uniform starting cash matching TDS standard
         maxWaves: 30,
         coinMultiplier: 1.0,
         xpMultiplier: 1.0
       },
-      molten: {
-        hpMultiplier: 1.15,
+      casual: {
+        hpMultiplier: 1.00, // Baseline normal health
+        startGold: 600,
+        maxWaves: 35,
+        coinMultiplier: 1.3,
+        xpMultiplier: 1.3
+      },
+      intermediate: {
+        hpMultiplier: 1.40,
         startGold: 600,
         maxWaves: 40,
-        coinMultiplier: 1.5,
-        xpMultiplier: 1.5
+        coinMultiplier: 1.6,
+        xpMultiplier: 1.6
+      },
+      molten: {
+        hpMultiplier: 1.80,
+        startGold: 600,
+        maxWaves: 40,
+        coinMultiplier: 2.0,
+        xpMultiplier: 2.0
       },
       fallen: {
-        hpMultiplier: 1.85,
-        startGold: 500,
+        hpMultiplier: 2.40, // Retuned Fallen scale to provide a structured, strategic challenge
+        startGold: 600,
         maxWaves: 40,
-        coinMultiplier: 2.5,
-        xpMultiplier: 2.5
+        coinMultiplier: 2.8,
+        xpMultiplier: 2.8
       }
     };
 
@@ -68,62 +86,51 @@ class Game {
       farmsPlaced: false
     };
 
-    // Speedrun matchmaking time tracker
     this.matchTime = 0;
 
-    // Tutorial
+    // Tutorial Progression
     this.tutorialCompleted = false;
-    this.tutorialStep = 0; // 0=lobby hint, 1=placement hint, 2=upgrade hint, 3=done
+    this.tutorialStep = 0; // 0=lobby, 1=placement, 1.5=start wave, 2=upgrade, 3=done
 
     this.loadStatsFromStorage();
 
     // 2. In-Match Stats
-    this.lives = 100;
-    this.gold = 400; // starting cash
+    this.lives = 150;
+    this.gold = 400;
     this.wave = 0;
     this.isHardcore = false;
-    this.maxWaves = 40;
-    this.state = 'lobby'; // 'lobby', 'playing', 'gameover', 'victory'
+    this.maxWaves = 30;
+    this.state = 'lobby'; // Set back to lobby state for initial rendering
     this.selectedMap = 'grassland';
     this.waveInProgress = false;
-    this.hasRevivedThisMatch = false; // Limit players to 1 rewarded ad revive per match
+    this.hasRevivedThisMatch = false; 
 
     // Cooperative multiplayer wallets & skip votes
-    this.playerWallets = {}; // key: player slot ('p1'...'p8'), value: cash balance
-    this.skipVotes = new Set(); // Stores slots of voted players
+    this.playerWallets = {};
+    this.skipVotes = new Set();
 
     // Auto Wave Mode (default enabled)
     this.autoMode = true;
-    this.autoStartTimer = 0; // counts down from 2.0 when a wave ends in autoMode
-    this.showMapDirections = false;
+    this.autoStartTimer = 0;
+    this.showMapDirections = true;
 
-    // Speeds
-    this.speedMultiplier = 1;
-
-    // Match Selections
-    this.selectedShopTower = 'scout';
-    this.selectedPlacedTower = null;
-
-    // Mouse grid
-    this.mouseGrid = { col: -1, row: -1 };
+    // Interactive mouse positioning trackers (Restored)
     this.mousePos = { x: -1, y: -1 };
+    this.mouseGrid = { col: -1, row: -1 };
     this.isMouseOnCanvas = false;
     this.smoothHoverPos = { x: 0, y: 0 };
     this.targetHoverPos = { x: 0, y: 0 };
 
-    // Play lists
+    this.speedMultiplier = 1;
     this.enemies = [];
     this.bullets = [];
     this.spawnQueue = [];
-    this.spawnInterval = 0.8;
-    this.spawnTimer = 0;
 
-    // Instantiate engine components
-    this.grid = new Grid(this.canvas.width, this.canvas.height, 40);
+    this.grid = new Grid(800, 600, 40);
     this.effectManager = new EffectManager();
     this.ui = new UI(this);
 
-    // Initialize WebRTC Multiplayer Signal Network with this Game instance
+    // Initialize WebRTC Signaling Network
     Network.init(this, (peerId) => {
       console.log("[Signal] established Peer ID room link:", peerId);
     });
@@ -135,15 +142,15 @@ class Game {
     
     // Sync Lobby displays immediately
     this.ui.updateLobbyMeta(this.playerLevel, this.playerXp, this.playerCoins);
-    // Render daily quests and leaderboard for the default map on first load
     this.ui.renderDailyQuests();
     this.ui.renderLeaderboard(this.selectedMap);
 
+    this.loadStatsFromStorage();
     if (!this.tutorialCompleted) {
-      this.ui.showTutorialHint(0);
+      this.tutorialStep = 0;
     }
 
-    // Initialize CrazyGames SDK Integration
+    // Initialize CrazyGames SDK
     CrazyGamesManager.init().then(() => {
       CrazyGamesManager.onRoomJoinReceived((params) => {
         if (params && params.roomId) {
@@ -156,31 +163,23 @@ class Game {
     requestAnimationFrame((t) => this.loop(t));
   }
 
-  /**
-   * Seamlessly redirects players into direct co-op lobbies via incoming invite parameters.
-   * @param {string} roomId 
-   */
   handleCrazyGamesInvite(roomId) {
-    console.log('[CrazyGames] Executing automated squad connection sequence for:', roomId);
+    console.log('[CrazyGames] Connecting to room link:', roomId);
     if (this.state === 'playing') {
       this.quitToLobby();
     }
 
-    // Switch to Map Selector / Setup View
     const mapsTab = document.querySelector('.tab-btn[data-target="panel-maps"]');
     if (mapsTab) mapsTab.click();
 
-    // Select CO-OP Party option
     const btnSelectCoop = document.getElementById('btn-select-coop');
     if (btnSelectCoop) btnSelectCoop.click();
 
-    // Insert room code into joining input field
     const inputJoinCode = document.getElementById('input-join-code');
     if (inputJoinCode) {
       inputJoinCode.value = roomId.toUpperCase();
     }
 
-    // Connect to room after visual states settle
     setTimeout(() => {
       const btnJoinCoop = document.getElementById('btn-join-coop');
       if (btnJoinCoop) btnJoinCoop.click();
@@ -228,10 +227,9 @@ class Game {
         }
       }
     } catch (e) {
-      console.warn("Storage load failed, utilizing initial defaults.", e);
+      console.warn("Storage load failed, adopting defaults.", e);
     }
 
-    // Ensure safe defaults
     if (!Array.isArray(this.unlockedAgents) || this.unlockedAgents.length === 0) {
       this.unlockedAgents = ['scout'];
     }
@@ -274,22 +272,19 @@ class Game {
       this.questRewarded.kills = true;
       this.playerCoins += 75;
       anyCompleted = true;
-      this.effectManager && this.effectManager.spawnText
-        && this.effectManager.spawnText(400, 260, 'QUEST COMPLETE! +🪙 75 Coins', '#f1c40f');
+      this.effectManager.spawnText(400, 260, 'QUEST COMPLETE! +🪙 75 Coins', '#f1c40f');
     }
     if (!this.questRewarded.cashSpent && this.questProgress.cashSpent >= this.questGoals.cashSpent) {
       this.questRewarded.cashSpent = true;
       this.playerCoins += 100;
       anyCompleted = true;
-      this.effectManager && this.effectManager.spawnText
-        && this.effectManager.spawnText(400, 240, 'QUEST COMPLETE! +🪙 100 Coins', '#f1c40f');
+      this.effectManager.spawnText(400, 240, 'QUEST COMPLETE! +🪙 100 Coins', '#f1c40f');
     }
     if (!this.questRewarded.farmsPlaced && this.questProgress.farmsPlaced >= this.questGoals.farmsPlaced) {
       this.questRewarded.farmsPlaced = true;
       this.playerCoins += 50;
       anyCompleted = true;
-      this.effectManager && this.effectManager.spawnText
-        && this.effectManager.spawnText(400, 220, 'QUEST COMPLETE! +🪙 50 Coins', '#f1c40f');
+      this.effectManager.spawnText(400, 220, 'QUEST COMPLETE! +🪙 50 Coins', '#f1c40f');
     }
 
     if (anyCompleted) {
@@ -303,7 +298,6 @@ class Game {
     const seconds = Math.floor(this.matchTime % 60);
     const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     
-    // Retrieve name from CrazyGames profile, fallback to localStorage input, fallback to "Guest"
     const activeUsername = CrazyGamesManager.currentUser?.username 
       || localStorage.getItem('tds_player_username') 
       || "Guest";
@@ -328,70 +322,83 @@ class Game {
     }).then(records => {
       this.leaderboard[this.selectedMap] = records;
       if (this.ui) this.ui.renderLeaderboard(this.selectedMap);
-    }).catch(e => console.warn('[Leaderboard] Post-victory sync error:', e));
+    }).catch(e => console.warn('[Leaderboard] Sync error:', e));
   }
 
   initWaveData() {
-    // 40 Wave Blueprint (Spawning matching Roblox Zombie Classes)
-    this.waveBlueprints = [
-      // 1-5 (Early Game Basics)
-      { runners: 8, quicks: 0, slows: 0, hiddens: 0, leads: 0, shadows: 0, goliaths: 0, templars: 0, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 1.2 },
-      { runners: 12, quicks: 3, slows: 0, hiddens: 0, leads: 0, shadows: 0, goliaths: 0, templars: 0, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 1.0 },
-      { runners: 10, quicks: 6, slows: 2, hiddens: 0, leads: 0, shadows: 0, goliaths: 0, templars: 0, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.9 },
-      { runners: 15, quicks: 10, slows: 4, hiddens: 0, leads: 0, shadows: 0, goliaths: 0, templars: 0, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.8 },
-      { runners: 10, quicks: 15, slows: 6, hiddens: 0, leads: 0, shadows: 0, goliaths: 0, templars: 0, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.75 },
+    this.waveBlueprintsEasy = this.generateWaves(30, 'easy');
+    this.waveBlueprintsCasual = this.generateWaves(35, 'casual');
+    this.waveBlueprintsIntermediate = this.generateWaves(40, 'intermediate');
+    this.waveBlueprintsMolten = this.generateWaves(40, 'molten');
+    this.waveBlueprintsFallen = this.generateWaves(40, 'fallen');
+  }
 
-      // 6-10 (Ramping up, first Boss)
-      { runners: 18, quicks: 12, slows: 8, hiddens: 0, leads: 0, shadows: 0, goliaths: 0, templars: 0, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.7 },
-      { runners: 20, quicks: 15, slows: 10, hiddens: 0, leads: 0, shadows: 0, goliaths: 1, templars: 0, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.65 },
-      { runners: 15, quicks: 20, slows: 12, hiddens: 0, leads: 0, shadows: 0, goliaths: 2, templars: 0, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.6 },
-      { runners: 25, quicks: 25, slows: 15, hiddens: 0, leads: 0, shadows: 0, goliaths: 3, templars: 0, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.55 },
-      { runners: 20, quicks: 20, slows: 15, hiddens: 0, leads: 0, shadows: 0, goliaths: 4, templars: 0, diggers: 1, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.6 }, // Wave 10: Grave Digger
+  generateWaves(count, difficulty) {
+    const waves = [];
+    for (let w = 1; w <= count; w++) {
+      const isBossWave = (w === count);
 
-      // 11-15 (Hidden & Lead Introduction)
-      { runners: 15, quicks: 15, slows: 10, hiddens: 5, leads: 0, shadows: 0, goliaths: 2, templars: 0, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.7 }, // Wave 11 Hiddens
-      { runners: 12, quicks: 12, slows: 8, hiddens: 10, leads: 2, shadows: 0, goliaths: 3, templars: 0, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.65 }, // Wave 12 Leads
-      { runners: 15, quicks: 15, slows: 12, hiddens: 12, leads: 6, shadows: 0, goliaths: 4, templars: 0, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.6 },
-      { runners: 10, quicks: 10, slows: 10, hiddens: 15, leads: 10, shadows: 0, goliaths: 5, templars: 0, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.55 },
-      { runners: 20, quicks: 20, slows: 15, hiddens: 15, leads: 12, shadows: 0, goliaths: 6, templars: 1, diggers: 0, titans: 1, guardians: 0, kings: 0, reavers: 0, rate: 0.5 }, // Wave 15 Templar
+      // Overhaul early game variety: waves 1-10 match Roblox TDS wave configurations
+      if (w === 1) {
+        waves.push({ runners: 4, quicks: 0, slows: 0, hiddens: 0, rate: 2.0 });
+        continue;
+      }
+      if (w === 2) {
+        waves.push({ runners: 8, quicks: 0, slows: 0, hiddens: 0, rate: 1.8 });
+        continue;
+      }
+      if (w === 3) {
+        waves.push({ runners: 10, quicks: 4, slows: 0, hiddens: 0, rate: 1.5 }); // Speedies debut
+        continue;
+      }
+      if (w === 4) {
+        waves.push({ runners: 12, quicks: 6, slows: 0, hiddens: 0, rate: 1.4 });
+        continue;
+      }
+      if (w === 5) {
+        waves.push({ runners: 8, quicks: 4, slows: 2, hiddens: 0, rate: 1.4 }); // Slows debut
+        continue;
+      }
+      if (w === 6) {
+        waves.push({ runners: 0, quicks: 10, slows: 4, hiddens: 0, rate: 1.3 });
+        continue;
+      }
+      if (w === 7) {
+        waves.push({ goliaths: 1, quicks: 6, slows: 2, hiddens: 0, rate: 1.2 }); // Normal Boss (Toxic Giant) debuts
+        continue;
+      }
+      if (w === 8) {
+        waves.push({ runners: 12, quicks: 8, slows: 4, hiddens: 0, rate: 1.1 });
+        continue;
+      }
+      if (w === 9) {
+        waves.push({ goliaths: 1, quicks: 15, slows: 6, hiddens: 0, rate: 1.0 });
+        continue;
+      }
+      if (w === 10) {
+        waves.push({ quicks: 10, slows: 6, hiddens: 4, rate: 1.0 }); // Camo Hiddens debut
+        continue;
+      }
 
-      // 16-20 (Armored swarms, Molten Titan)
-      { runners: 15, quicks: 15, slows: 12, hiddens: 18, leads: 15, shadows: 0, goliaths: 6, templars: 2, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.5 },
-      { runners: 20, quicks: 20, slows: 15, hiddens: 20, leads: 18, shadows: 0, goliaths: 8, templars: 3, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.45 },
-      { runners: 25, quicks: 25, slows: 20, hiddens: 22, leads: 20, shadows: 2, goliaths: 10, templars: 4, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.4 }, // Shadows
-      { runners: 30, quicks: 30, slows: 25, hiddens: 25, leads: 25, shadows: 4, goliaths: 12, templars: 5, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.35 },
-      { runners: 20, quicks: 20, slows: 20, hiddens: 20, leads: 20, shadows: 6, goliaths: 10, templars: 6, diggers: 1, titans: 1, guardians: 0, kings: 0, reavers: 0, rate: 0.4 }, // Wave 20: Molten Titan
-
-      // 21-25 (Shadow Swarms, Heavy Armors)
-      { runners: 15, quicks: 15, slows: 15, hiddens: 20, leads: 20, shadows: 10, goliaths: 8, templars: 5, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.4 },
-      { runners: 20, quicks: 20, slows: 18, hiddens: 25, leads: 25, shadows: 12, goliaths: 10, templars: 6, diggers: 0, titans: 0, goldReward: 10, rate: 0.38 },
-      { runners: 25, quicks: 25, slows: 20, hiddens: 30, leads: 30, shadows: 15, goliaths: 12, templars: 8, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.35 },
-      { runners: 30, quicks: 30, slows: 25, hiddens: 35, leads: 35, shadows: 18, goliaths: 15, templars: 10, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.32 },
-      { runners: 25, quicks: 25, slows: 25, hiddens: 25, leads: 25, shadows: 15, goliaths: 12, templars: 12, diggers: 0, titans: 2, guardians: 0, kings: 0, reavers: 0, rate: 0.35 }, // Wave 25 Duel Titans
-
-      // 26-30 (Endgame Preparation, Fallen Guardian)
-      { runners: 20, quicks: 20, slows: 20, hiddens: 30, leads: 30, shadows: 20, goliaths: 14, templars: 10, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.32 },
-      { runners: 25, quicks: 25, slows: 25, hiddens: 35, leads: 35, shadows: 25, goliaths: 16, templars: 12, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.3 },
-      { runners: 30, quicks: 30, slows: 30, hiddens: 40, leads: 40, shadows: 30, goliaths: 18, templars: 15, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.28 },
-      { runners: 35, quicks: 35, slows: 35, hiddens: 45, leads: 45, shadows: 35, goliaths: 20, templars: 18, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.25 },
-      { runners: 20, quicks: 20, slows: 20, hiddens: 20, leads: 20, shadows: 20, goliaths: 15, templars: 10, diggers: 1, titans: 1, guardians: 1, kings: 0, reavers: 0, rate: 0.3 }, // Wave 30: Fallen Guardian
-
-      // 31-35 (Heavy End onslaught)
-      { runners: 25, quicks: 25, slows: 25, hiddens: 35, leads: 35, shadows: 25, goliaths: 18, templars: 12, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.28 },
-      { runners: 30, quicks: 30, slows: 30, hiddens: 40, leads: 40, shadows: 30, goliaths: 20, templars: 15, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.25 },
-      { runners: 35, quicks: 35, slows: 35, hiddens: 45, leads: 45, shadows: 35, goliaths: 22, templars: 18, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.22 },
-      { runners: 40, quicks: 40, slows: 40, hiddens: 50, leads: 50, shadows: 40, goliaths: 25, templars: 20, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.2 },
-      { runners: 30, quicks: 30, slows: 30, hiddens: 30, leads: 30, shadows: 30, goliaths: 20, templars: 15, diggers: 0, titans: 3, guardians: 1, kings: 0, reavers: 0, rate: 0.25 }, // Wave 35 Giant Titan swarm
-
-      // 36-39 (Pre-boss Apocalyptic onslaught)
-      { runners: 35, quicks: 35, slows: 35, hiddens: 45, leads: 45, shadows: 35, goliaths: 22, templars: 18, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.22 },
-      { runners: 40, quicks: 40, slows: 40, hiddens: 50, leads: 50, shadows: 40, goliaths: 25, templars: 20, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.2 },
-      { runners: 45, quicks: 45, slows: 45, hiddens: 55, leads: 55, shadows: 45, goliaths: 28, templars: 22, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.18 },
-      { runners: 50, quicks: 50, slows: 50, hiddens: 60, leads: 60, shadows: 50, goliaths: 30, templars: 25, diggers: 0, titans: 0, guardians: 0, kings: 0, reavers: 0, rate: 0.15 },
-
-      // Wave 40 (The Apocalypse: Fallen King & Void Reaver)
-      { runners: 40, quicks: 40, slows: 40, hiddens: 40, leads: 40, shadows: 30, goliaths: 20, templars: 15, diggers: 2, titans: 2, guardians: 1, kings: 1, reavers: 1, rate: 0.22 }
-    ];
+      // Beyond Wave 10, scale up dynamically across all modes (unlocked for Easy/Casual too)
+      waves.push({
+        runners: isBossWave ? 15 : 8 + w * 2,
+        quicks: isBossWave ? 15 : Math.max(0, w - 5) * 1.5,
+        slows: isBossWave ? 10 : Math.max(0, w - 8) * 1.2,
+        hiddens: Math.round(Math.max(0, w - 9) * 0.8), // Active on all difficulties
+        leads: Math.round(Math.max(0, w - 11) * 0.6),   // Active on all difficulties
+        shadows: (difficulty === 'fallen') ? Math.max(0, w - 20) * 0.5 : 0,
+        goliaths: Math.round(Math.max(0, w - 13) * 0.4), // Scale consistently after wave 14
+        templars: (difficulty === 'fallen') ? Math.max(0, w - 25) * 0.2 : 0,
+        brute: (isBossWave && difficulty === 'easy') ? 1 : 0,
+        diggers: (isBossWave && difficulty === 'casual') ? 1 : 0,
+        hazard_giants: (isBossWave && difficulty === 'intermediate') ? 1 : 0,
+        titans: (isBossWave && difficulty === 'molten') ? 1 : 0,
+        kings: (isBossWave && difficulty === 'fallen') ? 1 : 0,
+        rate: Math.max(0.4, 1.6 - w * 0.03)
+      });
+    }
+    return waves;
   }
 
   _getCanvasCoords(clientX, clientY) {
@@ -409,8 +416,8 @@ class Game {
     if (this.showMapDirections) {
       this.showMapDirections = false;
       
-      // Tutorial hook: Upon the first canvas tap (which clears directions overlay), launch Step 1!
-      if (!this.tutorialCompleted && this.tutorialStep === 0) {
+      // Directions cleared: Transition to Step 1 tutorial (Prompt to Equip Scout) [4]
+      if (!this.tutorialCompleted && this.tutorialStep === 0.5) {
         this.tutorialStep = 1;
         this.ui.showTutorialHint(1);
       }
@@ -419,7 +426,6 @@ class Game {
     const col = this.mouseGrid.col;
     const row = this.mouseGrid.row;
 
-    // CLIENT OR HOST SEPARATION FOR CO-OP ACTIONS
     if (Network.mode === 'CLIENT') {
       const key = `${col},${row}`;
       if (this.grid.towers.has(key)) {
@@ -439,7 +445,6 @@ class Game {
         this.setSelectedPlacedTower(null);
       }
     } else {
-      // Authoritative Host or Offline Mode
       const key = `${col},${row}`;
       if (this.grid.towers.has(key)) {
         const agent = this.grid.towers.get(key);
@@ -511,9 +516,10 @@ class Game {
   setSelectedShopTower(type) {
     this.selectedShopTower = type;
     
-    // Clear sidebar pointing arrow when Scout is chosen in Step 1
+    // Scout button clicked: Transition immediately to Step 1.5 (Point to highlighted tile (2,1)) [4]
     if (!this.tutorialCompleted && this.tutorialStep === 1 && type === 'scout') {
-      this.ui.hidePointer();
+      this.tutorialStep = 1.5;
+      this.ui.showTutorialHint(1.5);
     }
   }
 
@@ -521,37 +527,34 @@ class Game {
     this.selectedPlacedTower = agent;
     this.ui.updateSelectionPanel(agent);
 
-    // Tutorial hook: if they select the scout on Step 2, show pointer to upgrade button
+    // Scout selected on field: Transition to Step 2.5 (Point to Upgrade button) [4]
     if (!this.tutorialCompleted && this.tutorialStep === 2) {
       if (agent && agent.gridX === 2 && agent.gridY === 1) {
-        const upgradeBtn = document.getElementById('btn-upgrade');
-        if (upgradeBtn && this.ui) {
-          this.ui.showPointerAt(upgradeBtn, 'left');
-          upgradeBtn.classList.add('tut-highlight');
-        }
+        this.tutorialStep = 2.5;
+        this.ui.showTutorialHint(2.5); 
       } else {
-        if (this.ui) this.ui.hidePointer();
+        this.ui.hidePointer();
       }
     }
   }
 
-  buyAgentFromShop(type) {
-    let price = 0;
-    if (type === 'minigunner') price = 250;
-    else if (type === 'commander') price = 350;
-    else if (type === 'dj') price = 400;
-    else if (type === 'pyromancer') price = 300;
-
-    if (this.playerCoins >= price && !this.unlockedAgents.includes(type)) {
-      this.playerCoins -= price;
+  buyAgentFromShopDirect(type, cost) {
+    if (this.unlockedAgents.includes(type)) return;
+    if (this.playerCoins >= cost) {
+      this.playerCoins -= cost;
       this.unlockedAgents.push(type);
       
-      if (this.equippedAgents.length < 5) {
+      if (this.equippedAgents.length < 5 && !this.equippedAgents.includes(type)) {
         this.equippedAgents.push(type);
       }
-
+      
       this.saveStatsToStorage();
+      soundManager.playUpgrade();
       this.ui.updateLobbyMeta(this.playerLevel, this.playerXp, this.playerCoins);
+      
+      this.effectManager.spawnText(400, 300, `UNLOCKED ${type.toUpperCase().replace('_', ' ')}!`, '#2ecc71');
+    } else {
+      this.effectManager.spawnText(400, 300, "INSUFFICIENT COINS!", '#e74c3c');
     }
   }
 
@@ -587,7 +590,7 @@ class Game {
       if (roll < 0.60) {
         chosenRarity = 'rare';
         const subRoll = Math.random();
-        chosenAgent = subRoll < 0.33 ? 'pyromancer' : (subRoll < 0.66 ? 'gladiator' : 'farm');
+        chosenAgent = subRoll < 0.33 ? 'pyromancer' : (subRoll < 0.66 ? 'farm' : 'sniper');
       } else {
         chosenRarity = 'epic';
         chosenAgent = Math.random() < 0.5 ? 'commander' : 'medic';
@@ -650,12 +653,12 @@ class Game {
     this.isHardcore = hcCheckbox ? hcCheckbox.checked : false;
     Enemy.hardcoreMode = this.isHardcore;
 
-    this.lives = this.isHardcore ? 20 : 100;
+    this.lives = this.isHardcore ? 10 : (this.selectedDifficulty === 'easy' ? 150 : 100);
     this.gold = this.isHardcore ? 250 : diffConfig.startGold;
     this.wave = 0;
     this.maxWaves = diffConfig.maxWaves;
     this.waveInProgress = false;
-    this.hasRevivedThisMatch = false; // Reset revive usage for the new game
+    this.hasRevivedThisMatch = false; 
     this.speedMultiplier = 1;
     this.enemies = [];
     this.bullets = [];
@@ -667,14 +670,12 @@ class Game {
     this.effectManager.clear();
     this.setSelectedPlacedTower(null);
 
-    // Initial empty shop selection: Force player to tap sidebar Scout button
     if (!this.tutorialCompleted) {
       this.selectedShopTower = null;
     } else {
       this.selectedShopTower = this.equippedAgents[0];
     }
 
-    // Initialize individual wallets
     this.playerWallets = {};
     this.playerWallets[window.myPlayerId] = this.gold;
     for (const c of Network.conns) {
@@ -683,14 +684,13 @@ class Game {
       }
     }
 
-    // --- TRANSMIT START SIGNAL TO ALL CONNECTED CO-OP CLIENTS ---
     if (Network.mode === 'HOST') {
       Network.broadcastToAll({
         type: 'START',
         selectedMap: this.selectedMap,
         isHardcore: this.isHardcore,
         playerWallets: this.playerWallets,
-        obstacles: this.grid.obstacles // <-- Synchronize generated obstacles!
+        obstacles: this.grid.obstacles 
       });
     }
 
@@ -706,14 +706,12 @@ class Game {
     this.ui.updateWaveButton(false);
     this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
 
-    // Deployment tutorial: Wait for initial tap instead of showing immediately
     if (!this.tutorialCompleted) {
-      this.tutorialStep = 0;
+      this.tutorialStep = 0.5; // Start at click anywhere stage [4]
     }
   }
 
   quitToLobby() {
-    // Request a CrazyGames midroll ad break when returning to lobby
     CrazyGamesManager.requestMidgameAd(() => {
       this.state = 'lobby';
       this.ui.showLobbyLayout();
@@ -727,16 +725,12 @@ class Game {
     });
   }
 
-  /**
-   * Action trigger that revives the player with 50 Lives upon watching a rewarded video ad.
-   */
   revivePlayer() {
     this.state = 'playing';
-    this.lives = 50; // Restore half health
+    this.lives = 50; 
     this.hasRevivedThisMatch = true;
-    this.waveInProgress = false; // Allow players to reform defense strategy
+    this.waveInProgress = false; 
 
-    // Notify performance tracker
     CrazyGamesManager.gameplayStart();
 
     this.ui.updateWaveButton(false);
@@ -750,16 +744,23 @@ class Game {
     let baseVal = 0;
     switch (type) {
       case 'scout': baseVal = 100; break;
-      case 'minigunner': baseVal = 250; break;
-      case 'commander': baseVal = 350; break;
-      case 'dj': baseVal = 400; break;
+      case 'minigunner': baseVal = 650; break;
+      case 'commander': baseVal = 450; break;
+      case 'dj': baseVal = 500; break;
       case 'pyromancer': baseVal = 300; break;
       case 'farm': baseVal = 250; break;
-      case 'gladiator': baseVal = 200; break;
-      case 'soldier': baseVal = 150; break;
-      case 'sniper': baseVal = 200; break;
-      case 'medic': baseVal = 300; break;
-      case 'rocketeer': baseVal = 400; break;
+      case 'gladiator': baseVal = 300; break;
+      case 'soldier': baseVal = 300; break;
+      case 'sniper': baseVal = 250; break;
+      case 'medic': baseVal = 350; break;
+      case 'rocketeer': baseVal = 500; break;
+      case 'demoman': baseVal = 300; break;
+      case 'freezer': baseVal = 250; break;
+      case 'shotgunner': baseVal = 350; break;
+      case 'crook_boss': baseVal = 500; break;
+      case 'military_base': baseVal = 400; break;
+      case 'ranger': baseVal = 850; break;
+      case 'turret': baseVal = 800; break;
       default: baseVal = 0;
     }
     if (this.isHardcore) {
@@ -769,19 +770,17 @@ class Game {
   }
 
   placeShopAgent(col, row, ownerId = 'p1') {
-    // Restrict placement coordinates to target grid during onboarding phase
-    if (!this.tutorialCompleted && this.tutorialStep === 1) {
+    if (!this.tutorialCompleted && this.tutorialStep === 1.5) {
       if (col !== 2 || row !== 1) {
         this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "PLACE ON THE HIGHLIGHTED TILE", '#f1c40f');
         return;
       }
     }
 
-    // STRICT TDS PLACEMENT LIMIT OF 40 TOTAL TOWERS
     const totalPlacedTowers = this.grid.towers.size;
     const maxTowersAllowed = 40;
     if (totalPlacedTowers >= maxTowersAllowed) {
-      this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT REACHED (MAX 40 TOWERS)", '#e74c3c');
+      this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT REACHED (MAX 40)", '#e74c3c');
       return;
     }
 
@@ -797,25 +796,32 @@ class Game {
       return;
     }
     if (this.selectedShopTower === 'commander' && currentPlacedOfTypeCount >= 3) {
-      this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 3 COMMANDERS)", '#e74c3c');
+      this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 3)", '#e74c3c');
       return;
     }
     if (this.selectedShopTower === 'dj' && currentPlacedOfTypeCount >= 1) {
-      this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 1 DJ UNIT)", '#e74c3c');
+      this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 1 DJ)", '#e74c3c');
       return;
     }
     if (this.selectedShopTower === 'medic' && currentPlacedOfTypeCount >= 3) {
-      this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 3 MEDICS)", '#e74c3c');
+      this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 3)", '#e74c3c');
       return;
     }
-    if (this.selectedShopTower === 'rocketeer' && currentPlacedOfTypeCount >= 8) {
-      this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 8 ROCKETEERS)", '#e74c3c');
+    if (this.selectedShopTower === 'crook_boss' && currentPlacedOfTypeCount >= 4) {
+      this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 4)", '#e74c3c');
+      return;
+    }
+    if (this.selectedShopTower === 'turret' && currentPlacedOfTypeCount >= 5) {
+      this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 5)", '#e74c3c');
+      return;
+    }
+    if (this.selectedShopTower === 'military_base' && currentPlacedOfTypeCount >= 5) {
+      this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 5)", '#e74c3c');
       return;
     }
 
     const cost = this.getTowerCost(this.selectedShopTower);
     
-    // Authoritative gold check
     let wallet = 0;
     if (Network.mode === 'HOST') {
       wallet = (ownerId === 'p1') ? this.gold : (this.playerWallets[ownerId] || 0);
@@ -844,14 +850,20 @@ class Game {
         case 'sniper': newAgent = new Sniper(col, row, size); break;
         case 'medic': newAgent = new Medic(col, row, size); break;
         case 'rocketeer': newAgent = new Rocketeer(col, row, size); break;
+        case 'demoman': newAgent = new Demoman(col, row, size); break;
+        case 'freezer': newAgent = new Freezer(col, row, size); break;
+        case 'shotgunner': newAgent = new Shotgunner(col, row, size); break;
+        case 'crook_boss': newAgent = new CrookBoss(col, row, size); break;
+        case 'military_base': newAgent = new MilitaryBase(col, row, size); break;
+        case 'ranger': newAgent = new Ranger(col, row, size); break;
+        case 'turret': newAgent = new Turret(col, row, size); break;
       }
 
       if (newAgent) {
         newAgent.equippedSkin = this.equippedSkins[this.selectedShopTower] || 'default';
-        newAgent.ownerId = ownerId; // Save placing player ID for separate incomes
+        newAgent.ownerId = ownerId; 
         this.grid.placeTower(col, row, newAgent);
         
-        // Authoritative co-op gold deduction
         if (Network.mode === 'HOST') {
           if (ownerId === 'p1') {
             this.gold -= cost;
@@ -870,10 +882,10 @@ class Game {
         this.questProgress.cashSpent += cost;
         this.checkQuestCompletion();
 
-        // Advance onboarding state on placement
-        if (!this.tutorialCompleted && this.tutorialStep === 1) {
-          this.tutorialStep = 1.5;
-          this.ui.showTutorialHint(1.5);
+        // Placed Scout: Transition to Step 2 (Prompt select placed Scout) [4]
+        if (!this.tutorialCompleted && this.tutorialStep === 1.5) {
+          this.tutorialStep = 2;
+          this.ui.showTutorialHint(2);
         }
 
         this.effectManager.spawnPlacementSparks(newAgent.x, newAgent.y, size);
@@ -903,12 +915,10 @@ class Game {
         this.ui.updateSelectionPanel(this.selectedPlacedTower);
         this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
 
-        // Terminate tutorial upon completing first active upgrade
-        if (!this.tutorialCompleted && this.tutorialStep === 2) {
+        // Scout Upgraded First: Transition to Step 2.5 (Point to Upgrade button) [4]
+        if (!this.tutorialCompleted && this.tutorialStep === 2.5) {
           this.tutorialStep = 3;
-          this.tutorialCompleted = true;
-          this.saveStatsToStorage();
-          this.ui.dismissTutorial();
+          this.ui.showTutorialHint(3);
         }
       }
     }
@@ -954,10 +964,9 @@ class Game {
   }
 
   skipWave() {
-    if (!this.waveInProgress || this.spawnQueue.length > 0 || this.wave >= this.maxWaves) return;
+    if (!this.waveInProgress || this.wave >= this.maxWaves) return;
     const reward = 50 + this.wave * 15;
     
-    // Credit reward to all active co-op wallets
     if (Network.mode === 'HOST' && this.playerWallets) {
       this.gold += reward;
       this.playerWallets['p1'] = this.gold;
@@ -990,10 +999,19 @@ class Game {
     this.ui.updateWaveButton(true);
     this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
 
-    const blueprint = this.waveBlueprints[this.wave - 1];
-    this.spawnInterval = blueprint.rate;
-    this.spawnQueue = [];
+    // Call dynamic wave alerts from Commander
+    this.triggerCommanderAlerts();
 
+    let blueprints = this.waveBlueprintsEasy;
+    if (this.selectedDifficulty === 'casual') blueprints = this.waveBlueprintsCasual;
+    else if (this.selectedDifficulty === 'intermediate') blueprints = this.waveBlueprintsIntermediate;
+    else if (this.selectedDifficulty === 'molten') blueprints = this.waveBlueprintsMolten;
+    else if (this.selectedDifficulty === 'fallen') blueprints = this.waveBlueprintsFallen;
+
+    const blueprint = blueprints[this.wave - 1];
+    this.spawnInterval = blueprint.rate;
+
+    // Concatenate standard list instead of clean overwrite to stack spawning queues [4]
     const spawnList = [];
     for (let i = 0; i < (blueprint.runners || 0); i++) spawnList.push('runner');
     for (let i = 0; i < (blueprint.quicks || 0); i++) spawnList.push('quick');
@@ -1003,23 +1021,48 @@ class Game {
     for (let i = 0; i < (blueprint.shadows || 0); i++) spawnList.push('shadow');
     for (let i = 0; i < (blueprint.goliaths || 0); i++) spawnList.push('goliath');
     for (let i = 0; i < (blueprint.templars || 0); i++) spawnList.push('templar');
-    for (let i = 0; i < (blueprint.diggers || 0); i++) spawnList.push('grave_digger');
+    for (let i = 0; i < (blueprint.brute || 0); i++) spawnList.push('brute');
+    for (let i = 0; i < (blueprint.diggers || 0); i++) {
+      if (this.selectedDifficulty === 'easy') {
+        spawnList.push('brute'); 
+      } else {
+        spawnList.push('grave_digger');
+      }
+    }
+    for (let i = 0; i < (blueprint.hazard_giants || 0); i++) spawnList.push('hazard_giant');
     for (let i = 0; i < (blueprint.titans || 0); i++) spawnList.push('molten_titan');
     for (let i = 0; i < (blueprint.guardians || 0); i++) spawnList.push('fallen_guardian');
     for (let i = 0; i < (blueprint.kings || 0); i++) spawnList.push('fallen_king');
     for (let i = 0; i < (blueprint.reavers || 0); i++) spawnList.push('void_reaver');
 
-    this.spawnQueue = spawnList.sort(() => Math.random() - 0.5);
+    this.spawnQueue = this.spawnQueue.concat(spawnList.sort(() => Math.random() - 0.5));
     this.spawnTimer = 0;
 
     this.effectManager.spawnText(400, 300, `WAVE ${this.wave}`, '#f1c40f');
 
-    // Tutorial hook: if they start the wave on Step 1.5, progress to Step 2
-    if (!this.tutorialCompleted && this.tutorialStep === 1.5) {
-      this.tutorialStep = 2;
-      setTimeout(() => {
-        this.ui.showTutorialHint(2);
-      }, 600);
+    // Wave Started: Transition to Step 4 (Finish dialogue) [4]
+    if (!this.tutorialCompleted && this.tutorialStep === 3) {
+      this.tutorialStep = 4;
+      this.ui.showTutorialHint(4);
+    }
+  }
+
+  triggerCommanderAlerts() {
+    let alertMsg = "";
+    if (this.wave === 1) {
+      alertMsg = "There's reports of zombie activity nearby.";
+    } else if (this.wave === 2) {
+      alertMsg = "Secure the area and keep an eye out. We have teams that are pushing them in our direction.";
+    } else if (this.wave === 5) {
+      alertMsg = "Heavy threat inbound! Watch out for those slow, tanky targets!";
+    } else if (this.wave === 7) {
+      alertMsg = "The Toxic Giant is approaching! Get those defenses up, let's get to work!";
+    } else if (this.wave === 10) {
+      alertMsg = "Warning: Camo zombies detected! Hiddens are approaching, keep your eyes open!";
+    }
+
+    if (alertMsg) {
+      this.ui.showCommanderAnnouncement(alertMsg);
     }
   }
 
@@ -1052,13 +1095,11 @@ class Game {
       this.smoothHoverPos.y += (this.targetHoverPos.y - this.smoothHoverPos.y) * 18 * dt;
     }
 
-    // Transmit client cursor vectors to the host & perform smooth client interpolation
     if (Network.mode === 'CLIENT') {
       Network.sendClientData();
       Network.checkHostHeartbeat();
       this.effectManager.update(dt);
 
-      // Frame-rate independent sliding interpolation for client-side enemies
       for (const zombie of this.enemies) {
         if (zombie.targetX !== undefined && zombie.targetY !== undefined) {
           const lerpFactor = 1.0 - Math.exp(-18 * dt); 
@@ -1072,7 +1113,6 @@ class Game {
         zombie.timeAccumulator += dt;
       }
 
-      // Smooth visual tick updates for client-side towers
       for (const tower of this.grid.towers.values()) {
         if (!tower.timeAccumulator) tower.timeAccumulator = 0;
         tower.timeAccumulator += dt;
@@ -1085,9 +1125,10 @@ class Game {
         }
       }
 
-      return; // Clients bypass authoritative loop calculations
+      return; 
     }
 
+    // Interactive Wave Autostart Loop (Calibrated to 6 seconds delay for Easy Mode)
     if (this.autoMode && !this.waveInProgress && this.autoStartTimer > 0 && this.state === 'playing' && !this.showMapDirections) {
       this.autoStartTimer -= dt;
       if (this.autoStartTimer <= 0) {
@@ -1114,6 +1155,15 @@ class Game {
       zombie.update(this.grid.pixelPath, this.effectManager, dt, this.enemies, this.grid.towers);
 
       if (zombie.health <= 0) {
+        // Award matching currency dynamically inside matches based on enemy stats [4]
+        const reward = zombie.goldReward || 10;
+        this.gold += reward;
+        if (this.playerWallets) {
+          this.playerWallets['p1'] = (this.playerWallets['p1'] || 0) + reward;
+        }
+        this.effectManager.spawnText(zombie.x, zombie.y - 10, `+$${reward}`, '#f1c40f');
+        this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
+
         this.questProgress.kills++;
         this.checkQuestCompletion();
         this.enemies.splice(i, 1);
@@ -1121,21 +1171,21 @@ class Game {
       }
 
       if (zombie.targetNodeIndex >= this.grid.pixelPath.length) {
-        // Fetch proportional leakage damage based on the specific zombie class
         const damage = zombie.baseDamage || 1;
         this.lives -= damage;
-        this.effectManager.spawnText(zombie.x, zombie.y, `-${damage} Lives`, '#e74c3c');
+        this.effectManager.spawnText(this.x, this.y - 18, `-${damage} HP`, '#e74c3c');
         this.enemies.splice(i, 1);
-        this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
-
+        
         if (this.lives <= 0) {
+          this.lives = 0;
           this.state = 'gameover';
           soundManager.playDefeat();
           this.ui.showMatchSummaryCard(false);
-          if (Network.mode === 'HOST') {
-            Network.broadcastGameOver(this.wave);
-          }
+          this.saveStatsToStorage();
+        } else {
+          this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
         }
+        continue;
       }
     }
 
@@ -1156,7 +1206,7 @@ class Game {
     if (this.waveInProgress && this.enemies.length === 0 && this.spawnQueue.length === 0) {
       this.waveInProgress = false;
 
-      // Harvest Farm economy end-of-wave payouts
+      // Harvest Farm payouts
       for (const agent of this.grid.towers.values()) {
         if (agent.type === 'farm') {
           const income = agent.getHarvestIncome();
@@ -1172,9 +1222,7 @@ class Game {
           } else {
             this.gold += income;
           }
-          
           this.effectManager.spawnText(agent.x, agent.y - 20, `+$${income}`, '#2ecc71');
-          this.effectManager.spawnImpact(agent.x, agent.y, '#2ecc71', 6, 0.5);
         }
       }
 
@@ -1183,7 +1231,6 @@ class Game {
         cashBonus = Math.floor(cashBonus * 0.75);
       }
 
-      // Distribute cash bonus to all active co-op wallets
       if (Network.mode === 'HOST' && this.playerWallets) {
         this.gold += cashBonus;
         this.playerWallets['p1'] = this.gold;
@@ -1196,80 +1243,79 @@ class Game {
         this.gold += cashBonus;
       }
 
-      // Read active difficulty coefficients instead of simple map checks
-      const diffConfig = this.difficultySettings[this.selectedDifficulty];
-      let coinReward = Math.round((10 + this.wave * 5) * diffConfig.coinMultiplier);
-      let xpReward = Math.round((15 + this.wave * 4) * diffConfig.xpMultiplier);
-
-      if (this.wave >= this.maxWaves && this.isHardcore) {
-        coinReward *= 3;
-        xpReward *= 3;
-      }
-
-      this.playerCoins += coinReward;
-      this.playerXp += xpReward;
-
-      const nextLevelXp = this.playerLevel * 100;
-      if (this.playerXp >= nextLevelXp) {
-        this.playerXp -= nextLevelXp;
-        this.playerLevel++;
-        this.effectManager.spawnText(400, 240, `LEVEL UP! REACHED LEVEL ${this.playerLevel}`, '#f1c40f');
-      }
-
-      this.saveStatsToStorage();
-      
-      this.effectManager.spawnText(400, 200, `WAVE SECURED! +🪙 ${coinReward} / +🌟 ${xpReward} XP`, '#2ecc71');
+      let coinReward = 0;
+      let xpReward = 0;
 
       if (this.wave >= this.maxWaves) {
         this.state = 'victory';
         soundManager.playVictory();
         this.saveSpeedrunRecord();
+        
+        const diffConfig = this.difficultySettings[this.selectedDifficulty];
+        coinReward = Math.round(300 * diffConfig.coinMultiplier);
+        xpReward = Math.round(200 * diffConfig.xpMultiplier);
+
+        if (this.isHardcore) {
+          coinReward *= 3;
+          xpReward *= 3;
+        }
+
+        this.playerCoins += coinReward;
+        this.playerXp += xpReward;
+
+        const nextLevelXp = this.playerLevel * 100;
+        if (this.playerXp >= nextLevelXp) {
+          this.playerXp -= nextLevelXp;
+          this.playerLevel++;
+          soundManager.playUpgrade();
+          this.effectManager.spawnText(400, 200, `LEVEL UP! LEVEL ${this.playerLevel}`, '#f1c40f');
+        }
+
+        this.saveStatsToStorage();
+
         this.ui.showMatchSummaryCard(true);
         if (Network.mode === 'HOST') {
-          Network.broadcastGameOver(this.wave);
+          Network.broadcastToAll({
+            type: 'MATCH_OVER',
+            isVictory: true
+          });
         }
       } else {
-        this.ui.updateWaveButton(false);
-        if (this.autoMode) {
-          this.autoStartTimer = 2.0;
-          this.ui.showAutoCountdown(2);
-        }
+        const diffConfig = this.difficultySettings[this.selectedDifficulty];
+        this.autoStartTimer = this.selectedDifficulty === 'easy' ? 6.0 : 4.0;
+        this.ui.showAutoCountdown(Math.ceil(this.autoStartTimer));
       }
 
       this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
     }
+  }
 
-    // Host continuously broadcasts server game-states to guests
-    if (Network.mode === 'HOST') {
-      // Record Host's local cursor data so that Clients can see it
-      window.playerCursors['p1'] = {
-        mouseX: this.isMouseOnCanvas ? this.mousePos.x : undefined,
-        mouseY: this.isMouseOnCanvas ? this.mousePos.y : undefined,
-        selectedShopTower: this.selectedShopTower,
-        equippedSkin: this.equippedSkins[this.selectedShopTower] || 'default'
-      };
-
-      Network.broadcastState();
+  updateWaveButton(waveInProgress) {
+    if (this.ui) {
+      this.ui.updateWaveButton(waveInProgress);
     }
   }
 
   evaluateSupportBuffs() {
-    for (const agent of this.grid.towers.values()) {
-      agent.djRangeBuffed = false;
-      agent.djCamoDetectionBuffed = false;
-      agent.commanderSpeedBuffed = false;
-      agent.commanderAbilityActive = false;
+    // Clear buffs first
+    for (const t of this.grid.towers.values()) {
+      t.djRangeBuffed = false;
+      t.djCamoDetectionBuffed = false;
+      t.commanderSpeedBuffed = false;
+      t.commanderAbilityActive = false;
     }
 
+    // Reapply based on area positioning
     for (const dj of this.grid.towers.values()) {
       if (dj.type === 'dj') {
-        for (const agent of this.grid.towers.values()) {
-          if (agent !== dj) {
-            const dist = Math.hypot(agent.x - dj.x, agent.y - dj.y);
-            if (dist <= dj.range) {
-              agent.djRangeBuffed = true;
+        const r = dj.range * (dj.djRangeBuffed ? 1.15 : 1.0);
+        for (const target of this.grid.towers.values()) {
+          if (target !== dj) {
+            const dist = Math.hypot(target.x - dj.x, target.y - dj.y);
+            if (dist <= r) {
+              target.djRangeBuffed = true;
               if (dj.level >= 3) {
-                agent.djCamoDetectionBuffed = true;
+                target.djCamoDetectionBuffed = true;
               }
             }
           }
@@ -1280,15 +1326,16 @@ class Game {
     for (const cmd of this.grid.towers.values()) {
       if (cmd.type === 'commander') {
         const hasBuff = cmd.buffDurationLeft > 0 || cmd.isAbilityActive;
-        for (const agent of this.grid.towers.values()) {
-          if (agent !== cmd) {
-            const dist = Math.hypot(agent.x - cmd.x, agent.y - cmd.y);
-            if (dist <= cmd.range) {
+        const r = cmd.range * (cmd.djRangeBuffed ? 1.15 : 1.0);
+        for (const target of this.grid.towers.values()) {
+          if (target !== cmd) {
+            const dist = Math.hypot(target.x - cmd.x, target.y - cmd.y);
+            if (dist <= r) {
               if (hasBuff) {
-                agent.commanderSpeedBuffed = true;
+                target.commanderSpeedBuffed = true;
               }
               if (cmd.isAbilityActive) {
-                agent.commanderAbilityActive = true;
+                target.commanderAbilityActive = true;
               }
             }
           }
@@ -1309,7 +1356,9 @@ class Game {
       case 'shadow': e = new Shadow(startPoint.x, startPoint.y); break;
       case 'goliath': e = new Goliath(startPoint.x, startPoint.y); break;
       case 'templar': e = new Templar(startPoint.x, startPoint.y); break;
+      case 'brute': e = new Brute(startPoint.x, startPoint.y); break;
       case 'grave_digger': e = new GraveDigger(startPoint.x, startPoint.y); break;
+      case 'hazard_giant': e = new HazardGiant(startPoint.x, startPoint.y); break;
       case 'molten_titan': e = new MoltenTitan(startPoint.x, startPoint.y); break;
       case 'fallen_guardian': e = new FallenGuardian(startPoint.x, startPoint.y); break;
       case 'fallen_king': e = new FallenKing(startPoint.x, startPoint.y); break;
@@ -1339,10 +1388,9 @@ class Game {
       }
 
       this.drawHoverVisuals();
-      this.drawPlayerCursors(); // Draw other players' mouse vectors on canvas
+      this.drawPlayerCursors(); 
       
-      // Render target placement and bouncing guide only when Scout is selected
-      if (!this.tutorialCompleted && this.tutorialStep === 1 && this.selectedShopTower === 'scout') {
+      if (!this.tutorialCompleted && this.tutorialStep === 1.5 && this.selectedShopTower === 'scout') {
         this.drawTutorialCanvasHighlight(this.ctx);
       }
 
@@ -1448,7 +1496,7 @@ class Game {
       this.ctx.textAlign = 'center';
       this.ctx.fillText("LOBBY ACTIVE", 400, 300);
       this.ctx.font = "400 18px 'Nunito', sans-serif";
-      this.ctx.fillText("Manage loadout and map selection in your console sidebar", 400, 335);
+      this.ctx.fillText("Prepare loadout and choose maps inside the console sidebar wizard", 400, 335);
     }
 
     if (this.state === 'victory') {
@@ -1458,28 +1506,21 @@ class Game {
     this.ctx.restore();
   }
 
-  /**
-   * Draws a glowing target tile overlay and bouncing indicator arrow on the canvas.
-   */
   drawTutorialCanvasHighlight(ctx) {
     const cellSize = this.grid.cellSize;
-    // Set target coordinate to Col 2, Row 1 (valid placement spot on Grassland)
     const targetX = 2 * cellSize + cellSize / 2;
     const targetY = 1 * cellSize + cellSize / 2;
     
-    // Smooth bouncing factor
-    const bounce = Math.sin(Date.now() / 150) * 6;
+    const bounce = Math.sin(Date.now() / 150) * 8;
     
     ctx.save();
     ctx.translate(targetX, targetY);
     
-    // Draw pulsating golden highlight border
     const pulse = Math.abs(Math.sin(Date.now() / 200)) * 6;
     ctx.strokeStyle = '#f1c40f';
     ctx.lineWidth = 3.5 + pulse;
     ctx.strokeRect(-cellSize / 2 + 2, -cellSize / 2 + 2, cellSize - 4, cellSize - 4);
     
-    // Draw "PLACE HERE" guide text
     ctx.fillStyle = '#f1c40f';
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 3;
@@ -1488,13 +1529,11 @@ class Game {
     ctx.strokeText("PLACE HERE", 0, -cellSize / 2 - 25 + bounce);
     ctx.fillText("PLACE HERE", 0, -cellSize / 2 - 25 + bounce);
     
-    // Draw bouncing arrow pointing directly down onto the grid cell
     ctx.fillStyle = '#f1c40f';
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.moveTo(-8, -cellSize / 2 - 15 + bounce);
-    ctx.lineTo(8, -cellSize / 2 - 8 + bounce);
+    ctx.moveTo(-8, -cellSize / 2 - 15);
     ctx.lineTo(8, -cellSize / 2 - 8 + bounce);
     ctx.lineTo(14, -cellSize / 2 - 8 + bounce);
     ctx.lineTo(0, -cellSize / 2 + 2 + bounce);
@@ -1535,7 +1574,6 @@ class Game {
       const isValid = this.grid.isCellValidForPlacement(col, row);
       const color = isValid ? '#2ecc71' : '#e74c3c';
 
-      // 1. Snapped Tile Box (Shows the destination tile slot)
       this.ctx.save();
       this.ctx.strokeStyle = color;
       this.ctx.lineWidth = 3;
@@ -1544,8 +1582,6 @@ class Game {
       this.ctx.fillRect(col * size + 2, row * size + 2, size - 4, size - 4);
       this.ctx.restore();
 
-      // 2. Completely Smooth (un-snapped) Range Circle & Character Preview
-      // Centered directly on the real-time mouse coordinate!
       const cx = this.mousePos.x;
       const cy = this.mousePos.y;
 
@@ -1579,6 +1615,13 @@ class Game {
         case 'sniper': tempAgent = new Sniper(0, 0, size); break;
         case 'medic': tempAgent = new Medic(0, 0, size); break;
         case 'rocketeer': tempAgent = new Rocketeer(0, 0, size); break;
+        case 'demoman': tempAgent = new Demoman(0, 0, size); break;
+        case 'freezer': tempAgent = new Freezer(0, 0, size); break;
+        case 'shotgunner': tempAgent = new Shotgunner(0, 0, size); break;
+        case 'crook_boss': tempAgent = new CrookBoss(0, 0, size); break;
+        case 'military_base': tempAgent = new MilitaryBase(0, 0, size); break;
+        case 'ranger': tempAgent = new Ranger(0, 0, size); break;
+        case 'turret': tempAgent = new Turret(0, 0, size); break;
       }
       if (tempAgent) {
         tempAgent.x = cx;
@@ -1596,13 +1639,12 @@ class Game {
     if (Network.mode === 'OFFLINE') return;
 
     for (const [pId, cursor] of Object.entries(window.playerCursors || {})) {
-      if (pId === window.myPlayerId) continue; // Don't draw our own locally
+      if (pId === window.myPlayerId) continue; 
       if (!cursor || cursor.mouseX === undefined) continue;
 
       const cx = cursor.mouseX;
       const cy = cursor.mouseY;
 
-      // Draw color-coded vector mouse cursor
       this.ctx.save();
       this.ctx.fillStyle = this.getPlayerColor(pId);
       this.ctx.strokeStyle = '#222';
@@ -1616,7 +1658,6 @@ class Game {
       this.ctx.fill();
       this.ctx.stroke();
 
-      // Render player label above pointer
       const name = (window.lobbyPlayers[pId] || "Player").split(" [")[0];
       this.ctx.fillStyle = '#fff';
       this.ctx.font = "900 11px 'Fredoka', sans-serif";
@@ -1625,7 +1666,6 @@ class Game {
       this.ctx.strokeText(name, cx + 12, cy + 12);
       this.ctx.fillText(name, cx + 12, cy + 12);
 
-      // Render their selected placement preview hologram if active
       if (cursor.selectedShopTower && cursor.selectedShopTower !== 'null') {
         this.ctx.globalAlpha = 0.22;
         this.ctx.strokeStyle = this.getPlayerColor(pId);
@@ -1704,6 +1744,13 @@ class Game {
       case 'sniper': return 220;
       case 'medic': return 110;
       case 'rocketeer': return 120;
+      case 'demoman': return 110;
+      case 'freezer': return 100;
+      case 'shotgunner': return 90;
+      case 'crook_boss': return 120;
+      case 'military_base': return 120;
+      case 'ranger': return 240;
+      case 'turret': return 160;
       default: return 0;
     }
   }

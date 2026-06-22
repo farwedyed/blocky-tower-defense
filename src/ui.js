@@ -13,7 +13,7 @@ export class UI {
     this.lobbyView = document.getElementById('lobby-view');
     this.gameView = document.getElementById('game-view');
 
-    // Instantiate sub-controllers
+    // Instantiate sub-controllers safely
     this.lobby = new LobbyUI(this.game, this);
     this.gameUI = new GameUI(this.game, this);
 
@@ -64,102 +64,156 @@ export class UI {
   }
 
   /* ───────────────────────────────────────────────────────────
-     DELEGATION METHODS (Matches interface of the original ui.js)
+     DEFENSIVE DELEGATION METHODS WITH NULL-GUARDS [4]
      ─────────────────────────────────────────────────────────── */
 
+  showCommanderAnnouncement(msg) {
+    if (this.gameUI) {
+      this.gameUI.showCommanderAnnouncement(msg);
+    }
+  }
+
   updateLobbyMeta(level, xp, coins) {
-    this.lobby.updateLobbyMeta(level, xp, coins);
+    if (this.lobby) {
+      this.lobby.updateLobbyMeta(level, xp, coins);
+    }
   }
 
   renderLoadoutConfig() {
-    this.lobby.renderLoadoutConfig();
+    if (this.lobby) {
+      this.lobby.renderLoadoutConfig();
+    }
   }
 
   renderPlacementShop() {
-    this.gameUI.renderPlacementShop();
+    if (this.gameUI) {
+      this.gameUI.renderPlacementShop();
+    }
   }
 
   updateHUD(lives, gold, wave, maxWaves) {
-    this.gameUI.updateHUD(lives, gold, wave, maxWaves);
+    if (this.gameUI) {
+      this.gameUI.updateHUD(lives, gold, wave, maxWaves);
+    }
   }
 
   updateSelectionPanel(agent) {
-    this.gameUI.updateSelectionPanel(agent);
+    if (this.gameUI) {
+      this.gameUI.updateSelectionPanel(agent);
+    }
   }
 
   hideSelectionPanel() {
-    this.gameUI.hideSelectionPanel();
+    if (this.gameUI) {
+      this.gameUI.hideSelectionPanel();
+    }
   }
 
   updateWaveButton(waveInProgress) {
-    this.gameUI.updateWaveButton(waveInProgress);
+    if (this.gameUI) {
+      this.gameUI.updateWaveButton(waveInProgress);
+    }
   }
 
   updateSpeedButton(multiplier) {
-    this.gameUI.updateSpeedButton(multiplier);
+    if (this.gameUI) {
+      this.gameUI.updateSpeedButton(multiplier);
+    }
   }
 
   updateAutoWaveButton(isOn) {
-    this.gameUI.updateAutoWaveButton(isOn);
+    if (this.gameUI) {
+      this.gameUI.updateAutoWaveButton(isOn);
+    }
   }
 
   showAutoCountdown(seconds) {
-    this.gameUI.showAutoCountdown(seconds);
+    if (this.gameUI) {
+      this.gameUI.showAutoCountdown(seconds);
+    }
   }
 
   showOverlay(title, subtitle) {
-    this.gameUI.showOverlay(title, subtitle);
+    if (this.gameUI) {
+      this.gameUI.showOverlay(title, subtitle);
+    }
   }
 
   hideOverlay() {
-    this.gameUI.hideOverlay();
+    if (this.gameUI) {
+      this.gameUI.hideOverlay();
+    }
   }
 
   showGameLayout(mapName) {
-    this.gameUI.showGameLayout(mapName);
+    if (this.gameUI) {
+      this.gameUI.showGameLayout(mapName);
+    }
   }
 
   showLobbyLayout() {
-    this.gameUI.showLobbyLayout();
+    if (this.gameUI) {
+      this.gameUI.showLobbyLayout();
+    }
   }
 
   startUnboxingAnimation(crateType, chosenAgent, chosenRarity, revealedSkinName) {
-    this.lobby.startUnboxingAnimation(crateType, chosenAgent, chosenRarity, revealedSkinName);
+    if (this.lobby) {
+      this.lobby.startUnboxingAnimation(crateType, chosenAgent, chosenRarity, revealedSkinName);
+    }
   }
 
   renderDailyQuests() {
-    this.lobby.renderDailyQuests();
+    if (this.lobby) {
+      this.lobby.renderDailyQuests();
+    }
   }
 
   renderLeaderboard(mapId) {
-    this.lobby.renderLeaderboard(mapId);
+    if (this.lobby) {
+      this.lobby.renderLeaderboard(mapId);
+    }
   }
 
   showTutorialHint(step) {
-    this.gameUI.showTutorialHint(step);
+    if (this.gameUI) {
+      this.gameUI.showTutorialHint(step);
+    }
   }
 
   dismissTutorial() {
-    this.gameUI.dismissTutorial();
+    if (this.gameUI) {
+      this.gameUI.dismissTutorial();
+    }
   }
 
   showMatchSummaryCard(isVictory) {
-    this.gameUI.showMatchSummaryCard(isVictory);
+    if (this.gameUI) {
+      this.gameUI.showMatchSummaryCard(isVictory);
+    }
   }
 
   updateCoopPlayerList() {
-    this.lobby.updateCoopPlayerList();
+    if (this.lobby) {
+      this.lobby.updateCoopPlayerList();
+    }
   }
 
   showPointerAt(targetElement, direction) {
-    this.gameUI.showPointerAt(targetElement, direction);
+    if (this.gameUI) {
+      this.gameUI.showPointerAt(targetElement, direction);
+    }
   }
 
   showPointerAtCanvasCenter() {
-    this.gameUI.showPointerAtCanvasCenter();
+    if (this.gameUI) {
+      this.gameUI.showPointerAtCanvasCenter();
+    }
   }
 
   hidePointer() {
-    this.gameUI.hidePointer();
+    if (this.gameUI) {
+      this.gameUI.hidePointer();
+    }
   }
 }
