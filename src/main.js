@@ -24,8 +24,8 @@ class Game {
     this.playerLevel = 1;
     this.playerXp = 0;
     this.playerCoins = 150;
-    this.unlockedAgents = ['scout'];
-    this.equippedAgents = ['scout'];
+    this.unlockedAgents = ['scout', 'sniper'];
+    this.equippedAgents = ['scout', 'sniper'];
     this.ownedSkins = [];
     this.equippedSkins = {};
 
