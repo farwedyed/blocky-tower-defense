@@ -122,6 +122,7 @@ export class GameUI {
   drawCommanderFace() {
     if (!this.commanderFaceCanvas) return;
     const ctx = this.commanderFaceCanvas.getContext('2d');
+    if (!ctx) return;
     const w = this.commanderFaceCanvas.width;
     const h = this.commanderFaceCanvas.height;
     ctx.clearRect(0, 0, w, h);
@@ -297,120 +298,130 @@ export class GameUI {
   }
 
   renderPlacementShop() {
-    this.equippedAgentsList.innerHTML = '';
+    try {
+      this.equippedAgentsList.innerHTML = '';
 
-    this.game.equippedAgents.forEach(type => {
-      const btn = document.createElement('button');
-      btn.className = `placement-btn ${this.game.selectedShopTower === type ? 'active' : ''}`;
-      btn.setAttribute('data-type', type);
+      this.game.equippedAgents.forEach(type => {
+        // Defensive type guard to prevent undefined/null elements in the inventory list from throwing errors
+        if (!type || typeof type !== 'string') return;
 
-      let name = type.replace('_', ' ').toUpperCase();
-      if (type === 'dj') name = 'DJ Booth';
-      const cost = this.game.getTowerCost(type);
+        const btn = document.createElement('button');
+        btn.className = `placement-btn ${this.game.selectedShopTower === type ? 'active' : ''}`;
+        btn.setAttribute('data-type', type);
 
-      btn.innerHTML = `
-        <div class="icon"><canvas width="45" height="45"></canvas></div>
-        <div class="info">
-          <span class="name" style="text-transform: uppercase;">${name}</span>
-          <span class="cost">$${cost}</span>
-        </div>
-      `;
+        let name = type.replace('_', ' ').toUpperCase();
+        if (type === 'dj') name = 'DJ Booth';
+        const cost = this.game.getTowerCost(type);
 
-      const cvs = btn.querySelector('canvas');
-      
-      if (this.parentUI.lobby) {
-        this.parentUI.lobby.drawAgentPreview(cvs, type);
-      }
+        btn.innerHTML = `
+          <div class="icon"><canvas width="45" height="45"></canvas></div>
+          <div class="info">
+            <span class="name" style="text-transform: uppercase;">${name}</span>
+            <span class="cost">$${cost}</span>
+          </div>
+        `;
 
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.placement-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        this.game.setSelectedShopTower(type);
-        this.game.setSelectedPlacedTower(null);
+        const cvs = btn.querySelector('canvas');
+        
+        if (this.parentUI.lobby) {
+          this.parentUI.lobby.drawAgentPreview(cvs, type);
+        }
+
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.placement-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          this.game.setSelectedShopTower(type);
+          this.game.setSelectedPlacedTower(null);
+        });
+
+        this.equippedAgentsList.appendChild(btn);
       });
-
-      this.equippedAgentsList.appendChild(btn);
-    });
+    } catch (e) {
+      console.error("Defensive Guard: Error caught in renderPlacementShop():", e);
+    }
   }
 
   updateHUD(lives, gold, wave, maxWaves) {
-    if (this.hudLives) {
-      const valEl = document.getElementById('hud-lives-val');
-      if (valEl) {
-        valEl.textContent = Math.max(0, lives);
-      } else {
-        this.hudLives.textContent = `❤️ ${Math.max(0, lives)}`;
-      }
-    }
-    if (this.hudGold) {
-      const valEl = document.getElementById('hud-gold-val');
-      if (valEl) {
-        valEl.textContent = `$${gold}`;
-      } else {
-        this.hudGold.textContent = `💵 $${gold}`;
-      }
-    }
-    if (this.hudWave) {
-      const valEl = document.getElementById('hud-wave-val');
-      if (valEl) {
-        valEl.textContent = `${wave} / ${maxWaves}`;
-      } else {
-        this.hudWave.textContent = `🌊 ${wave} / ${maxWaves}`;
-      }
-    }
-
-    const placementBtns = document.querySelectorAll('.placement-btn');
-    placementBtns.forEach(btn => {
-      const type = btn.getAttribute('data-type');
-      const cost = this.game.getTowerCost(type);
-      if (gold < cost) {
-        btn.style.opacity = '0.4';
-      } else {
-        btn.style.opacity = '1.0';
-      }
-    });
-
-    if (this.btnSkipWave) {
-      const showSkip = this.game.waveInProgress && this.game.wave < this.game.maxWaves;
-      if (showSkip) {
-        this.btnSkipWave.style.display = 'block';
-        this.btnSkipWave.classList.remove('hidden');
-
-        // Added UI Cooldown Visual check and lock to prevent skips spamming [4]
-        if (this.game.skipCooldown > 0) {
-          this.btnSkipWave.disabled = true;
-          this.btnSkipWave.style.opacity = '0.5';
-          this.btnSkipWave.textContent = `COOLDOWN (${Math.ceil(this.game.skipCooldown)}s)`;
+    try {
+      if (this.hudLives) {
+        const valEl = document.getElementById('hud-lives-val');
+        if (valEl) {
+          valEl.textContent = Math.max(0, lives);
         } else {
-          this.btnSkipWave.disabled = false;
-          this.btnSkipWave.style.opacity = '1.0';
-          const votesCount = Network.mode === 'CLIENT' ? (this.game.skipVotesCount || 0) : (this.game.skipVotes ? this.game.skipVotes.size : 0);
-          const votesReq = Network.mode === 'CLIENT' ? (this.game.skipVotesRequired || 1) : Math.ceil((Network.conns.filter(c => c && c.open).length + 1) / 2);
-          
-          if (votesCount > 0) {
-            this.btnSkipWave.textContent = `SKIP VOTE (${votesCount}/${votesReq})`;
-          } else {
-            this.btnSkipWave.textContent = "SKIP WAVE";
-          }
+          this.hudLives.textContent = `❤️ ${Math.max(0, lives)}`;
         }
-      } else {
-        this.btnSkipWave.style.display = 'none';
-        this.btnSkipWave.classList.add('hidden');
       }
-    }
-
-    if (this.btnSpeed) {
-      if (Network.mode === 'CLIENT') {
-        this.btnSpeed.disabled = true;
-        this.btnSpeed.style.opacity = '0.6';
-      } else {
-        this.btnSpeed.disabled = false;
-        this.btnSpeed.style.opacity = '1.0';
+      if (this.hudGold) {
+        const valEl = document.getElementById('hud-gold-val');
+        if (valEl) {
+          valEl.textContent = `$${gold}`;
+        } else {
+          this.hudGold.textContent = `💵 $${gold}`;
+        }
       }
-    }
+      if (this.hudWave) {
+        const valEl = document.getElementById('hud-wave-val');
+        if (valEl) {
+          valEl.textContent = `${wave} / ${maxWaves}`;
+        } else {
+          this.hudWave.textContent = `🌊 ${wave} / ${maxWaves}`;
+        }
+      }
 
-    if (this.game.selectedPlacedTower) {
-      this.updateSelectionPanel(this.game.selectedPlacedTower);
+      const placementBtns = document.querySelectorAll('.placement-btn');
+      placementBtns.forEach(btn => {
+        const type = btn.getAttribute('data-type');
+        const cost = this.game.getTowerCost(type);
+        if (gold < cost) {
+          btn.style.opacity = '0.4';
+        } else {
+          btn.style.opacity = '1.0';
+        }
+      });
+
+      if (this.btnSkipWave) {
+        const showSkip = this.game.waveInProgress && this.game.wave < this.game.maxWaves;
+        if (showSkip) {
+          this.btnSkipWave.style.display = 'block';
+          this.btnSkipWave.classList.remove('hidden');
+
+          if (this.game.skipCooldown > 0) {
+            this.btnSkipWave.disabled = true;
+            this.btnSkipWave.style.opacity = '0.5';
+            this.btnSkipWave.textContent = `COOLDOWN (${Math.ceil(this.game.skipCooldown)}s)`;
+          } else {
+            this.btnSkipWave.disabled = false;
+            this.btnSkipWave.style.opacity = '1.0';
+            const votesCount = Network.mode === 'CLIENT' ? (this.game.skipVotesCount || 0) : (this.game.skipVotes ? this.game.skipVotes.size : 0);
+            const votesReq = Network.mode === 'CLIENT' ? (this.game.skipVotesRequired || 1) : Math.ceil((Network.conns.filter(c => c && c.open).length + 1) / 2);
+            
+            if (votesCount > 0) {
+              this.btnSkipWave.textContent = `SKIP VOTE (${votesCount}/${votesReq})`;
+            } else {
+              this.btnSkipWave.textContent = "SKIP WAVE";
+            }
+          }
+        } else {
+          this.btnSkipWave.style.display = 'none';
+          this.btnSkipWave.classList.add('hidden');
+        }
+      }
+
+      if (this.btnSpeed) {
+        if (Network.mode === 'CLIENT') {
+          this.btnSpeed.disabled = true;
+          this.btnSpeed.style.opacity = '0.6';
+        } else {
+          this.btnSpeed.disabled = false;
+          this.btnSpeed.style.opacity = '1.0';
+        }
+      }
+
+      if (this.game.selectedPlacedTower) {
+        this.updateSelectionPanel(this.game.selectedPlacedTower);
+      }
+    } catch (e) {
+      console.error("Defensive Guard: Error caught in updateHUD():", e);
     }
   }
 
@@ -514,7 +525,7 @@ export class GameUI {
     }
 
     if (agent.type === 'commander' || agent.type === 'gladiator' || agent.type === 'medic') {
-      btnAbility.classList.remove('hidden');
+      btnAbility.className = 'btn btn-secondary';
       if (agent.isAbilityActive) {
         btnAbility.textContent = `ACTIVE (${Math.ceil(agent.abilityActiveTimer)}s)`;
         btnAbility.disabled = true;
@@ -540,7 +551,7 @@ export class GameUI {
         }
       };
     } else {
-      btnAbility.classList.add('hidden');
+      btnAbility.className = 'btn btn-secondary hidden';
     }
   }
 
@@ -618,11 +629,11 @@ export class GameUI {
   showOverlay(title, subtitle) {
     this.overlayTitle.textContent = title;
     this.overlaySubtitle.textContent = subtitle;
-    this.overlay.classList.remove('hidden');
+    this.overlay.className = 'overlay-content';
   }
 
   hideOverlay() {
-    this.overlay.classList.add('hidden');
+    this.overlay.className = 'overlay-content hidden';
   }
 
   showGameLayout(mapName) {
@@ -636,14 +647,14 @@ export class GameUI {
     this.hidePointer();
 
     if (!this.game.tutorialCompleted) {
-      this.showTutorialHint(0.5); // Starts at Step 0.5: Point arrow to Canvas to prompt overlay clearance [4]
+      this.showTutorialHint(0.5); 
     }
   }
 
   showLobbyLayout() {
     this.parentUI.gameView.classList.add('hidden');
     this.parentUI.lobbyView.classList.remove('hidden');
-    this.dismissCommanderDialog(); // Safely hide balloon
+    this.dismissCommanderDialog(); 
     
     if (this.parentUI.lobby) {
       this.parentUI.lobby.drawAllStaticPreviews();
@@ -657,7 +668,6 @@ export class GameUI {
   }
 
   showTutorialHint(step) {
-    // Only hide balloon on step changes, leaving the physical bouncing pointers visible [4]
     this.dismissCommanderDialog(); 
     if (!this.commanderWrapper) return;
 
@@ -681,12 +691,12 @@ export class GameUI {
       this.btnCommanderAction.onclick = () => {
         this.game.tutorialCompleted = true;
         this.game.saveStatsToStorage();
-        this.dismissTutorial(); // Closes dialog AND removes pointer highlights [4]
+        this.dismissTutorial(); 
       };
     } else {
       this.btnCommanderAction.textContent = "GOT IT ✓";
       this.btnCommanderAction.onclick = () => {
-        this.dismissCommanderDialog(); // ONLY hides speech balloon, leaves pointers active! [4]
+        this.dismissCommanderDialog(); 
       };
     }
 
@@ -708,7 +718,7 @@ export class GameUI {
     this.hidePointer();
 
     if (step === 0.5) {
-      this.showPointerAtCanvasCenter(); // Points arrow to the center of the canvas [4]
+      this.showPointerAtCanvasCenter(); 
     }
     else if (step === 1) {
       const scoutBtn = this.equippedAgentsList.querySelector('.placement-btn[data-type="scout"]');
@@ -727,10 +737,10 @@ export class GameUI {
       }
     } 
     else if (step === 1.5) {
-      this.showPointerAtCanvasTile(2, 1); // Points arrow directly to the glowing tile coordinates (2,1) [4]
+      this.showPointerAtCanvasTile(2, 1); 
     }
     else if (step === 2) {
-      this.showPointerAtCanvasTile(2, 1); // Points arrow to placed Scout to select him [4]
+      this.showPointerAtCanvasTile(2, 1); 
     }
     else if (step === 2.5) {
       if (this.btnUpgrade) {
@@ -748,14 +758,14 @@ export class GameUI {
 
   dismissCommanderDialog() {
     if (this.commanderWrapper) {
-      this.commanderWrapper.classList.add('hidden'); // ONLY hides dialogue speech bubble, leaving arrows intact [4]
+      this.commanderWrapper.classList.add('hidden'); 
     }
   }
 
   dismissTutorial() {
     document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
     this.hidePointer();
-    this.dismissCommanderDialog(); // Fully hides dialogue overlay [4]
+    this.dismissCommanderDialog(); 
   }
 
   showMatchSummaryCard(isVictory) {
@@ -938,7 +948,7 @@ export class GameUI {
         CrazyGamesManager.requestRewardedAd(() => {
           this.game.revivePlayer();
           summaryCard.remove();
-          this.overlay.classList.add('hidden');
+          this.overlay.className = 'overlay-content hidden';
           this.overlayTitle.classList.remove('hidden');
           this.overlaySubtitle.classList.remove('hidden');
         });
@@ -948,7 +958,7 @@ export class GameUI {
     const closeBtn = document.getElementById('btn-summary-close');
     closeBtn.addEventListener('click', () => {
       summaryCard.remove();
-      this.overlay.classList.add('hidden');
+      this.overlay.className = 'overlay-content hidden';
       this.overlayTitle.classList.remove('hidden');
       this.overlaySubtitle.classList.remove('hidden');
       this.game.quitToLobby();

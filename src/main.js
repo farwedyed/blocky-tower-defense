@@ -233,6 +233,27 @@ class Game {
       console.warn("Storage load failed, adopting defaults.", e);
     }
 
+    // Defensive arrays cleaning to filter out any corrupted or null items
+    if (Array.isArray(this.unlockedAgents)) {
+      this.unlockedAgents = this.unlockedAgents.filter(a => a && typeof a === 'string');
+    }
+    if (Array.isArray(this.equippedAgents)) {
+      this.equippedAgents = this.equippedAgents.filter(a => a && typeof a === 'string');
+    }
+    if (Array.isArray(this.ownedSkins)) {
+      this.ownedSkins = this.ownedSkins.filter(s => s && typeof s === 'string');
+    }
+
+    if (this.equippedSkins && typeof this.equippedSkins === 'object') {
+      for (const k of Object.keys(this.equippedSkins)) {
+        if (!k || typeof k !== 'string' || typeof this.equippedSkins[k] !== 'string') {
+          delete this.equippedSkins[k];
+        }
+      }
+    } else {
+      this.equippedSkins = {};
+    }
+
     if (!Array.isArray(this.unlockedAgents) || this.unlockedAgents.length === 0) {
       this.unlockedAgents = ['scout', 'sniper'];
     }
@@ -241,9 +262,6 @@ class Game {
     }
     if (!Array.isArray(this.ownedSkins)) {
       this.ownedSkins = [];
-    }
-    if (!this.equippedSkins || typeof this.equippedSkins !== 'object') {
-      this.equippedSkins = {};
     }
     if (!this.leaderboard || typeof this.leaderboard !== 'object') {
       this.leaderboard = { grassland: [], desert: [], tundra: [], cyber_city: [], fallen_outpost: [] };
@@ -645,75 +663,79 @@ class Game {
   }
 
   deployToMatch() {
-    this.state = 'playing';
-    this.showMapDirections = true;
-    
-    this.grid.selectMap(this.selectedMap);
-    
-    const diffConfig = this.difficultySettings[this.selectedDifficulty];
+    try {
+      this.state = 'playing';
+      this.showMapDirections = true;
+      
+      this.grid.selectMap(this.selectedMap);
+      
+      const diffConfig = this.difficultySettings[this.selectedDifficulty];
 
-    const hcCheckbox = document.getElementById('hardcore-toggle');
-    this.isHardcore = hcCheckbox ? hcCheckbox.checked : false;
-    Enemy.hardcoreMode = this.isHardcore;
+      const hcCheckbox = document.getElementById('hardcore-toggle');
+      this.isHardcore = hcCheckbox ? hcCheckbox.checked : false;
+      Enemy.hardcoreMode = this.isHardcore;
 
-    this.lives = this.isHardcore ? 10 : (this.selectedDifficulty === 'easy' ? 150 : 100);
-    this.gold = this.isHardcore ? 250 : diffConfig.startGold;
-    this.wave = 0;
-    this.maxWaves = diffConfig.maxWaves;
-    this.waveInProgress = false;
-    this.hasRevivedThisMatch = false; 
-    this.speedMultiplier = 1;
-    this.enemies = [];
-    this.bullets = [];
-    this.spawnQueue = [];
-    this.matchTime = 0;
-    this.skipVotes.clear();
-    
-    this.grid.clear();
-    this.effectManager.clear();
-    this.setSelectedPlacedTower(null);
+      this.lives = this.isHardcore ? 10 : (this.selectedDifficulty === 'easy' ? 150 : 100);
+      this.gold = this.isHardcore ? 250 : diffConfig.startGold;
+      this.wave = 0;
+      this.maxWaves = diffConfig.maxWaves;
+      this.waveInProgress = false;
+      this.hasRevivedThisMatch = false; 
+      this.speedMultiplier = 1;
+      this.enemies = [];
+      this.bullets = [];
+      this.spawnQueue = [];
+      this.matchTime = 0;
+      this.skipVotes.clear();
+      
+      this.grid.clear();
+      this.effectManager.clear();
+      this.setSelectedPlacedTower(null);
 
-    if (!this.tutorialCompleted) {
-      this.selectedShopTower = null;
-    } else {
-      this.selectedShopTower = this.equippedAgents[0];
-    }
-
-    this.playerWallets = {};
-    this.playerWallets[window.myPlayerId] = this.gold;
-    for (const c of Network.conns) {
-      if (c && c.open) {
-        this.playerWallets[c.playerId] = this.gold;
+      if (!this.tutorialCompleted) {
+        this.selectedShopTower = null;
+      } else {
+        this.selectedShopTower = this.equippedAgents[0];
       }
-    }
 
-    if (Network.mode === 'HOST') {
-      Network.broadcastToAll({
-        type: 'START',
-        selectedMap: this.selectedMap,
-        isHardcore: this.isHardcore,
-        playerWallets: this.playerWallets,
-        obstacles: this.grid.obstacles,
-        lives: this.lives,
-        gold: this.gold,
-        maxWaves: this.maxWaves
-      });
-    }
+      this.playerWallets = {};
+      this.playerWallets[window.myPlayerId] = this.gold;
+      for (const c of Network.conns) {
+        if (c && c.open) {
+          this.playerWallets[c.playerId] = this.gold;
+        }
+      }
 
-    let mapName = 'Grassland';
-    if (this.selectedMap === 'desert') mapName = 'Desert Outpost';
-    else if (this.selectedMap === 'tundra') mapName = 'Frost Tundra';
-    else if (this.selectedMap === 'cyber_city') mapName = 'Cyber City';
-    else if (this.selectedMap === 'fallen_outpost') mapName = 'Fallen Outpost';
+      if (Network.mode === 'HOST') {
+        Network.broadcastToAll({
+          type: 'START',
+          selectedMap: this.selectedMap,
+          isHardcore: this.isHardcore,
+          playerWallets: this.playerWallets,
+          obstacles: this.grid.obstacles,
+          lives: this.lives,
+          gold: this.gold,
+          maxWaves: this.maxWaves
+        });
+      }
 
-    this.ui.showGameLayout(mapName);
-    this.ui.renderPlacementShop();
-    this.ui.updateSpeedButton(1);
-    this.ui.updateWaveButton(false);
-    this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
+      let mapName = 'Grassland';
+      if (this.selectedMap === 'desert') mapName = 'Desert Outpost';
+      else if (this.selectedMap === 'tundra') mapName = 'Frost Tundra';
+      else if (this.selectedMap === 'cyber_city') mapName = 'Cyber City';
+      else if (this.selectedMap === 'fallen_outpost') mapName = 'Fallen Outpost';
 
-    if (!this.tutorialCompleted) {
-      this.tutorialStep = 0.5; // Start at click anywhere stage [4]
+      this.ui.showGameLayout(mapName);
+      this.ui.renderPlacementShop();
+      this.ui.updateSpeedButton(1);
+      this.ui.updateWaveButton(false);
+      this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
+
+      if (!this.tutorialCompleted) {
+        this.tutorialStep = 0.5; // Start at click anywhere stage [4]
+      }
+    } catch (e) {
+      console.error("Defensive Guard: Error caught in deployToMatch():", e);
     }
   }
 

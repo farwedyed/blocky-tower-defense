@@ -243,8 +243,6 @@ export class LobbyUI {
       </div>
     `;
 
-    // Force prepend as direct top-level children of #panel-maps so that
-    // toggling the Wizard step slides does not hide the splash screen.
     parentPanel.prepend(coopPanel);
     parentPanel.prepend(splashContainer);
   }
@@ -284,8 +282,6 @@ export class LobbyUI {
       if (mapsStep) {
         mapsStep.classList.remove('hidden');
         mapsStep.classList.add('active');
-        
-        // Point directly to Next button in Step 1 (do not tell them to choose a map)
         this.triggerStep1Pointer();
       }
       if (diffStep) diffStep.classList.add('hidden');
@@ -320,8 +316,6 @@ export class LobbyUI {
         this.stepMaps.classList.add('hidden');
         this.stepDiff.classList.remove('hidden');
         this.stepDiff.classList.add('active');
-        
-        // Redraw boss previews to ensure crisp canvases
         this.drawAllBossPreviews();
 
         // Tutorial Step 2: Point directly to PREPARATION button
@@ -345,7 +339,6 @@ export class LobbyUI {
         this.stepDiff.classList.add('hidden');
         this.stepMaps.classList.remove('hidden');
         this.stepMaps.classList.add('active');
-
         this.triggerStep1Pointer();
       });
     }
@@ -553,7 +546,6 @@ export class LobbyUI {
       });
     }
 
-    // Delegated Purchase listener for Direct-Buy elements in Shop Panel
     const shopPanel = document.getElementById('panel-shop');
     if (shopPanel) {
       shopPanel.addEventListener('click', (e) => {
@@ -580,7 +572,6 @@ export class LobbyUI {
         this.game.setSelectedMap(mapId);
         this.renderLeaderboard(mapId);
 
-        // Highlight "NEXT" button in Step 1 map select
         if (!this.game.tutorialCompleted) {
           this.parentUI.hidePointer();
           document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
@@ -722,7 +713,6 @@ export class LobbyUI {
       }
     }
 
-    // Refresh and process the shop state for all TDS-structured categorizations
     this.shopCards = document.querySelectorAll('.shop-card');
     this.shopCards.forEach(card => {
       const type = card.getAttribute('data-agent-type');
@@ -889,92 +879,78 @@ export class LobbyUI {
   }
 
   drawBossPreview(canvas, bossType) {
+    if (!canvas) return; // Defensive null-guard to prevent visual initialization crashes
     const ctx = canvas.getContext('2d');
+    if (!ctx) return; 
     const w = canvas.width;
     const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
     ctx.save();
     
-    // Scale and position the head model centered
     ctx.translate(w / 2, h / 2 + 10);
     ctx.strokeStyle = '#222';
     ctx.lineWidth = 3;
 
-    // Draw baseline character pedestal shadow
     ctx.fillStyle = 'rgba(0,0,0,0.15)';
     ctx.beginPath();
     ctx.ellipse(0, 16, 18, 5, 0, 0, Math.PI * 2);
     ctx.fill();
 
     if (bossType === 'brute') {
-      // Brute Boss Model
-      ctx.fillStyle = '#1e8449'; // Forest Green Torso
+      ctx.fillStyle = '#1e8449'; 
       ctx.fillRect(-12, -8, 24, 24);
       ctx.strokeRect(-12, -8, 24, 24);
-      // Giant fists
       ctx.fillStyle = '#27ae60';
       ctx.fillRect(-17, 2, 8, 8);
       ctx.strokeRect(-17, 2, 8, 8);
       ctx.fillRect(9, 2, 8, 8);
       ctx.strokeRect(9, 2, 8, 8);
-      // Head
       ctx.fillStyle = '#27ae60';
       ctx.fillRect(-8, -21, 16, 13);
       ctx.strokeRect(-8, -21, 16, 13);
-      // Glowing red eyes
       ctx.fillStyle = '#e74c3c';
       ctx.fillRect(-4, -16, 2.5, 2.5);
       ctx.fillRect(2.5, -16, 2.5, 2.5);
     } 
     else if (bossType === 'grave_digger') {
-      // Grave Digger Model
-      ctx.fillStyle = '#2f3542'; // Dark Robe
+      ctx.fillStyle = '#2f3542'; 
       ctx.fillRect(-10, -6, 20, 22);
       ctx.strokeRect(-10, -6, 20, 22);
-      // Shovel pole
       ctx.strokeStyle = '#747d8c';
       ctx.lineWidth = 3.5;
       ctx.beginPath(); ctx.moveTo(14, -18); ctx.lineTo(14, 18); ctx.stroke();
       ctx.fillStyle = '#a4b0be';
       ctx.fillRect(10, -22, 8, 5);
-      // Head and Hood
       ctx.fillStyle = '#1e272e';
       ctx.fillRect(-8, -20, 16, 14);
       ctx.strokeRect(-8, -20, 16, 14);
-      // Glowing Purple Eyes
       ctx.fillStyle = '#9b59b6';
       ctx.fillRect(-3, -15, 2, 2);
       ctx.fillRect(1.5, -15, 2, 2);
     } 
     else if (bossType === 'hazard_giant') {
-      // Hazard Giant
-      ctx.fillStyle = '#f1c40f'; // Toxic yellow body
+      ctx.fillStyle = '#f1c40f'; 
       ctx.fillRect(-12, -8, 24, 22);
       ctx.strokeRect(-12, -8, 24, 22);
-      // Back canisters
       ctx.fillStyle = '#2ecc71';
       ctx.fillRect(-16, -4, 5, 12);
       ctx.strokeRect(-16, -4, 5, 12);
-      // Hazmat Dome Helmet
       ctx.fillStyle = '#f1c40f';
       ctx.fillRect(-8, -20, 16, 12);
       ctx.strokeRect(-8, -20, 16, 12);
-      ctx.fillStyle = '#2ecc71'; // Glowing bio visor
+      ctx.fillStyle = '#2ecc71'; 
       ctx.fillRect(-5, -16, 10, 4);
     } 
     else if (bossType === 'molten_titan') {
-      // Molten Titan
-      ctx.fillStyle = '#1e272e'; // Dark magma frame
+      ctx.fillStyle = '#1e272e'; 
       ctx.fillRect(-12, -8, 24, 22);
       ctx.strokeRect(-12, -8, 24, 22);
-      ctx.fillStyle = '#ff6b6b'; // Veins
+      ctx.fillStyle = '#ff6b6b'; 
       ctx.fillRect(-8, -4, 3, 12);
       ctx.fillRect(5, -2, 3, 8);
-      // Head
       ctx.fillStyle = '#1e272e';
       ctx.fillRect(-8, -20, 16, 12);
       ctx.strokeRect(-8, -20, 16, 12);
-      // Fire crest crown
       ctx.fillStyle = '#e67e22';
       ctx.beginPath();
       ctx.moveTo(-8, -20); ctx.lineTo(-6, -24); ctx.lineTo(-3, -20);
@@ -982,18 +958,15 @@ export class LobbyUI {
       ctx.closePath(); ctx.fill(); ctx.stroke();
     } 
     else if (bossType === 'fallen_king') {
-      // Fallen King
-      ctx.fillStyle = '#2c3e50'; // Royal Obsidian Plate
+      ctx.fillStyle = '#2c3e50'; 
       ctx.fillRect(-12, -8, 24, 22);
       ctx.strokeRect(-12, -8, 24, 22);
-      ctx.fillStyle = '#8e44ad'; // Purple Crest Cloak
+      ctx.fillStyle = '#8e44ad'; 
       ctx.fillRect(-14, -8, 3, 22);
       ctx.fillRect(11, -8, 3, 22);
-      // Head and Helmet
       ctx.fillStyle = '#2c3e50';
       ctx.fillRect(-8, -20, 16, 12);
       ctx.strokeRect(-8, -20, 16, 12);
-      // Gold Spiked Crown
       ctx.fillStyle = '#f1c40f';
       ctx.beginPath();
       ctx.moveTo(-8, -20); ctx.lineTo(-5, -23); ctx.lineTo(-2, -20);
@@ -1005,7 +978,9 @@ export class LobbyUI {
   }
 
   drawMapPreview(canvas, mapId) {
+    if (!canvas) return; // Defensive null-guard to prevent visual initialization crashes
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     const w = canvas.width;
     const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
@@ -1110,7 +1085,9 @@ export class LobbyUI {
   }
 
   drawAgentPreview(canvas, agentType) {
+    if (!canvas) return; // Defensive null-guard to prevent visual initialization crashes
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     const w = canvas.width;
     const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
@@ -1211,6 +1188,7 @@ export class LobbyUI {
     ctx.fillStyle = '#111';
     ctx.fillRect(2, -3, 2, 2);
     ctx.fillRect(2, 1, 2, 2);
+    ctx.fillRect(3, -1, 1, 2);
 
     if (agentType === 'scout') {
       ctx.fillStyle = '#27ae60';
