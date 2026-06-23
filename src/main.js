@@ -3,7 +3,7 @@
 import { Grid } from './grid.js';
 import { UI } from './ui.js';
 import { EffectManager } from './particle.js';
-import { Enemy, Runner, Quick, Slow, Hidden, Lead, Shadow, Goliath, Templar, GraveDigger, MoltenTitan, FallenGuardian, FallenKing, VoidReaver, Brute } from './enemy.js';
+import { Enemy, Runner, Quick, Slow, Hidden, Lead, Shadow, Goliath, Templar, GraveDigger, HazardGiant, MoltenTitan, FallenGuardian, FallenKing, VoidReaver, Brute } from './enemy.js';
 import { Scout, Minigunner, Commander, DJUnit, Pyromancer, Farm, Gladiator, Soldier, Sniper, Medic, Rocketeer, Demoman, Freezer, Shotgunner, CrookBoss, MilitaryBase, Ranger, Turret } from './tower.js';
 import { soundManager } from './sound.js';
 import { uploadRecord, fetchTopRecords } from './firebase.js';
@@ -24,7 +24,7 @@ class Game {
     this.playerLevel = 1;
     this.playerXp = 0;
     this.playerCoins = 150;
-    this.unlockedAgents = ['scout', 'sniper'];
+    this.unlockedAgents = ['scout', 'sniper']; // Starter loadout aligned with Roblox TDS
     this.equippedAgents = ['scout', 'sniper'];
     this.ownedSkins = [];
     this.equippedSkins = {};
@@ -33,14 +33,14 @@ class Game {
     this.selectedDifficulty = 'easy';
     this.difficultySettings = {
       easy: {
-        hpMultiplier: 0.80, // Generates fair, proportional health scaling
-        startGold: 600,     // Uniform starting cash matching TDS standard
+        hpMultiplier: 0.80, 
+        startGold: 600,     
         maxWaves: 30,
         coinMultiplier: 1.0,
         xpMultiplier: 1.0
       },
       casual: {
-        hpMultiplier: 1.00, // Baseline normal health
+        hpMultiplier: 1.00, 
         startGold: 600,
         maxWaves: 35,
         coinMultiplier: 1.3,
@@ -61,7 +61,7 @@ class Game {
         xpMultiplier: 2.0
       },
       fallen: {
-        hpMultiplier: 2.40, // Retuned Fallen scale to provide a structured, strategic challenge
+        hpMultiplier: 2.40, 
         startGold: 600,
         maxWaves: 40,
         coinMultiplier: 2.8,
@@ -100,10 +100,13 @@ class Game {
     this.wave = 0;
     this.isHardcore = false;
     this.maxWaves = 30;
-    this.state = 'lobby'; // Set back to lobby state for initial rendering
+    this.state = 'lobby'; 
     this.selectedMap = 'grassland';
     this.waveInProgress = false;
     this.hasRevivedThisMatch = false; 
+
+    // Wave skip cooldown state
+    this.skipCooldown = 0;
 
     // Cooperative multiplayer wallets & skip votes
     this.playerWallets = {};
@@ -231,10 +234,10 @@ class Game {
     }
 
     if (!Array.isArray(this.unlockedAgents) || this.unlockedAgents.length === 0) {
-      this.unlockedAgents = ['scout'];
+      this.unlockedAgents = ['scout', 'sniper'];
     }
     if (!Array.isArray(this.equippedAgents) || this.equippedAgents.length === 0) {
-      this.equippedAgents = ['scout'];
+      this.equippedAgents = ['scout', 'sniper'];
     }
     if (!Array.isArray(this.ownedSkins)) {
       this.ownedSkins = [];
@@ -278,7 +281,7 @@ class Game {
       this.questRewarded.cashSpent = true;
       this.playerCoins += 100;
       anyCompleted = true;
-      this.effectManager.spawnText(400, 240, 'QUEST COMPLETE! +🪙 100 Coins', '#f1c40f');
+      this.effectManager.spawnText(400, 260, 'QUEST COMPLETE! +🪙 100 Coins', '#f1c40f');
     }
     if (!this.questRewarded.farmsPlaced && this.questProgress.farmsPlaced >= this.questGoals.farmsPlaced) {
       this.questRewarded.farmsPlaced = true;
@@ -338,7 +341,7 @@ class Game {
     for (let w = 1; w <= count; w++) {
       const isBossWave = (w === count);
 
-      // Overhaul early game variety: waves 1-10 match Roblox TDS wave configurations
+      // Early game variety: waves 1-10 match Roblox TDS wave configurations
       if (w === 1) {
         waves.push({ runners: 4, quicks: 0, slows: 0, hiddens: 0, rate: 2.0 });
         continue;
@@ -348,7 +351,7 @@ class Game {
         continue;
       }
       if (w === 3) {
-        waves.push({ runners: 10, quicks: 4, slows: 0, hiddens: 0, rate: 1.5 }); // Speedies debut
+        waves.push({ runners: 10, quicks: 4, slows: 0, hiddens: 0, rate: 1.5 }); 
         continue;
       }
       if (w === 4) {
@@ -356,7 +359,7 @@ class Game {
         continue;
       }
       if (w === 5) {
-        waves.push({ runners: 8, quicks: 4, slows: 2, hiddens: 0, rate: 1.4 }); // Slows debut
+        waves.push({ runners: 8, quicks: 4, slows: 2, hiddens: 0, rate: 1.4 }); 
         continue;
       }
       if (w === 6) {
@@ -364,7 +367,7 @@ class Game {
         continue;
       }
       if (w === 7) {
-        waves.push({ goliaths: 1, quicks: 6, slows: 2, hiddens: 0, rate: 1.2 }); // Normal Boss (Toxic Giant) debuts
+        waves.push({ goliaths: 1, quicks: 6, slows: 2, hiddens: 0, rate: 1.2 }); 
         continue;
       }
       if (w === 8) {
@@ -376,19 +379,19 @@ class Game {
         continue;
       }
       if (w === 10) {
-        waves.push({ quicks: 10, slows: 6, hiddens: 4, rate: 1.0 }); // Camo Hiddens debut
+        waves.push({ quicks: 10, slows: 6, hiddens: 4, rate: 1.0 }); 
         continue;
       }
 
-      // Beyond Wave 10, scale up dynamically across all modes (unlocked for Easy/Casual too)
+      // Beyond Wave 10, scale up dynamically across all modes
       waves.push({
         runners: isBossWave ? 15 : 8 + w * 2,
         quicks: isBossWave ? 15 : Math.max(0, w - 5) * 1.5,
         slows: isBossWave ? 10 : Math.max(0, w - 8) * 1.2,
-        hiddens: Math.round(Math.max(0, w - 9) * 0.8), // Active on all difficulties
-        leads: Math.round(Math.max(0, w - 11) * 0.6),   // Active on all difficulties
+        hiddens: Math.round(Math.max(0, w - 9) * 0.8), 
+        leads: Math.round(Math.max(0, w - 11) * 0.6),   
         shadows: (difficulty === 'fallen') ? Math.max(0, w - 20) * 0.5 : 0,
-        goliaths: Math.round(Math.max(0, w - 13) * 0.4), // Scale consistently after wave 14
+        goliaths: Math.round(Math.max(0, w - 13) * 0.4), 
         templars: (difficulty === 'fallen') ? Math.max(0, w - 25) * 0.2 : 0,
         brute: (isBossWave && difficulty === 'easy') ? 1 : 0,
         diggers: (isBossWave && difficulty === 'casual') ? 1 : 0,
@@ -690,7 +693,10 @@ class Game {
         selectedMap: this.selectedMap,
         isHardcore: this.isHardcore,
         playerWallets: this.playerWallets,
-        obstacles: this.grid.obstacles 
+        obstacles: this.grid.obstacles,
+        lives: this.lives,
+        gold: this.gold,
+        maxWaves: this.maxWaves
       });
     }
 
@@ -956,7 +962,7 @@ class Game {
       const required = Math.ceil((Network.conns.filter(c => c && c.open).length + 1) / 2);
       if (this.skipVotes.size >= required) {
         this.skipVotes.clear();
-        this.skipWave();
+        this.skipWave(); 
       } else {
         this.effectManager.spawnText(400, 260, `SKIP VOTE: ${this.skipVotes.size}/${required}`, '#e67e22');
       }
@@ -964,7 +970,7 @@ class Game {
   }
 
   skipWave() {
-    if (!this.waveInProgress || this.wave >= this.maxWaves) return;
+    if (!this.waveInProgress || this.wave >= this.maxWaves || this.skipCooldown > 0) return;
     const reward = 50 + this.wave * 15;
     
     if (Network.mode === 'HOST' && this.playerWallets) {
@@ -980,8 +986,11 @@ class Game {
     }
     
     this.effectManager.spawnText(400, 260, `WAVE SKIPPED! +$${reward}`, '#e67e22');
+    
+    this.skipCooldown = 15.0; // 15-second skip cooldown to prevent spam skips [4]
+    
     this.waveInProgress = false;
-    this.startNextWave();
+    this.startNextWave(true); 
   }
 
   toggleAutoMode() {
@@ -990,7 +999,7 @@ class Game {
     this.ui.updateAutoWaveButton(this.autoMode);
   }
 
-  startNextWave() {
+  startNextWave(isFromSkip = false) {
     if (this.showMapDirections) return;
     if (this.waveInProgress || this.state !== 'playing') return;
 
@@ -1002,6 +1011,10 @@ class Game {
     // Call dynamic wave alerts from Commander
     this.triggerCommanderAlerts();
 
+    if (!isFromSkip) {
+      this.skipCooldown = 0; 
+    }
+
     let blueprints = this.waveBlueprintsEasy;
     if (this.selectedDifficulty === 'casual') blueprints = this.waveBlueprintsCasual;
     else if (this.selectedDifficulty === 'intermediate') blueprints = this.waveBlueprintsIntermediate;
@@ -1011,7 +1024,6 @@ class Game {
     const blueprint = blueprints[this.wave - 1];
     this.spawnInterval = blueprint.rate;
 
-    // Concatenate standard list instead of clean overwrite to stack spawning queues [4]
     const spawnList = [];
     for (let i = 0; i < (blueprint.runners || 0); i++) spawnList.push('runner');
     for (let i = 0; i < (blueprint.quicks || 0); i++) spawnList.push('quick');
@@ -1128,7 +1140,7 @@ class Game {
       return; 
     }
 
-    // Interactive Wave Autostart Loop (Calibrated to 6 seconds delay for Easy Mode)
+    // Interactive Wave Autostart Loop 
     if (this.autoMode && !this.waveInProgress && this.autoStartTimer > 0 && this.state === 'playing' && !this.showMapDirections) {
       this.autoStartTimer -= dt;
       if (this.autoStartTimer <= 0) {
@@ -1150,12 +1162,15 @@ class Game {
 
     this.evaluateSupportBuffs();
 
+    if (this.skipCooldown > 0) {
+      this.skipCooldown -= dt;
+    }
+
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const zombie = this.enemies[i];
       zombie.update(this.grid.pixelPath, this.effectManager, dt, this.enemies, this.grid.towers);
 
       if (zombie.health <= 0) {
-        // Award matching currency dynamically inside matches based on enemy stats [4]
         const reward = zombie.goldReward || 10;
         this.gold += reward;
         if (this.playerWallets) {
@@ -1297,7 +1312,6 @@ class Game {
   }
 
   evaluateSupportBuffs() {
-    // Clear buffs first
     for (const t of this.grid.towers.values()) {
       t.djRangeBuffed = false;
       t.djCamoDetectionBuffed = false;
@@ -1305,7 +1319,6 @@ class Game {
       t.commanderAbilityActive = false;
     }
 
-    // Reapply based on area positioning
     for (const dj of this.grid.towers.values()) {
       if (dj.type === 'dj') {
         const r = dj.range * (dj.djRangeBuffed ? 1.15 : 1.0);

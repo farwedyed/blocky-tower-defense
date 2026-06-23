@@ -371,18 +371,27 @@ export class GameUI {
     });
 
     if (this.btnSkipWave) {
-      // Changed: skips are now stackable and always available inside valid waves [4]
       const showSkip = this.game.waveInProgress && this.game.wave < this.game.maxWaves;
       if (showSkip) {
         this.btnSkipWave.style.display = 'block';
         this.btnSkipWave.classList.remove('hidden');
-        const votesCount = Network.mode === 'CLIENT' ? (this.game.skipVotesCount || 0) : (this.game.skipVotes ? this.game.skipVotes.size : 0);
-        const votesReq = Network.mode === 'CLIENT' ? (this.game.skipVotesRequired || 1) : Math.ceil((Network.conns.filter(c => c && c.open).length + 1) / 2);
-        
-        if (votesCount > 0) {
-          this.btnSkipWave.textContent = `SKIP VOTE (${votesCount}/${votesReq})`;
+
+        // Added UI Cooldown Visual check and lock to prevent skips spamming [4]
+        if (this.game.skipCooldown > 0) {
+          this.btnSkipWave.disabled = true;
+          this.btnSkipWave.style.opacity = '0.5';
+          this.btnSkipWave.textContent = `COOLDOWN (${Math.ceil(this.game.skipCooldown)}s)`;
         } else {
-          this.btnSkipWave.textContent = "SKIP WAVE";
+          this.btnSkipWave.disabled = false;
+          this.btnSkipWave.style.opacity = '1.0';
+          const votesCount = Network.mode === 'CLIENT' ? (this.game.skipVotesCount || 0) : (this.game.skipVotes ? this.game.skipVotes.size : 0);
+          const votesReq = Network.mode === 'CLIENT' ? (this.game.skipVotesRequired || 1) : Math.ceil((Network.conns.filter(c => c && c.open).length + 1) / 2);
+          
+          if (votesCount > 0) {
+            this.btnSkipWave.textContent = `SKIP VOTE (${votesCount}/${votesReq})`;
+          } else {
+            this.btnSkipWave.textContent = "SKIP WAVE";
+          }
         }
       } else {
         this.btnSkipWave.style.display = 'none';
@@ -763,7 +772,7 @@ export class GameUI {
     summaryCard.style.cssText = `
       background: rgba(20, 30, 50, 0.98);
       border: 4px solid ${isVictory ? '#f1c40f' : '#e74c3c'};
-      box-shadow: 0 0 25px ${isVictory ? 'rgba(241,196,15,0.4)' : 'rgba(231, 76, 60, 0.4)'};
+      box-shadow: 0 0 25px ${isVictory ? 'rgba(241,196,15,0.4)' : 'rgba(231,76,60,0.4)'};
       border-radius: 16px;
       padding: 16px 20px 20px 20px;
       width: 360px;

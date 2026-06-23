@@ -278,53 +278,34 @@ export const Network = {
                 try {
                     c.send({
                         type: 'LOBBY_WELCOME',
-                        assignedId: c.playerId,
+                        playerId: assignedId,
                         lobbyPlayers: window.lobbyPlayers,
-                        selectedMap: this.game.selectedMap,
-                        isHardcore: this.game.isHardcore,
-                        peerIds: this.peerIds,
-                        hostPlayerId: this.hostPlayerId
+                        peerIds: this.peerIds
                     });
-                } catch(e) {
-                    console.warn("Failed to send LOBBY_WELCOME:", e);
+                } catch (e) {
+                    console.warn('[Network] Failed to transmit lobby welcome:', e);
                 }
-
-                this.broadcastToAll({
-                    type: 'LOBBY_UPDATE',
-                    lobbyPlayers: window.lobbyPlayers,
-                    peerIds: this.peerIds,
-                    hostPlayerId: this.hostPlayerId
-                });
-            }
+                
+                this.updateCoopPlayerList();
+            } 
             else if (data.type === 'MIGRATE_REJOIN') {
-                c.playerId = data.playerId;
-                this.peerIds[c.playerId] = c.peer;
-                window.lobbyPlayers[c.playerId] = data.name || ("Player " + c.playerId.substring(1));
-
-                this.broadcastToAll({
-                    type: 'LOBBY_UPDATE',
-                    lobbyPlayers: window.lobbyPlayers,
-                    peerIds: this.peerIds,
-                    hostPlayerId: this.hostPlayerId
-                });
+                window.lobbyPlayers[data.playerId] = data.name;
+                this.peerIds[data.playerId] = c.peer;
+                this.updateCoopPlayerList();
             }
             else if (data.type === 'P_DATA') {
                 window.playerCursors[c.playerId] = {
-                    mouseX: data.mouseX,
-                    mouseY: data.mouseY,
+                    x: data.mouseX,
+                    y: data.mouseY,
                     selectedShopTower: data.selectedShopTower,
                     equippedSkin: data.equippedSkin
                 };
             }
             else if (data.type === 'PLACE_TOWER') {
                 if (this.game) {
-                    const cost = this.game.getTowerCost(data.towerType);
-                    const wallet = this.game.playerWallets ? this.game.playerWallets[c.playerId] : this.game.gold;
-                    
-                    if (wallet >= cost && this.game.grid.isCellValidForPlacement(data.col, data.row)) {
-                        this.game.selectedShopTower = data.towerType;
-                        this.game.placeShopAgent(data.col, data.row, c.playerId);
-                    }
+                    this.game.selectedShopTower = data.towerType;
+                    this.game.equippedSkins[data.towerType] = data.skin;
+                    this.game.placeShopAgent(data.col, data.row, c.playerId);
                 }
             }
             else if (data.type === 'UPGRADE_TOWER') {
@@ -415,7 +396,6 @@ export const Network = {
     },
 
     broadcastState: function() {
-        // Intercept loops dynamically if they aren't configured yet
         this.interceptEffects();
         this.interceptSounds();
 
@@ -467,7 +447,7 @@ export const Network = {
                 enraged: e.enraged,
                 slowDuration: e.slowDuration,
                 burnDuration: e.burnDuration,
-                baseDamage: e.baseDamage // Synchronize TDS-style base damage properties to clients
+                baseDamage: e.baseDamage 
             })),
 
             bullets: this.game.bullets.map(b => ({
@@ -479,10 +459,9 @@ export const Network = {
 
             peerIds: this.peerIds, 
             hostPlayerId: this.hostPlayerId,
-            events: [...this.pendingEvents] // Replicate all spawned sounds & visuals
+            events: [...this.pendingEvents] 
         };
 
-        // Reset tracking stack to avoid double triggers
         this.pendingEvents = [];
 
         this.conns.forEach(c => {
@@ -508,7 +487,6 @@ export const Network = {
                 if (data.hostPlayerId) this.hostPlayerId = data.hostPlayerId;
                 this.lastGameStateTime = Date.now(); 
 
-                // Force Client UI redraw to show host and other guest slots
                 if (this.game && this.game.ui) {
                     this.game.ui.updateCoopPlayerList();
                 }
@@ -519,13 +497,11 @@ export const Network = {
                 if (data.hostPlayerId) this.hostPlayerId = data.hostPlayerId;
                 this.lastGameStateTime = Date.now(); 
 
-                // Force Client UI redraw on lobby squad adjustments
                 if (this.game && this.game.ui) {
                     this.game.ui.updateCoopPlayerList();
                 }
             }
             else if (data.type === 'START') {
-                // Client transitions to gameplay state automatically
                 this.game.selectedMap = data.selectedMap;
                 this.game.isHardcore = data.isHardcore;
                 this.game.playerWallets = data.playerWallets || {};
@@ -534,14 +510,15 @@ export const Network = {
                 this.game.showMapDirections = true;
                 this.game.grid.selectMap(data.selectedMap);
 
-                // Replicate map obstacles perfectly from host (solves tree/rock placement conflicts)
                 if (data.obstacles) {
                     this.game.grid.obstacles = data.obstacles;
                 }
 
-                this.game.lives = data.isHardcore ? 20 : 100;
-                // Safe lookup: assigns gold accurately from playerWallets map
-                this.game.gold = this.game.playerWallets[window.myPlayerId] || (data.isHardcore ? 250 : 100);
+                // Synchronize starting match statistics accurately from Host
+                this.game.lives = data.lives !== undefined ? data.lives : (data.isHardcore ? 10 : 150);
+                this.game.gold = data.gold !== undefined ? (this.game.playerWallets[window.myPlayerId] || data.gold) : (data.isHardcore ? 250 : 600);
+                this.game.maxWaves = data.maxWaves !== undefined ? data.maxWaves : 30;
+                
                 this.game.wave = 0;
                 this.game.waveInProgress = false;
                 this.game.speedMultiplier = 1;
@@ -588,7 +565,7 @@ export const Network = {
                     this.game.gold = data.gold;
                 }
 
-                // 1. Synchronize Towers (Update existing instances to reduce visual lag)
+                // 1. Synchronize Towers
                 const activeKeys = new Set();
                 data.towers.forEach(tData => {
                     const key = tData.key;
@@ -632,7 +609,7 @@ export const Network = {
                     }
                 }
 
-                // 2. Synchronize Enemies (Re-use instances & map class prototypes for custom visuals)
+                // 2. Synchronize Enemies 
                 const getEnemyClass = (name) => {
                     switch (name) {
                         case 'Zombie': return Runner;
@@ -659,13 +636,10 @@ export const Network = {
                         const EnemyClass = getEnemyClass(eData.name);
                         enemy = new EnemyClass(eData.x, eData.y);
                         enemy.id = eData.id;
-
-                        // Snap coordinate position immediately on first creation
                         enemy.x = eData.x;
                         enemy.y = eData.y;
                     }
 
-                    // Save coordinates as target vectors for smooth local interpolation
                     enemy.targetX = eData.x;
                     enemy.targetY = eData.y;
 
@@ -681,7 +655,6 @@ export const Network = {
                     enemy.slowDuration = eData.slowDuration;
                     enemy.burnDuration = eData.burnDuration;
                     
-                    // Sync the proportional leakage base damage on guest client devices
                     if (eData.baseDamage !== undefined) {
                         enemy.baseDamage = eData.baseDamage;
                     }
@@ -888,6 +861,12 @@ export const Network = {
             } catch (e) {
                 console.warn("Failed to send client cursor state:", e);
             }
+        }
+    },
+
+    updateCoopPlayerList: function() {
+        if (this.game && this.game.ui) {
+            this.game.ui.updateCoopPlayerList();
         }
     }
 };
