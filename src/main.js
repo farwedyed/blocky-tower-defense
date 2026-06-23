@@ -1162,6 +1162,11 @@ class Game {
       return; 
     }
 
+    // Authoritative Host Broadcast Frame Trigger (Solves Co-op Sync completely)
+    if (Network.mode === 'HOST') {
+      Network.broadcastState();
+    }
+
     // Interactive Wave Autostart Loop 
     if (this.autoMode && !this.waveInProgress && this.autoStartTimer > 0 && this.state === 'playing' && !this.showMapDirections) {
       this.autoStartTimer -= dt;

@@ -278,34 +278,53 @@ export const Network = {
                 try {
                     c.send({
                         type: 'LOBBY_WELCOME',
-                        playerId: assignedId,
+                        assignedId: c.playerId,
                         lobbyPlayers: window.lobbyPlayers,
-                        peerIds: this.peerIds
+                        selectedMap: this.game.selectedMap,
+                        isHardcore: this.game.isHardcore,
+                        peerIds: this.peerIds,
+                        hostPlayerId: this.hostPlayerId
                     });
-                } catch (e) {
-                    console.warn('[Network] Failed to transmit lobby welcome:', e);
+                } catch(e) {
+                    console.warn("Failed to send LOBBY_WELCOME:", e);
                 }
-                
-                this.updateCoopPlayerList();
-            } 
+
+                this.broadcastToAll({
+                    type: 'LOBBY_UPDATE',
+                    lobbyPlayers: window.lobbyPlayers,
+                    peerIds: this.peerIds,
+                    hostPlayerId: this.hostPlayerId
+                });
+            }
             else if (data.type === 'MIGRATE_REJOIN') {
-                window.lobbyPlayers[data.playerId] = data.name;
-                this.peerIds[data.playerId] = c.peer;
-                this.updateCoopPlayerList();
+                c.playerId = data.playerId;
+                this.peerIds[c.playerId] = c.peer;
+                window.lobbyPlayers[c.playerId] = data.name || ("Player " + c.playerId.substring(1));
+
+                this.broadcastToAll({
+                    type: 'LOBBY_UPDATE',
+                    lobbyPlayers: window.lobbyPlayers,
+                    peerIds: this.peerIds,
+                    hostPlayerId: this.hostPlayerId
+                });
             }
             else if (data.type === 'P_DATA') {
                 window.playerCursors[c.playerId] = {
-                    x: data.mouseX,
-                    y: data.mouseY,
+                    mouseX: data.mouseX,
+                    mouseY: data.mouseY,
                     selectedShopTower: data.selectedShopTower,
                     equippedSkin: data.equippedSkin
                 };
             }
             else if (data.type === 'PLACE_TOWER') {
                 if (this.game) {
-                    this.game.selectedShopTower = data.towerType;
-                    this.game.equippedSkins[data.towerType] = data.skin;
-                    this.game.placeShopAgent(data.col, data.row, c.playerId);
+                    const cost = this.game.getTowerCost(data.towerType);
+                    const wallet = this.game.playerWallets ? this.game.playerWallets[c.playerId] : this.game.gold;
+                    
+                    if (wallet >= cost && this.game.grid.isCellValidForPlacement(data.col, data.row)) {
+                        this.game.selectedShopTower = data.towerType;
+                        this.game.placeShopAgent(data.col, data.row, c.playerId);
+                    }
                 }
             }
             else if (data.type === 'UPGRADE_TOWER') {
@@ -368,7 +387,6 @@ export const Network = {
                 hostPlayerId: this.hostPlayerId
             });
 
-            // Force Host UI redraw on client leave
             if (this.game && this.game.ui) {
                 this.game.ui.updateCoopPlayerList();
             }
@@ -404,6 +422,14 @@ export const Network = {
         this.lastUpdate = now;
 
         if (!this.game || this.game.state === 'lobby') return;
+
+        // Pack the Host's own cursor into playerCursors['p1'] before sending so clients can see it
+        window.playerCursors['p1'] = {
+            mouseX: this.game.mousePos.x,
+            mouseY: this.game.mousePos.y,
+            selectedShopTower: this.game.selectedShopTower,
+            equippedSkin: this.game.equippedSkins[this.game.selectedShopTower] || 'default'
+        };
 
         // Authoritative Co-op State Payload
         const statePayload = {
@@ -514,7 +540,6 @@ export const Network = {
                     this.game.grid.obstacles = data.obstacles;
                 }
 
-                // Synchronize starting match statistics accurately from Host
                 this.game.lives = data.lives !== undefined ? data.lives : (data.isHardcore ? 10 : 150);
                 this.game.gold = data.gold !== undefined ? (this.game.playerWallets[window.myPlayerId] || data.gold) : (data.isHardcore ? 250 : 600);
                 this.game.maxWaves = data.maxWaves !== undefined ? data.maxWaves : 30;
@@ -609,7 +634,7 @@ export const Network = {
                     }
                 }
 
-                // 2. Synchronize Enemies 
+                // 2. Synchronize Enemies
                 const getEnemyClass = (name) => {
                     switch (name) {
                         case 'Zombie': return Runner;
@@ -705,7 +730,6 @@ export const Network = {
                     });
                 }
 
-                // --- CRITICAL HUD RE-RENDER ON THE CLIENT-SIDE ---
                 if (this.game.ui) {
                     this.game.ui.updateSpeedButton(this.game.speedMultiplier); 
                     this.game.ui.updateHUD(this.game.lives, this.game.gold, this.game.wave, this.game.maxWaves);
@@ -732,7 +756,7 @@ export const Network = {
     },
 
     checkHostHeartbeat: function() {
-        if (this.mode !== 'CLIENT' || this.state === 'lobby') return;
+        if (this.mode !== 'CLIENT' || !this.game || this.game.state === 'lobby') return;
         
         const elapsed = Date.now() - this.lastGameStateTime;
         if (elapsed > 4000) { 
