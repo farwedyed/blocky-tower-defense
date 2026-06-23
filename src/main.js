@@ -90,6 +90,7 @@ class Game {
 
     // Tutorial Progression
     this.tutorialCompleted = false;
+    this.tutorialActive = false; // Session-only active flag
     this.tutorialStep = 0; // 0=lobby, 1=placement, 1.5=start wave, 2=upgrade, 3=done
 
     this.loadStatsFromStorage();
@@ -222,7 +223,13 @@ class Game {
           this.questRewarded = { ...this.questRewarded, ...parsed };
         }
       }
-      if (tutorial === 'true') this.tutorialCompleted = true;
+      if (tutorial === 'true') {
+        this.tutorialCompleted = true;
+        this.tutorialActive = false;
+      } else {
+        this.tutorialCompleted = false;
+        this.tutorialActive = false;
+      }
       if (leaderboard) {
         const parsed = JSON.parse(leaderboard);
         if (parsed && typeof parsed === 'object') {
@@ -416,6 +423,7 @@ class Game {
         hazard_giants: (isBossWave && difficulty === 'intermediate') ? 1 : 0,
         titans: (isBossWave && difficulty === 'molten') ? 1 : 0,
         kings: (isBossWave && difficulty === 'fallen') ? 1 : 0,
+        reavers: (isBossWave && difficulty === 'fallen') ? 1 : 0,
         rate: Math.max(0.4, 1.6 - w * 0.03)
       });
     }
@@ -438,7 +446,7 @@ class Game {
       this.showMapDirections = false;
       
       // Directions cleared: Transition to Step 1 tutorial (Prompt to Equip Scout) [4]
-      if (!this.tutorialCompleted && this.tutorialStep === 0.5) {
+      if (this.tutorialActive && this.tutorialStep === 0.5) {
         this.tutorialStep = 1;
         this.ui.showTutorialHint(1);
       }
@@ -537,8 +545,8 @@ class Game {
   setSelectedShopTower(type) {
     this.selectedShopTower = type;
     
-    // Scout button clicked: Transition immediately to Step 1.5 (Point to highlighted tile (2,1)) [4]
-    if (!this.tutorialCompleted && this.tutorialStep === 1 && type === 'scout') {
+    // Scout button clicked: Transition immediately to Step 1.5 (Point to highlighted tile (2,2)) [4]
+    if (this.tutorialActive && this.tutorialStep === 1 && type === 'scout') {
       this.tutorialStep = 1.5;
       this.ui.showTutorialHint(1.5);
     }
@@ -549,8 +557,8 @@ class Game {
     this.ui.updateSelectionPanel(agent);
 
     // Scout selected on field: Transition to Step 2.5 (Point to Upgrade button) [4]
-    if (!this.tutorialCompleted && this.tutorialStep === 2) {
-      if (agent && agent.gridX === 2 && agent.gridY === 1) {
+    if (this.tutorialActive && this.tutorialStep === 2) {
+      if (agent && agent.type === 'scout') {
         this.tutorialStep = 2.5;
         this.ui.showTutorialHint(2.5); 
       } else {
@@ -692,7 +700,16 @@ class Game {
       this.effectManager.clear();
       this.setSelectedPlacedTower(null);
 
+      // Store a flag on whether we should run the tutorial session for this match
+      this.tutorialActive = !this.tutorialCompleted;
+
+      // Instantly mark the tutorial as completed and save to storage so it never reappears
       if (!this.tutorialCompleted) {
+        this.tutorialCompleted = true;
+        this.saveStatsToStorage();
+      }
+
+      if (this.tutorialActive) {
         this.selectedShopTower = null;
       } else {
         this.selectedShopTower = this.equippedAgents[0];
@@ -731,7 +748,7 @@ class Game {
       this.ui.updateWaveButton(false);
       this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
 
-      if (!this.tutorialCompleted) {
+      if (this.tutorialActive) {
         this.tutorialStep = 0.5; // Start at click anywhere stage [4]
       }
     } catch (e) {
@@ -798,12 +815,7 @@ class Game {
   }
 
   placeShopAgent(col, row, ownerId = 'p1') {
-    if (!this.tutorialCompleted && this.tutorialStep === 1.5) {
-      if (col !== 2 || row !== 1) {
-        this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "PLACE ON THE HIGHLIGHTED TILE", '#f1c40f');
-        return;
-      }
-    }
+    // Removed strict tutorial tile locks during the tutorial phase to give players full freedom.
 
     const totalPlacedTowers = this.grid.towers.size;
     const maxTowersAllowed = 40;
@@ -911,7 +923,7 @@ class Game {
         this.checkQuestCompletion();
 
         // Placed Scout: Transition to Step 2 (Prompt select placed Scout) [4]
-        if (!this.tutorialCompleted && this.tutorialStep === 1.5) {
+        if (this.tutorialActive && this.tutorialStep === 1.5) {
           this.tutorialStep = 2;
           this.ui.showTutorialHint(2);
         }
@@ -944,7 +956,7 @@ class Game {
         this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
 
         // Scout Upgraded First: Transition to Step 2.5 (Point to Upgrade button) [4]
-        if (!this.tutorialCompleted && this.tutorialStep === 2.5) {
+        if (this.tutorialActive && this.tutorialStep === 2.5) {
           this.tutorialStep = 3;
           this.ui.showTutorialHint(3);
         }
@@ -961,7 +973,7 @@ class Game {
       Network.conn.send({ type: 'SELL_TOWER', col: col, row: row });
       this.setSelectedPlacedTower(null);
     } else {
-      const refund = this.selectedPlacedTower.getSellValue();
+      const refund = this.tutorialActive ? this.selectedPlacedTower.cost : this.selectedPlacedTower.getSellValue();
       this.gold += refund;
       this.playerWallets['p1'] = this.gold;
 
@@ -1075,7 +1087,7 @@ class Game {
     this.effectManager.spawnText(400, 300, `WAVE ${this.wave}`, '#f1c40f');
 
     // Wave Started: Transition to Step 4 (Finish dialogue) [4]
-    if (!this.tutorialCompleted && this.tutorialStep === 3) {
+    if (this.tutorialActive && this.tutorialStep === 3) {
       this.tutorialStep = 4;
       this.ui.showTutorialHint(4);
     }
@@ -1215,7 +1227,7 @@ class Game {
       if (zombie.targetNodeIndex >= this.grid.pixelPath.length) {
         const damage = zombie.baseDamage || 1;
         this.lives -= damage;
-        this.effectManager.spawnText(this.x, this.y - 18, `-${damage} HP`, '#e74c3c');
+        this.effectManager.spawnText(zombie.x, zombie.y - 18, `-${damage} HP`, '#e74c3c');
         this.enemies.splice(i, 1);
         
         if (this.lives <= 0) {
@@ -1430,7 +1442,7 @@ class Game {
       this.drawHoverVisuals();
       this.drawPlayerCursors(); 
       
-      if (!this.tutorialCompleted && this.tutorialStep === 1.5 && this.selectedShopTower === 'scout') {
+      if (this.tutorialActive && this.tutorialStep === 1.5 && this.selectedShopTower === 'scout') {
         this.drawTutorialCanvasHighlight(this.ctx);
       }
 
@@ -1549,7 +1561,7 @@ class Game {
   drawTutorialCanvasHighlight(ctx) {
     const cellSize = this.grid.cellSize;
     const targetX = 2 * cellSize + cellSize / 2;
-    const targetY = 1 * cellSize + cellSize / 2;
+    const targetY = 2 * cellSize + cellSize / 2; // changed from 1 to 2
     
     const bounce = Math.sin(Date.now() / 150) * 8;
     

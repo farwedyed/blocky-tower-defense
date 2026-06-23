@@ -37,7 +37,7 @@
           <img id="cg-avatar" src="https://img.icons8.com/color/48/user-male-circle.png" style="width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid var(--border-color);" />
           <div style="display: flex; flex-direction: column; align-items: flex-start;">
             <span id="cg-username" style="color: var(--text-dark);">Guest Player</span>
-            <button id="btn-cg-auth" class="btn" style="font-size: 0.65rem; padding: 2px 6px; margin-top: 2px; background: var(--primary-blue); color: #fff; border-width: 1.5px; border-radius: 4px; box-shadow: none;">LOG IN</button>
+            <button id="btn-cg-auth" class="btn" style="font-size: 0.65rem; padding: 2px 6px; margin-top: 2px; background: var(--primary-blue); color: #fff; border-width: 2px; margin: 0; display: none;">LOG IN</button>
           </div>
         </div>
 
@@ -629,7 +629,10 @@
         </div>
         <div class="commander-speech-balloon">
           <p id="commander-dialog-text">Awaiting operational instructions, survivor.</p>
-          <button id="btn-commander-action" class="btn">GOT IT ✓</button>
+          <div style="display: flex; gap: 8px; align-self: flex-end;">
+            <button id="btn-commander-skip" class="btn btn-secondary" style="font-size: 0.72rem; padding: 4px 10px; background: #95a5a6; color: white; border-width: 2px; margin: 0; display: none;">SKIP TUTORIAL</button>
+            <button id="btn-commander-action" class="btn">GOT IT ✓</button>
+          </div>
         </div>
       </div>
 

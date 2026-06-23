@@ -172,7 +172,7 @@ export class Grid {
       } while (
         (this.pathTiles.has(key) || 
          this.hasObstacleNear(col, row) || 
-         (col === 2 && row === 1)) && // Explicitly exclude tutorial placement tile
+         (col === 2 && row === 2)) && // Explicitly exclude tutorial placement tile (2, 2)
         attempts < 100
       );
 

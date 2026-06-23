@@ -39,6 +39,7 @@ export class GameUI {
     this.commanderFaceCanvas = document.getElementById('commander-face-canvas');
     this.commanderText = document.getElementById('commander-dialog-text');
     this.btnCommanderAction = document.getElementById('btn-commander-action');
+    this.btnCommanderSkip = document.getElementById('btn-commander-skip');
 
     // Track active target element for real-time updates
     this.activePointerTarget = null;
@@ -101,6 +102,31 @@ export class GameUI {
 
     this.btnSell.addEventListener('click', () => {
       this.game.sellSelectedTower();
+    });
+
+    if (this.btnCommanderSkip) {
+      this.btnCommanderSkip.addEventListener('click', () => {
+        this.game.tutorialCompleted = true;
+        this.game.tutorialActive = false; // Deactivate active session
+        this.game.saveStatsToStorage();
+        this.dismissTutorial();
+      });
+    }
+
+    // Global listener to close upgrade/selection panel when clicking outside
+    document.addEventListener('click', (e) => {
+      if (this.game.state !== 'playing') return;
+
+      const canvas = document.getElementById('game-canvas');
+      const selectionPanel = document.getElementById('selection-panel');
+      const sidebarToggle = document.getElementById('btn-toggle-sidebar');
+
+      // Check if the click target is outside the canvas, outside the selection panel, and not the sidebar toggle
+      if (canvas && !canvas.contains(e.target) &&
+          selectionPanel && !selectionPanel.contains(e.target) &&
+          (!sidebarToggle || !sidebarToggle.contains(e.target))) {
+        this.game.setSelectedPlacedTower(null);
+      }
     });
 
     this.overlay.addEventListener('click', (e) => {
@@ -545,8 +571,8 @@ export class GameUI {
       }
 
       btnAbility.onclick = () => {
-        const success = agent.activateAbility(this.game.effectManager, this.game);
-        if (success) {
+        const handled = agent.activateAbility(this.game.effectManager, this.game);
+        if (handled) {
           this.updateSelectionPanel(agent);
         }
       };
@@ -646,7 +672,7 @@ export class GameUI {
     CrazyGamesManager.gameplayStart();
     this.hidePointer();
 
-    if (!this.game.tutorialCompleted) {
+    if (this.game.tutorialActive) {
       this.showTutorialHint(0.5); 
     }
   }
@@ -677,8 +703,8 @@ export class GameUI {
     const messages = {
       0.5: "Welcome to the battleground, rookie! I am your Commander. Tap anywhere on the map grid to clear the direction directives and ready up.",
       1: "Let's set up a perimeter. Select the Scout from your troops panel on the right.",
-      1.5: "Excellent. Now, place your Scout on the highlighted yellow tile on the field.",
-      2: "Good job! Now, tap directly on the placed Scout to select him.",
+      1.5: "Excellent. Now, place your Scout near the path (like the highlighted tile). You can place him anywhere valid!",
+      2: "Good job! Now, tap directly on your placed Scout to select him.",
       2.5: "Great! Now press UPGRADE in your action panel to power him up before starting the wave.",
       3: "Looking strong! Now, press 'START WAVE' to summon the training zombies!",
       4: "Superb work, rookie. You've mastered the basics of Blocky tactical defenses. Dismissed!"
@@ -686,10 +712,19 @@ export class GameUI {
 
     this.commanderText.textContent = messages[step] || "Awaiting operational instructions...";
 
+    if (this.btnCommanderSkip) {
+      if (step >= 0.5 && step < 4) {
+        this.btnCommanderSkip.style.display = 'block';
+      } else {
+        this.btnCommanderSkip.style.display = 'none';
+      }
+    }
+
     if (step === 4) {
       this.btnCommanderAction.textContent = "FINISH TUTORIAL ✓";
       this.btnCommanderAction.onclick = () => {
         this.game.tutorialCompleted = true;
+        this.game.tutorialActive = false; // Deactivate active session flag
         this.game.saveStatsToStorage();
         this.dismissTutorial(); 
       };
@@ -737,10 +772,21 @@ export class GameUI {
       }
     } 
     else if (step === 1.5) {
-      this.showPointerAtCanvasTile(2, 1); 
+      this.showPointerAtCanvasTile(2, 2); 
     }
     else if (step === 2) {
-      this.showPointerAtCanvasTile(2, 1); 
+      let scout = null;
+      for (const t of this.game.grid.towers.values()) {
+        if (t.type === 'scout') {
+          scout = t;
+          break;
+        }
+      }
+      if (scout) {
+        this.showPointerAtCanvasTile(scout.gridX, scout.gridY);
+      } else {
+        this.showPointerAtCanvasTile(2, 2);
+      }
     }
     else if (step === 2.5) {
       if (this.btnUpgrade) {
