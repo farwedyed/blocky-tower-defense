@@ -129,6 +129,7 @@ class Game {
     this.enemies = [];
     this.bullets = [];
     this.spawnQueue = [];
+    this.activeSpawners = []; // Simultaneous spawners handler
 
     this.grid = new Grid(800, 600, 40);
     this.effectManager = new EffectManager();
@@ -693,15 +694,10 @@ class Game {
       this.enemies = [];
       this.bullets = [];
       this.spawnQueue = [];
-      this.matchTime = 0;
-      this.skipVotes.clear();
-      
-      this.grid.clear();
-      this.effectManager.clear();
-      this.setSelectedPlacedTower(null);
+      this.activeSpawners = [];
 
       // Store a flag on whether we should run the tutorial session for this match
-      this.tutorialActive = !this.tutorialCompleted;
+      const runTutorialThisMatch = !this.tutorialCompleted;
 
       // Instantly mark the tutorial as completed and save to storage so it never reappears
       if (!this.tutorialCompleted) {
@@ -709,7 +705,7 @@ class Game {
         this.saveStatsToStorage();
       }
 
-      if (this.tutorialActive) {
+      if (runTutorialThisMatch) {
         this.selectedShopTower = null;
       } else {
         this.selectedShopTower = this.equippedAgents[0];
@@ -748,7 +744,7 @@ class Game {
       this.ui.updateWaveButton(false);
       this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
 
-      if (this.tutorialActive) {
+      if (runTutorialThisMatch) {
         this.tutorialStep = 0.5; // Start at click anywhere stage [4]
       }
     } catch (e) {
@@ -1018,6 +1014,26 @@ class Game {
     } else {
       this.gold += reward;
     }
+
+    // Harvest Farm payouts immediately upon skipping a wave
+    for (const agent of this.grid.towers.values()) {
+      if (agent.type === 'farm') {
+        const income = agent.getHarvestIncome();
+        const owner = agent.ownerId || 'p1';
+        
+        if (Network.mode === 'HOST') {
+          if (owner === 'p1') {
+            this.gold += income;
+            this.playerWallets['p1'] = this.gold;
+          } else {
+            this.playerWallets[owner] = (this.playerWallets[owner] || 0) + income;
+          }
+        } else {
+          this.gold += income;
+        }
+        this.effectManager.spawnText(agent.x, agent.y - 20, `+$${income}`, '#2ecc71');
+      }
+    }
     
     this.effectManager.spawnText(400, 260, `WAVE SKIPPED! +$${reward}`, '#e67e22');
     
@@ -1056,8 +1072,6 @@ class Game {
     else if (this.selectedDifficulty === 'fallen') blueprints = this.waveBlueprintsFallen;
 
     const blueprint = blueprints[this.wave - 1];
-    this.spawnInterval = blueprint.rate;
-
     const spawnList = [];
     for (let i = 0; i < (blueprint.runners || 0); i++) spawnList.push('runner');
     for (let i = 0; i < (blueprint.quicks || 0); i++) spawnList.push('quick');
@@ -1081,8 +1095,12 @@ class Game {
     for (let i = 0; i < (blueprint.kings || 0); i++) spawnList.push('fallen_king');
     for (let i = 0; i < (blueprint.reavers || 0); i++) spawnList.push('void_reaver');
 
-    this.spawnQueue = this.spawnQueue.concat(spawnList.sort(() => Math.random() - 0.5));
-    this.spawnTimer = 0;
+    // Register a concurrent, active spawner tracking this individual wave
+    this.activeSpawners.push({
+      queue: spawnList.sort(() => Math.random() - 0.5),
+      timer: 0,
+      interval: blueprint.rate
+    });
 
     this.effectManager.spawnText(400, 300, `WAVE ${this.wave}`, '#f1c40f');
 
@@ -1190,12 +1208,19 @@ class Game {
       }
     }
 
-    if (this.spawnQueue.length > 0 && !this.showMapDirections) {
-      this.spawnTimer += dt;
-      if (this.spawnTimer >= this.spawnInterval) {
-        this.spawnTimer = 0;
-        const nextType = this.spawnQueue.shift();
-        this.spawnZombie(nextType);
+    // Authoritative simultaneous multiple active spawners handling
+    if (!this.showMapDirections) {
+      for (let i = this.activeSpawners.length - 1; i >= 0; i--) {
+        const spawner = this.activeSpawners[i];
+        spawner.timer += dt;
+        if (spawner.timer >= spawner.interval) {
+          spawner.timer = 0;
+          const nextType = spawner.queue.shift();
+          this.spawnZombie(nextType);
+        }
+        if (spawner.queue.length === 0) {
+          this.activeSpawners.splice(i, 1);
+        }
       }
     }
 
@@ -1257,7 +1282,7 @@ class Game {
 
     this.effectManager.update(dt);
 
-    if (this.waveInProgress && this.enemies.length === 0 && this.spawnQueue.length === 0) {
+    if (this.waveInProgress && this.enemies.length === 0 && this.activeSpawners.length === 0) {
       this.waveInProgress = false;
 
       // Harvest Farm payouts
