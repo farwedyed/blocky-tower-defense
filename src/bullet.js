@@ -188,7 +188,7 @@ export class Rocket extends Bullet {
     this.damageType = 'explosive';
   }
 
-  update(enemies, effectManager, dt) {
+  update(effectManager, enemies, dt) { // Corrected parameter order
     let tx = this.target ? this.target.x : this.x;
     let ty = this.target ? this.target.y : this.y;
 
@@ -201,7 +201,7 @@ export class Rocket extends Bullet {
     const dist = Math.hypot(dx, dy);
 
     if (dist < 8 || (dx === 0 && dy === 0)) {
-      this.explode(enemies, effectManager);
+      this.explode(effectManager, enemies); // Corrected call order
       return true; 
     }
 
@@ -209,7 +209,7 @@ export class Rocket extends Bullet {
     if (dist <= step) {
       this.x = tx;
       this.y = ty;
-      this.explode(enemies, effectManager);
+      this.explode(effectManager, enemies); // Corrected call order
       return true; 
     } else {
       this.x += (dx / dist) * step;
@@ -223,7 +223,7 @@ export class Rocket extends Bullet {
     return false;
   }
 
-  explode(enemies, effectManager) {
+  explode(effectManager, enemies) { // Corrected parameter order
     effectManager.spawnExplosion(this.x, this.y, this.splashRadius);
     soundManager.playShoot();
 

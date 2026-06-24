@@ -1,7 +1,7 @@
 /* --- NETWORKING MODULE WITH CO-OP TOWER DEFENSE REPLICATION & HOST MIGRATION --- */
 
-import { Enemy, Runner, Quick, Slow, Hidden, Lead, Shadow, Goliath, Templar, GraveDigger, MoltenTitan, FallenGuardian, FallenKing, VoidReaver } from './enemy.js';
-import { Scout, Minigunner, Commander, DJUnit, Pyromancer, Farm, Gladiator, Soldier, Sniper, Medic, Rocketeer } from './tower.js';
+import { Enemy, Runner, Quick, Slow, Hidden, Lead, Shadow, Goliath, Templar, GraveDigger, MoltenTitan, FallenGuardian, FallenKing, VoidReaver, Brute, FrostSpirit } from './enemy.js';
+import { Scout, Minigunner, Commander, DJUnit, Pyromancer, Farm, Gladiator, Soldier, Sniper, Medic, Rocketeer, Demoman, Freezer, Shotgunner, CrookBoss, MilitaryBase, Ranger, Turret } from './tower.js';
 import { soundManager } from './sound.js';
 import { CrazyGamesManager } from './crazygames.js';
 
@@ -611,6 +611,13 @@ export const Network = {
                             case 'sniper': tower = new Sniper(tData.col, tData.row, size); break;
                             case 'medic': tower = new Medic(tData.col, tData.row, size); break;
                             case 'rocketeer': tower = new Rocketeer(tData.col, tData.row, size); break;
+                            case 'demoman': tower = new Demoman(tData.col, tData.row, size); break;
+                            case 'freezer': tower = new Freezer(tData.col, tData.row, size); break;
+                            case 'shotgunner': tower = new Shotgunner(tData.col, tData.row, size); break;
+                            case 'crook_boss': tower = new CrookBoss(tData.col, tData.row, size); break;
+                            case 'military_base': tower = new MilitaryBase(tData.col, tData.row, size); break;
+                            case 'ranger': tower = new Ranger(tData.col, tData.row, size); break;
+                            case 'turret': tower = new Turret(tData.col, tData.row, size); break;
                         }
                         if (tower) {
                             this.game.grid.towers.set(key, tower);
@@ -650,6 +657,8 @@ export const Network = {
                         case 'Fallen Guardian': return FallenGuardian;
                         case 'Fallen King': return FallenKing;
                         case 'Void Reaver': return VoidReaver;
+                        case 'Brute': return Brute;
+                        case 'Frost Spirit': return FrostSpirit;
                         default: return Runner;
                     }
                 };
