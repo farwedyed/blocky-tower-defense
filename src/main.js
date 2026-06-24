@@ -696,6 +696,10 @@ class Game {
       this.spawnQueue = [];
       this.activeSpawners = [];
 
+      // FIX: Clear the tower grid and active particles/visual effects from the previous match
+      this.grid.clear();
+      this.effectManager.clear();
+
       // Store a flag on whether we should run the tutorial session for this match
       const runTutorialThisMatch = !this.tutorialCompleted;
 
