@@ -1,5 +1,5 @@
 // src/crazygames.js
-// Corrected Wrapper Module for CrazyGames SDK v3 with Mute settings, accounts, and Video Ads
+// Defensive Wrapper Module for CrazyGames SDK v3 supporting robust offline/out-of-iframe execution
 
 import { soundManager } from './sound.js';
 
@@ -52,43 +52,52 @@ export const CrazyGamesManager = {
           }
         }
 
-        // 3. Register multiplayer room join listeners for players already in the page
-        this.sdk.game.addJoinRoomListener((inviteParams) => {
-          console.log('[CrazyGames] Room join triggered in-game:', inviteParams);
-          this.triggerRoomJoin(inviteParams);
-        });
-
-        // 4. Check if the game was opened directly from an invite link
-        const startupInviteParams = this.sdk.game.inviteParams;
-        if (startupInviteParams) {
-          console.log('[CrazyGames] Startup invite parameters detected:', startupInviteParams);
-          // Wait slightly for main.js and PeerJS to load before handling redirect
-          setTimeout(() => {
-            this.triggerRoomJoin(startupInviteParams);
-          }, 800);
+        // Register multiplayer room join listeners safely
+        try {
+          this.sdk.game.addJoinRoomListener((inviteParams) => {
+            console.log('[CrazyGames] Room join triggered in-game:', inviteParams);
+            this.triggerRoomJoin(inviteParams);
+          });
+        } catch (e) {
+          console.warn('[CrazyGames] Failed to add join room listener:', e);
         }
 
-        // 5. Setup Game Settings listener (Audio muting)
-        const applyMuteSetting = (settings) => {
-          if (settings && typeof settings.muteAudio === 'boolean') {
-            soundManager.setEnabled(!settings.muteAudio);
-            console.log('[CrazyGames] Audio system state sync. Muted:', settings.muteAudio);
+        // Check if the game was opened directly from an invite link safely
+        try {
+          const startupInviteParams = this.sdk.game.inviteParams;
+          if (startupInviteParams) {
+            console.log('[CrazyGames] Startup invite parameters detected:', startupInviteParams);
+            setTimeout(() => {
+              this.triggerRoomJoin(startupInviteParams);
+            }, 800);
           }
-        };
-
-        // Apply initial settings if available at startup
-        if (this.sdk.game.settings) {
-          applyMuteSetting(this.sdk.game.settings);
+        } catch (e) {
+          console.warn('[CrazyGames] Failed to read startup invite params:', e);
         }
 
-        // Listen for real-time muting changes
-        this.sdk.game.addSettingsChangeListener(applyMuteSetting);
+        // Setup Game Settings listener (Audio muting) safely
+        try {
+          const applyMuteSetting = (settings) => {
+            if (settings && typeof settings.muteAudio === 'boolean') {
+              soundManager.setEnabled(!settings.muteAudio);
+              console.log('[CrazyGames] Audio system state sync. Muted:', settings.muteAudio);
+            }
+          };
+
+          if (this.sdk.game.settings) {
+            applyMuteSetting(this.sdk.game.settings);
+          }
+
+          this.sdk.game.addSettingsChangeListener(applyMuteSetting);
+        } catch (e) {
+          console.warn('[CrazyGames] Failed to register audio settings listener:', e);
+        }
 
       } else {
         console.warn('[CrazyGames] SDK script is not available on window. Falling back.');
       }
     } catch (e) {
-      console.error('[CrazyGames] Initialization error:', e);
+      console.error('[CrazyGames] Initialization error caught gracefully:', e);
     }
   },
 
@@ -301,20 +310,32 @@ export const CrazyGamesManager = {
   // Track Gameplay active state for performance throttling
   gameplayStart: function() {
     if (this.sdk && this.isInitialized) {
-      this.sdk.game.gameplayStart();
+      try {
+        this.sdk.game.gameplayStart();
+      } catch (e) {
+        console.warn('[CrazyGames] gameplayStart failed caught gracefully:', e);
+      }
     }
   },
 
   gameplayStop: function() {
     if (this.sdk && this.isInitialized) {
-      this.sdk.game.gameplayStop();
+      try {
+        this.sdk.game.gameplayStop();
+      } catch (e) {
+        console.warn('[CrazyGames] gameplayStop failed caught gracefully:', e);
+      }
     }
   },
 
   // Trigger achievement confetti
   happytime: function() {
     if (this.sdk && this.isInitialized) {
-      this.sdk.game.happytime();
+      try {
+        this.sdk.game.happytime();
+      } catch (e) {
+        console.warn('[CrazyGames] happytime failed caught gracefully:', e);
+      }
     }
   }
 };
