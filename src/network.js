@@ -156,43 +156,56 @@ export const Network = {
 
             this.peer.on('connection', (c) => {
                 if (this.conns.length >= 7) {
-                    console.warn("Lobby connection refused: lobby is full (max 8 players).");
-                    setTimeout(() => {
-                        try { c.close(); } catch(e) {}
-                    }, 500);
-                    return;
+                    return; // Max squad size of 8 (1 host + 7 guests)
                 }
-                this.conns.push(c);
                 this.setupHostConnection(c);
             });
         }
     },
 
     interceptEffects: function() {
-        if (!this.game || !this.game.effectManager || this._effectsIntercepted) return;
+        if (this._effectsIntercepted || !this.game || !this.game.effectManager) return;
         this._effectsIntercepted = true;
 
         const em = this.game.effectManager;
+        const originalSparks = em.spawnPlacementSparks;
+        const originalImpact = em.spawnImpact;
+        const originalNote = em.spawnMusicNote;
+        const originalMuzzle = em.spawnMuzzleFlash;
+        const originalExplosion = em.spawnExplosion;
+        const originalSwing = em.spawnSwingArc;
+        const originalText = em.spawnText;
+
         const self = this;
 
-        const wrap = (methodName, type) => {
-            const original = em[methodName];
-            if (!original) return;
-            em[methodName] = function(...args) {
-                original.apply(this, args);
-                if (self.mode === 'HOST') {
-                    self.pendingEvents.push({ type, args });
-                }
-            };
+        em.spawnPlacementSparks = function(...args) {
+            originalSparks.apply(em, args);
+            if (self.mode === 'HOST') self.pendingEvents.push({ type: 'placementSparks', args });
         };
-
-        wrap('spawnPlacementSparks', 'placementSparks');
-        wrap('spawnImpact', 'impact');
-        wrap('spawnMusicNote', 'musicNote');
-        wrap('spawnMuzzleFlash', 'muzzleFlash');
-        wrap('spawnExplosion', 'explosion');
-        wrap('spawnSwingArc', 'swingArc');
-        wrap('spawnText', 'text');
+        em.spawnImpact = function(...args) {
+            originalImpact.apply(em, args);
+            if (self.mode === 'HOST') self.pendingEvents.push({ type: 'impact', args });
+        };
+        em.spawnMusicNote = function(...args) {
+            originalNote.apply(em, args);
+            if (self.mode === 'HOST') self.pendingEvents.push({ type: 'musicNote', args });
+        };
+        em.spawnMuzzleFlash = function(...args) {
+            originalMuzzle.apply(em, args);
+            if (self.mode === 'HOST') self.pendingEvents.push({ type: 'muzzleFlash', args });
+        };
+        em.spawnExplosion = function(...args) {
+            originalExplosion.apply(em, args);
+            if (self.mode === 'HOST') self.pendingEvents.push({ type: 'explosion', args });
+        };
+        em.spawnSwingArc = function(...args) {
+            originalSwing.apply(em, args);
+            if (self.mode === 'HOST') self.pendingEvents.push({ type: 'swingArc', args });
+        };
+        em.spawnText = function(...args) {
+            originalText.apply(em, args);
+            if (self.mode === 'HOST') self.pendingEvents.push({ type: 'text', args });
+        };
     },
 
     interceptSounds: function() {
@@ -204,7 +217,7 @@ export const Network = {
             const original = soundManager[methodName];
             if (!original) return;
             soundManager[methodName] = function(...args) {
-                original.apply(this, args);
+                original.apply(soundManager, args);
                 if (self.mode === 'HOST') {
                     self.pendingEvents.push({ type: 'sound', name: methodName, args });
                 }
@@ -293,7 +306,7 @@ export const Network = {
                 // Initialize starting cash pool and cursors
                 if (this.game) {
                     if (!this.game.playerWallets) this.game.playerWallets = {};
-                    this.game.playerWallets[c.playerId] = this.game.isHardcore ? 250 : 100;
+                    this.game.playerWallets[c.playerId] = this.game.isHardcore ? 250 : 600;
 
                     // Force Host UI redraw to show newly joined client
                     if (this.game.ui) {
@@ -348,8 +361,8 @@ export const Network = {
                     const wallet = this.game.playerWallets ? this.game.playerWallets[c.playerId] : this.game.gold;
                     
                     if (wallet >= cost && this.game.grid.isCellValidForPlacement(data.col, data.row)) {
-                        this.game.selectedShopTower = data.towerType;
-                        this.game.placeShopAgent(data.col, data.row, c.playerId);
+                        // FIX: Explicitly pass data.towerType to placeShopAgent to bypass Host selection hijacking!
+                        this.game.placeShopAgent(data.col, data.row, c.playerId, data.towerType);
                     }
                 }
             }

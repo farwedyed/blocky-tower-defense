@@ -120,7 +120,7 @@ class Game {
     };
     this.questRewarded = {
       kills: false,
-      cashSpent: false,
+      saveSpent: false,
       farmsPlaced: false
     };
 
@@ -442,7 +442,7 @@ class Game {
           type: 'PLACE_TOWER',
           col: col,
           row: row,
-          targetShopTower: this.selectedShopTower,
+          towerType: this.selectedShopTower,
           skin: activeSkin
         });
       } else {
@@ -581,59 +581,48 @@ class Game {
       return;
     }
 
+    // UPDATE: Filter only available unowned skins for the characters the player currently owns
+    const skinsList = ['Golden', 'Cyber', 'Hazmat'];
+    const availableUnownedSkins = [];
+
+    this.unlockedAgents.forEach(agent => {
+      skinsList.forEach(suffix => {
+        const skinName = `${agent}_${suffix}`;
+        if (!this.ownedSkins.includes(skinName)) {
+          availableUnownedSkins.push({ agent, skinName });
+        }
+      });
+    });
+
+    // Zero-waste refund if they have fully unlocked 100% of their roster's skins
+    if (availableUnownedSkins.length === 0) {
+      alert("⚠️ You already own all possible skins for your current squad! Recruit more characters from the Agent Shop first.");
+      return;
+    }
+
     this.playerCoins -= cost;
     this.saveStatsToStorage();
     this.ui.updateLobbyMeta(this.playerLevel, this.playerXp, this.playerCoins);
 
-    let chosenAgent = 'scout';
+    // Roll a random skin from the unowned eligible pool
+    const chosen = availableUnownedSkins[Math.floor(Math.random() * availableUnownedSkins.length)];
+    const chosenAgent = chosen.agent;
+    const revealedSkinName = chosen.skinName;
+
+    // Map visual rarity based on crate selection
     let chosenRarity = 'common';
-
     const roll = Math.random();
-
     if (crateType === 'basic') {
-      if (roll < 0.80) {
-        chosenRarity = 'common';
-        chosenAgent = Math.random() < 0.5 ? 'scout' : 'soldier';
-      } else {
-        chosenRarity = 'rare';
-        const subRoll = Math.random();
-        chosenAgent = subRoll < 0.33 ? 'gladiator' : (subRoll < 0.66 ? 'farm' : 'sniper');
-      }
+      chosenRarity = roll < 0.80 ? 'common' : 'rare';
     } else if (crateType === 'elite') {
-      if (roll < 0.60) {
-        chosenRarity = 'rare';
-        const subRoll = Math.random();
-        chosenAgent = subRoll < 0.33 ? 'pyromancer' : (subRoll < 0.66 ? 'farm' : 'sniper');
-      } else {
-        chosenRarity = 'epic';
-        chosenAgent = Math.random() < 0.5 ? 'commander' : 'medic';
-      }
+      chosenRarity = roll < 0.60 ? 'rare' : 'epic';
     } else if (crateType === 'deluxe') {
-      if (roll < 0.50) {
-        chosenRarity = 'epic';
-        chosenAgent = 'minigunner';
-      } else {
-        chosenRarity = 'legendary';
-        chosenAgent = Math.random() < 0.5 ? 'dj' : 'rocketeer';
-      }
+      chosenRarity = roll < 0.50 ? 'epic' : 'legendary';
     }
 
-    let revealedSkinName = null;
-    if (!this.unlockedAgents.includes(chosenAgent)) {
-      this.unlockedAgents.push(chosenAgent);
-      if (this.equippedAgents.length < 5 && !this.equippedAgents.includes(chosenAgent)) {
-        this.equippedAgents.push(chosenAgent);
-      }
-      this.saveStatsToStorage();
-    } else {
-      const skinsList = ['Golden', 'Cyber', 'Hazmat'];
-      const skinSuffix = skinsList[Math.floor(Math.random() * skinsList.length)];
-      revealedSkinName = `${chosenAgent}_${skinSuffix}`;
-      if (!this.ownedSkins.includes(revealedSkinName)) {
-        this.ownedSkins.push(revealedSkinName);
-        this.saveStatsToStorage();
-      }
-    }
+    // Award skin to player inventory
+    this.ownedSkins.push(revealedSkinName);
+    this.saveStatsToStorage();
 
     this.ui.startUnboxingAnimation(crateType, chosenAgent, chosenRarity, revealedSkinName);
   }
@@ -800,7 +789,11 @@ class Game {
     return baseVal;
   }
 
-  placeShopAgent(col, row, ownerId = 'p1') {
+  placeShopAgent(col, row, ownerId = 'p1', type = null) {
+    // FIX: Decouple from this.selectedShopTower so co-op placements do not scramble selections
+    const towerType = type || this.selectedShopTower;
+    if (!towerType) return;
+
     const totalPlacedTowers = this.grid.towers.size;
     const maxTowersAllowed = 40;
     if (totalPlacedTowers >= maxTowersAllowed) {
@@ -810,41 +803,41 @@ class Game {
 
     let currentPlacedOfTypeCount = 0;
     for (const t of this.grid.towers.values()) {
-      if (t.type === this.selectedShopTower) {
+      if (t.type === towerType) {
         currentPlacedOfTypeCount++;
       }
     }
 
-    if (this.selectedShopTower === 'farm' && currentPlacedOfTypeCount >= 8) {
+    if (towerType === 'farm' && currentPlacedOfTypeCount >= 8) {
       this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 8 FARMS)", '#e74c3c');
       return;
     }
-    if (this.selectedShopTower === 'commander' && currentPlacedOfTypeCount >= 3) {
+    if (towerType === 'commander' && currentPlacedOfTypeCount >= 3) {
       this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 3)", '#e74c3c');
       return;
     }
-    if (this.selectedShopTower === 'dj' && currentPlacedOfTypeCount >= 1) {
+    if (towerType === 'dj' && currentPlacedOfTypeCount >= 1) {
       this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 1 DJ)", '#e74c3c');
       return;
     }
-    if (this.selectedShopTower === 'medic' && currentPlacedOfTypeCount >= 3) {
+    if (towerType === 'medic' && currentPlacedOfTypeCount >= 3) {
       this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 3)", '#e74c3c');
       return;
     }
-    if (this.selectedShopTower === 'crook_boss' && currentPlacedOfTypeCount >= 4) {
+    if (towerType === 'crook_boss' && currentPlacedOfTypeCount >= 4) {
       this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 4)", '#e74c3c');
       return;
     }
-    if (this.selectedShopTower === 'turret' && currentPlacedOfTypeCount >= 5) {
+    if (towerType === 'turret' && currentPlacedOfTypeCount >= 5) {
       this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 5)", '#e74c3c');
       return;
     }
-    if (this.selectedShopTower === 'military_base' && currentPlacedOfTypeCount >= 5) {
+    if (towerType === 'military_base' && currentPlacedOfTypeCount >= 5) {
       this.effectManager.spawnText(col * this.grid.cellSize + this.grid.cellSize / 2, row * this.grid.cellSize + this.grid.cellSize / 2, "LIMIT (MAX 5)", '#e74c3c');
       return;
     }
 
-    const cost = this.getTowerCost(this.selectedShopTower);
+    const cost = this.getTowerCost(towerType);
     
     let wallet = 0;
     if (Network.mode === 'HOST') {
@@ -862,7 +855,7 @@ class Game {
       let newAgent;
       const size = this.grid.cellSize;
 
-      switch (this.selectedShopTower) {
+      switch (towerType) {
         case 'scout': newAgent = new Scout(col, row, size); break;
         case 'minigunner': newAgent = new Minigunner(col, row, size); break;
         case 'commander': newAgent = new Commander(col, row, size); break;
@@ -884,7 +877,7 @@ class Game {
       }
 
       if (newAgent) {
-        newAgent.equippedSkin = this.equippedSkins[this.selectedShopTower] || 'default';
+        newAgent.equippedSkin = this.equippedSkins[towerType] || 'default';
         newAgent.ownerId = ownerId; 
         this.grid.placeTower(col, row, newAgent);
         
@@ -900,7 +893,7 @@ class Game {
         }
         soundManager.playPlace();
 
-        if (this.selectedShopTower === 'farm') {
+        if (towerType === 'farm') {
           this.questProgress.farmsPlaced++;
         }
         this.questProgress.cashSpent += cost;
@@ -1224,10 +1217,20 @@ class Game {
 
       if (zombie.health <= 0) {
         const reward = zombie.goldReward || 10;
-        this.gold += reward;
-        if (this.playerWallets) {
-          this.playerWallets['p1'] = (this.playerWallets['p1'] || 0) + reward;
+        
+        // UPDATE: Credit zombie kill rewards to all connected co-op player wallets simultaneously
+        if (Network.mode === 'HOST' && this.playerWallets) {
+          this.gold += reward;
+          this.playerWallets['p1'] = this.gold;
+          for (const pId of Object.keys(this.playerWallets)) {
+            if (pId !== 'p1') {
+              this.playerWallets[pId] = (this.playerWallets[pId] || 0) + reward;
+            }
+          }
+        } else {
+          this.gold += reward;
         }
+
         this.effectManager.spawnText(zombie.x, zombie.y - 10, `+$${reward}`, '#f1c40f');
         this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
 
