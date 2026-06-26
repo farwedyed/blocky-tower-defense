@@ -1,14 +1,52 @@
+// src/main.js
 // Main Orchestration Module for Blocky TDS 2D
 
 import { Grid } from './grid.js';
 import { UI } from './ui.js';
 import { EffectManager } from './particle.js';
-import { Enemy, Runner, Quick, Slow, Hidden, Lead, Shadow, Goliath, Templar, GraveDigger, HazardGiant, MoltenTitan, FallenGuardian, FallenKing, VoidReaver, Brute } from './enemy.js';
-import { Scout, Minigunner, Commander, DJUnit, Pyromancer, Farm, Gladiator, Soldier, Sniper, Medic, Rocketeer, Demoman, Freezer, Shotgunner, CrookBoss, MilitaryBase, Ranger, Turret } from './tower.js';
+import { 
+  Enemy, 
+  Runner, 
+  Quick, 
+  Slow, 
+  Hidden, 
+  Lead, 
+  Shadow, 
+  Goliath, 
+  Templar, 
+  GraveDigger, 
+  MoltenTitan, 
+  FallenGuardian, 
+  FallenKing, 
+  VoidReaver, 
+  Brute,
+  HazardGiant
+} from './enemy.js';
+import { 
+  Scout, 
+  Minigunner, 
+  Commander, 
+  DJUnit, 
+  Pyromancer, 
+  Farm, 
+  Gladiator, 
+  Soldier, 
+  Sniper, 
+  Medic, 
+  Rocketeer, 
+  Demoman, 
+  Freezer, 
+  Shotgunner, 
+  CrookBoss, 
+  MilitaryBase, 
+  Ranger, 
+  Turret 
+} from './tower.js';
 import { soundManager } from './sound.js';
 import { uploadRecord, fetchTopRecords } from './firebase.js';
 import { Network } from './network.js';
 import { CrazyGamesManager } from './crazygames.js';
+import { initWaveData } from './waves.js';
 
 window.lobbyPlayers = window.lobbyPlayers || { p1: "Host Survivor", p2: "", p3: "", p4: "", p5: "", p6: "", p7: "", p8: "" };
 window.myPlayerId = window.myPlayerId || "p1";
@@ -118,7 +156,7 @@ class Game {
     this.autoStartTimer = 0;
     this.showMapDirections = true;
 
-    // Interactive mouse positioning trackers (Restored)
+    // Interactive mouse positioning trackers
     this.mousePos = { x: -1, y: -1 };
     this.mouseGrid = { col: -1, row: -1 };
     this.isMouseOnCanvas = false;
@@ -135,14 +173,18 @@ class Game {
     this.effectManager = new EffectManager();
     this.ui = new UI(this);
 
-    // Initialize WebRTC Signaling Network
-    Network.init(this, (peerId) => {
-      console.log("[Signal] established Peer ID room link:", peerId);
-    });
+    // Initialize WebRTC Signaling Network Safely (Adblocker Guard)
+    if (typeof Network !== 'undefined' && typeof Peer !== 'undefined') {
+      Network.init(this, (peerId) => {
+        console.log("[Signal] established Peer ID room link:", peerId);
+      });
+    } else {
+      console.warn("[Network] Offline mode forced on start: network SDK missing or blocked.");
+    }
 
     this.lastTime = 0;
 
-    this.initWaveData();
+    this.initWaveBlueprints();
     this.initEventListeners();
     
     // Sync Lobby displays immediately
@@ -229,7 +271,7 @@ class Game {
         this.tutorialActive = false;
       } else {
         this.tutorialCompleted = false;
-        this.tutorialActive = false;
+        this.tutorialActive = true; // Guide them inside the session!
       }
       if (leaderboard) {
         const parsed = JSON.parse(leaderboard);
@@ -354,81 +396,13 @@ class Game {
     }).catch(e => console.warn('[Leaderboard] Sync error:', e));
   }
 
-  initWaveData() {
-    this.waveBlueprintsEasy = this.generateWaves(30, 'easy');
-    this.waveBlueprintsCasual = this.generateWaves(35, 'casual');
-    this.waveBlueprintsIntermediate = this.generateWaves(40, 'intermediate');
-    this.waveBlueprintsMolten = this.generateWaves(40, 'molten');
-    this.waveBlueprintsFallen = this.generateWaves(40, 'fallen');
-  }
-
-  generateWaves(count, difficulty) {
-    const waves = [];
-    for (let w = 1; w <= count; w++) {
-      const isBossWave = (w === count);
-
-      // Early game variety: waves 1-10 match Roblox TDS wave configurations
-      if (w === 1) {
-        waves.push({ runners: 4, quicks: 0, slows: 0, hiddens: 0, rate: 2.0 });
-        continue;
-      }
-      if (w === 2) {
-        waves.push({ runners: 8, quicks: 0, slows: 0, hiddens: 0, rate: 1.8 });
-        continue;
-      }
-      if (w === 3) {
-        waves.push({ runners: 10, quicks: 4, slows: 0, hiddens: 0, rate: 1.5 }); 
-        continue;
-      }
-      if (w === 4) {
-        waves.push({ runners: 12, quicks: 6, slows: 0, hiddens: 0, rate: 1.4 });
-        continue;
-      }
-      if (w === 5) {
-        waves.push({ runners: 8, quicks: 4, slows: 2, hiddens: 0, rate: 1.4 }); 
-        continue;
-      }
-      if (w === 6) {
-        waves.push({ runners: 0, quicks: 10, slows: 4, hiddens: 0, rate: 1.3 });
-        continue;
-      }
-      if (w === 7) {
-        waves.push({ goliaths: 1, quicks: 6, slows: 2, hiddens: 0, rate: 1.2 }); 
-        continue;
-      }
-      if (w === 8) {
-        waves.push({ runners: 12, quicks: 8, slows: 4, hiddens: 0, rate: 1.1 });
-        continue;
-      }
-      if (w === 9) {
-        waves.push({ goliaths: 1, quicks: 15, slows: 6, hiddens: 0, rate: 1.0 });
-        continue;
-      }
-      if (w === 10) {
-        waves.push({ quicks: 10, slows: 6, hiddens: 4, rate: 1.0 }); 
-        continue;
-      }
-
-      // Beyond Wave 10, scale up dynamically across all modes
-      waves.push({
-        runners: isBossWave ? 15 : 8 + w * 2,
-        quicks: isBossWave ? 15 : Math.max(0, w - 5) * 1.5,
-        slows: isBossWave ? 10 : Math.max(0, w - 8) * 1.2,
-        hiddens: Math.round(Math.max(0, w - 9) * 0.8), 
-        leads: Math.round(Math.max(0, w - 11) * 0.6),   
-        shadows: (difficulty === 'fallen') ? Math.max(0, w - 20) * 0.5 : 0,
-        goliaths: Math.round(Math.max(0, w - 13) * 0.4), 
-        templars: (difficulty === 'fallen') ? Math.max(0, w - 25) * 0.2 : 0,
-        brute: (isBossWave && difficulty === 'easy') ? 1 : 0,
-        diggers: (isBossWave && difficulty === 'casual') ? 1 : 0,
-        hazard_giants: (isBossWave && difficulty === 'intermediate') ? 1 : 0,
-        titans: (isBossWave && difficulty === 'molten') ? 1 : 0,
-        kings: (isBossWave && difficulty === 'fallen') ? 1 : 0,
-        reavers: (isBossWave && difficulty === 'fallen') ? 1 : 0,
-        rate: Math.max(0.4, 1.6 - w * 0.03)
-      });
-    }
-    return waves;
+  initWaveBlueprints() {
+    const data = initWaveData();
+    this.waveBlueprintsEasy = data.waveBlueprintsEasy;
+    this.waveBlueprintsCasual = data.waveBlueprintsCasual;
+    this.waveBlueprintsIntermediate = data.waveBlueprintsIntermediate;
+    this.waveBlueprintsMolten = data.waveBlueprintsMolten;
+    this.waveBlueprintsFallen = data.waveBlueprintsFallen;
   }
 
   _getCanvasCoords(clientX, clientY) {
@@ -446,7 +420,7 @@ class Game {
     if (this.showMapDirections) {
       this.showMapDirections = false;
       
-      // Directions cleared: Transition to Step 1 tutorial (Prompt to Equip Scout) [4]
+      // Directions cleared: Transition to Step 1 tutorial (Prompt to Equip Scout)
       if (this.tutorialActive && this.tutorialStep === 0.5) {
         this.tutorialStep = 1;
         this.ui.showTutorialHint(1);
@@ -468,7 +442,7 @@ class Game {
           type: 'PLACE_TOWER',
           col: col,
           row: row,
-          towerType: this.selectedShopTower,
+          targetShopTower: this.selectedShopTower,
           skin: activeSkin
         });
       } else {
@@ -529,8 +503,17 @@ class Game {
       this.mouseGrid = this.grid.pixelToGrid(x, y);
     }, { passive: false });
 
+    // Explicitly parse changedTouches on release to get highly accurate mobile landscape clicks
     this.canvas.addEventListener('touchend', (e) => {
       e.preventDefault();
+      const touch = e.changedTouches[0];
+      if (touch) {
+        const { x, y } = this._getCanvasCoords(touch.clientX, touch.clientY);
+        this.mousePos.x = x;
+        this.mousePos.y = y;
+        this.mouseGrid = this.grid.pixelToGrid(x, y);
+        this.isMouseOnCanvas = true;
+      }
       this._handleGridInteraction();
       setTimeout(() => {
         this.isMouseOnCanvas = false;
@@ -546,7 +529,7 @@ class Game {
   setSelectedShopTower(type) {
     this.selectedShopTower = type;
     
-    // Scout button clicked: Transition immediately to Step 1.5 (Point to highlighted tile (2,2)) [4]
+    // Scout button clicked: Transition immediately to Step 1.5
     if (this.tutorialActive && this.tutorialStep === 1 && type === 'scout') {
       this.tutorialStep = 1.5;
       this.ui.showTutorialHint(1.5);
@@ -557,7 +540,7 @@ class Game {
     this.selectedPlacedTower = agent;
     this.ui.updateSelectionPanel(agent);
 
-    // Scout selected on field: Transition to Step 2.5 (Point to Upgrade button) [4]
+    // Scout selected on field: Transition to Step 2.5 (Point to Upgrade button)
     if (this.tutorialActive && this.tutorialStep === 2) {
       if (agent && agent.type === 'scout') {
         this.tutorialStep = 2.5;
@@ -675,6 +658,7 @@ class Game {
     try {
       this.state = 'playing';
       this.showMapDirections = true;
+      this.autoStartTimer = 0; // Fixes re-matched auto countdown freezes
       
       this.grid.selectMap(this.selectedMap);
       
@@ -696,22 +680,23 @@ class Game {
       this.spawnQueue = [];
       this.activeSpawners = [];
 
-      // FIX: Clear the tower grid and active particles/visual effects from the previous match
       this.grid.clear();
       this.effectManager.clear();
 
       // Store a flag on whether we should run the tutorial session for this match
       const runTutorialThisMatch = !this.tutorialCompleted;
 
-      // Instantly mark the tutorial as completed and save to storage so it never reappears
-      if (!this.tutorialCompleted) {
+      // UPDATE: Mark the tutorial as completed instantly in storage so that if they 
+      // refresh, leave, or play again, it never triggers a second time.
+      if (runTutorialThisMatch) {
+        this.tutorialActive = true;
+        this.tutorialStep = 0.5; // Start at click anywhere stage
+        this.selectedShopTower = null;
+
         this.tutorialCompleted = true;
         this.saveStatsToStorage();
-      }
-
-      if (runTutorialThisMatch) {
-        this.selectedShopTower = null;
       } else {
+        this.tutorialActive = false;
         this.selectedShopTower = this.equippedAgents[0];
       }
 
@@ -749,7 +734,7 @@ class Game {
       this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
 
       if (runTutorialThisMatch) {
-        this.tutorialStep = 0.5; // Start at click anywhere stage [4]
+        this.tutorialStep = 0.5; // Start at click anywhere stage
       }
     } catch (e) {
       console.error("Defensive Guard: Error caught in deployToMatch():", e);
@@ -757,6 +742,7 @@ class Game {
   }
 
   quitToLobby() {
+    this.tutorialActive = false; // UPDATE: Explicitly clear the active gameplay tutorial state on return
     CrazyGamesManager.requestMidgameAd(() => {
       this.state = 'lobby';
       this.ui.showLobbyLayout();
@@ -815,8 +801,6 @@ class Game {
   }
 
   placeShopAgent(col, row, ownerId = 'p1') {
-    // Removed strict tutorial tile locks during the tutorial phase to give players full freedom.
-
     const totalPlacedTowers = this.grid.towers.size;
     const maxTowersAllowed = 40;
     if (totalPlacedTowers >= maxTowersAllowed) {
@@ -922,7 +906,7 @@ class Game {
         this.questProgress.cashSpent += cost;
         this.checkQuestCompletion();
 
-        // Placed Scout: Transition to Step 2 (Prompt select placed Scout) [4]
+        // Placed Scout: Transition to Step 2 (Prompt select placed Scout)
         if (this.tutorialActive && this.tutorialStep === 1.5) {
           this.tutorialStep = 2;
           this.ui.showTutorialHint(2);
@@ -955,7 +939,7 @@ class Game {
         this.ui.updateSelectionPanel(this.selectedPlacedTower);
         this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
 
-        // Scout Upgraded First: Transition to Step 2.5 (Point to Upgrade button) [4]
+        // Scout Upgraded First: Transition to Step 2.5 (Point to Upgrade button)
         if (this.tutorialActive && this.tutorialStep === 2.5) {
           this.tutorialStep = 3;
           this.ui.showTutorialHint(3);
@@ -1041,7 +1025,7 @@ class Game {
     
     this.effectManager.spawnText(400, 260, `WAVE SKIPPED! +$${reward}`, '#e67e22');
     
-    this.skipCooldown = 15.0; // 15-second skip cooldown to prevent spam skips [4]
+    this.skipCooldown = 15.0; // 15-second skip cooldown to prevent spam skips
     
     this.waveInProgress = false;
     this.startNextWave(true); 
@@ -1099,7 +1083,7 @@ class Game {
     for (let i = 0; i < (blueprint.kings || 0); i++) spawnList.push('fallen_king');
     for (let i = 0; i < (blueprint.reavers || 0); i++) spawnList.push('void_reaver');
 
-    // Register a concurrent, active spawner tracking this individual wave
+    // Register a spawner
     this.activeSpawners.push({
       queue: spawnList.sort(() => Math.random() - 0.5),
       timer: 0,
@@ -1108,7 +1092,7 @@ class Game {
 
     this.effectManager.spawnText(400, 300, `WAVE ${this.wave}`, '#f1c40f');
 
-    // Wave Started: Transition to Step 4 (Finish dialogue) [4]
+    // Wave Started: Transition to Step 4
     if (this.tutorialActive && this.tutorialStep === 3) {
       this.tutorialStep = 4;
       this.ui.showTutorialHint(4);
@@ -1144,12 +1128,12 @@ class Game {
     const dt = Math.min(0.1, (timestamp - this.lastTime) / 1000.0) * this.speedMultiplier;
     this.lastTime = timestamp;
 
-    if (this.state === 'playing') {
+    // LOBBY RENDERING BYPASS OPTIMIZATION: Only draw if actively inside a match scenario
+    if (this.state === 'playing' || this.state === 'victory' || this.state === 'gameover') {
       this.matchTime += dt;
       this.update(dt);
+      this.draw(); 
     }
-    
-    this.draw();
 
     requestAnimationFrame((t) => this.loop(t));
   }
@@ -1196,7 +1180,7 @@ class Game {
       return; 
     }
 
-    // Authoritative Host Broadcast Frame Trigger (Solves Co-op Sync completely)
+    // Authoritative Host Broadcast Frame Trigger
     if (Network.mode === 'HOST') {
       Network.broadcastState();
     }
@@ -1452,7 +1436,7 @@ class Game {
     this.ctx.save();
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    if (this.state === 'playing') {
+    if (this.state === 'playing' || this.state === 'victory' || this.state === 'gameover') {
       this.effectManager.screenShake.apply(this.ctx);
       this.grid.draw(this.ctx);
 
@@ -1590,7 +1574,7 @@ class Game {
   drawTutorialCanvasHighlight(ctx) {
     const cellSize = this.grid.cellSize;
     const targetX = 2 * cellSize + cellSize / 2;
-    const targetY = 2 * cellSize + cellSize / 2; // changed from 1 to 2
+    const targetY = 2 * cellSize + cellSize / 2; 
     
     const bounce = Math.sin(Date.now() / 150) * 8;
     
@@ -1620,7 +1604,7 @@ class Game {
     ctx.lineTo(0, -cellSize / 2 + 2 + bounce);
     ctx.lineTo(-14, -cellSize / 2 - 8 + bounce);
     ctx.lineTo(-8, -cellSize / 2 - 8 + bounce);
-    this.ctx.closePath();
+    ctx.closePath();
     ctx.fill();
     ctx.stroke();
     
@@ -1717,9 +1701,9 @@ class Game {
   }
 
   drawPlayerCursors() {
-    if (Network.mode === 'OFFLINE') return;
+    if (Network.mode === 'OFFLINE' || !window.playerCursors) return;
 
-    for (const [pId, cursor] of Object.entries(window.playerCursors || {})) {
+    for (const [pId, cursor] of Object.entries(window.playerCursors)) {
       if (pId === window.myPlayerId) continue; 
       if (!cursor || cursor.mouseX === undefined) continue;
 

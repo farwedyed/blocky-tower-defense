@@ -39,6 +39,13 @@ export const Network = {
         this._effectsIntercepted = false;
         this._soundsIntercepted = false;
 
+        // Graceful adblocker safeguard for PeerJS CDN failures
+        if (typeof Peer === 'undefined') {
+            console.warn("[Network] PeerJS SDK failed to load or was blocked by an adblocker. Running in offline fallback.");
+            this.mode = 'OFFLINE';
+            return;
+        }
+
         // Try to intercept systems early
         this.interceptEffects();
         this.interceptSounds();
@@ -59,98 +66,106 @@ export const Network = {
         // Generate a clean, native 6-character ID so connections can be made using simple room codes
         const cleanShortId = Math.random().toString(36).substring(2, 8).toLowerCase();
 
-        this.peer = new Peer(cleanShortId, { 
-            host: 'farwedd-zombie-dombie-server.hf.space',
-            port: 443,
-            path: '/peerjs/myapp',
-            secure: true,
-            debug: 1,
-            config: {
-                iceServers: [
-                    // --- STUN SERVERS ---
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:global.stun.twilio.com:3478' },
-                    { urls: 'stun:stun.relay.metered.ca:80' },
-                    { urls: 'stun:free.expressturn.com:3478' },
-                    
-                    // --- METERED.CA TURN SERVERS ---
-                    { 
-                        urls: 'turn:standard.relay.metered.ca:80', 
-                        username: METERED_USER, 
-                        credential: METERED_PASS 
-                    },
-                    { 
-                        urls: 'turn:standard.relay.metered.ca:80?transport=tcp', 
-                        username: METERED_USER, 
-                        credential: METERED_PASS 
-                    },
-                    { 
-                        urls: 'turn:standard.relay.metered.ca:443', 
-                        username: METERED_USER, 
-                        credential: METERED_PASS 
-                    },
-                    { 
-                        urls: 'turns:standard.relay.metered.ca:443?transport=tcp', 
-                        username: METERED_USER, 
-                        credential: METERED_PASS 
-                    },
+        try {
+            this.peer = new Peer(cleanShortId, { 
+                host: 'farwedd-zombie-dombie-server.hf.space',
+                port: 443,
+                path: '/peerjs/myapp',
+                secure: true,
+                debug: 1,
+                config: {
+                    iceServers: [
+                        // --- STUN SERVERS ---
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:global.stun.twilio.com:3478' },
+                        { urls: 'stun:stun.relay.metered.ca:80' },
+                        { urls: 'stun:free.expressturn.com:3478' },
+                        
+                        // --- METERED.CA TURN SERVERS ---
+                        { 
+                            urls: 'turn:standard.relay.metered.ca:80', 
+                            username: METERED_USER, 
+                            credential: METERED_PASS 
+                        },
+                        { 
+                            urls: 'turn:standard.relay.metered.ca:80?transport=tcp', 
+                            username: METERED_USER, 
+                            credential: METERED_PASS 
+                        },
+                        { 
+                            urls: 'turn:standard.relay.metered.ca:443', 
+                            username: METERED_USER, 
+                            credential: METERED_PASS 
+                        },
+                        { 
+                            urls: 'turns:standard.relay.metered.ca:443?transport=tcp', 
+                            username: METERED_USER, 
+                            credential: METERED_PASS 
+                        },
 
-                    // --- METERED.CA OPEN RELAY PROJECT ---
-                    { 
-                        urls: 'turn:openrelay.metered.ca:80', 
-                        username: 'openrelayproject', 
-                        credential: 'openrelayproject' 
-                    },
-                    { 
-                        urls: 'turn:openrelay.metered.ca:443', 
-                        username: 'openrelayproject', 
-                        credential: 'openrelayproject' 
-                    },
-                    { 
-                        urls: 'turns:openrelay.metered.ca:443?transport=tcp', 
-                        username: 'openrelayproject', 
-                        credential: 'openrelayproject' 
-                    },
+                        // --- METERED.CA OPEN RELAY PROJECT ---
+                        { 
+                            urls: 'turn:openrelay.metered.ca:80', 
+                            username: 'openrelayproject', 
+                            credential: 'openrelayproject' 
+                        },
+                        { 
+                            urls: 'turn:openrelay.metered.ca:443', 
+                            username: 'openrelayproject', 
+                            credential: 'openrelayproject' 
+                        },
+                        { 
+                            urls: 'turns:openrelay.metered.ca:443?transport=tcp', 
+                            username: 'openrelayproject', 
+                            credential: 'openrelayproject' 
+                        },
 
-                    // --- EXPRESSTURN FREE TIER ---
-                    { 
-                        urls: 'turn:free.expressturn.com:3478', 
-                        username: EXPRESSTURN_USER, 
-                        credential: EXPRESSTURN_PASS 
-                    },
-                    { 
-                        urls: 'turn:free.expressturn.com:3478?transport=tcp', 
-                        username: EXPRESSTURN_USER, 
-                        credential: EXPRESSTURN_PASS 
-                    }
-                ]
-            }
-        });
+                        // --- EXPRESSTURN FREE TIER ---
+                        { 
+                            urls: 'turn:free.expressturn.com:3478', 
+                            username: EXPRESSTURN_USER, 
+                            credential: EXPRESSTURN_PASS 
+                        },
+                        { 
+                            urls: 'turn:free.expressturn.com:3478?transport=tcp', 
+                            username: EXPRESSTURN_USER, 
+                            credential: EXPRESSTURN_PASS 
+                        }
+                    ]
+                }
+            });
+        } catch (err) {
+            console.error("[Network] Failed to initialize Peer connection:", err);
+            this.mode = 'OFFLINE';
+            return;
+        }
 
         // Global Signaling Error Boundary
-        this.peer.on('error', (err) => {
-            console.warn("PeerJS global error caught gracefully:", err);
-        });
+        if (this.peer) {
+            this.peer.on('error', (err) => {
+                console.warn("PeerJS global error caught gracefully:", err);
+            });
 
-        this.peer.on('open', (id) => { 
-            this.peerIds[window.myPlayerId] = id;
-            onOpen(id); 
+            this.peer.on('open', (id) => { 
+                this.peerIds[window.myPlayerId] = id;
+                if (onOpen) onOpen(id); 
 
-            // Sync host room state to CrazyGames safely using our dedicated manager
-            CrazyGamesManager.updateRoomPresence(id.toLowerCase(), true);
-        });
+                // Sync host room state to CrazyGames safely using our dedicated manager
+                CrazyGamesManager.updateRoomPresence(id.toLowerCase(), true);
+            });
 
-        this.peer.on('connection', (c) => {
-            if (this.conns.length >= 7) {
-                console.warn("Lobby connection refused: lobby is full (max 8 players).");
-                setTimeout(() => {
-                    try { c.close(); } catch(e) {}
-                }, 500);
-                return;
-            }
-            this.conns.push(c);
-            this.setupHostConnection(c);
-        });
+            this.peer.on('connection', (c) => {
+                if (this.conns.length >= 7) {
+                    console.warn("Lobby connection refused: lobby is full (max 8 players).");
+                    setTimeout(() => {
+                        try { c.close(); } catch(e) {}
+                    }, 500);
+                    return;
+                }
+                this.conns.push(c);
+                this.setupHostConnection(c);
+            });
+        }
     },
 
     interceptEffects: function() {
@@ -207,11 +222,22 @@ export const Network = {
     },
 
     join: function(hostId, playerName, onConnected) {
+        if (typeof Peer === 'undefined' || !this.peer) {
+            this.handleDisconnectFallback("⚠️ Multiplayer is unavailable because the network SDK was blocked by an adblocker.");
+            return;
+        }
+
         this.mode = 'CLIENT';
-        this.conn = this.peer.connect(hostId, {
-            reliable: true,
-            serialization: 'json'
-        });
+        try {
+            this.conn = this.peer.connect(hostId, {
+                reliable: true,
+                serialization: 'json'
+            });
+        } catch (err) {
+            console.error("[Network] Failed to connect to host:", err);
+            this.handleDisconnectFallback("⚠️ Failed to initiate connection.");
+            return;
+        }
 
         this.conn.on('error', (err) => {
             console.warn("Client data channel error caught gracefully:", err);
@@ -423,12 +449,16 @@ export const Network = {
 
         if (!this.game || this.game.state === 'lobby') return;
 
-        // Pack the Host's own cursor into playerCursors['p1'] before sending so clients can see it
+        // Defensive guard to ensure game components are available before packaging state
+        const equippedSkin = (this.game.equippedSkins && this.game.selectedShopTower) 
+            ? (this.game.equippedSkins[this.game.selectedShopTower] || 'default') 
+            : 'default';
+
         window.playerCursors['p1'] = {
-            mouseX: this.game.mousePos.x,
-            mouseY: this.game.mousePos.y,
-            selectedShopTower: this.game.selectedShopTower,
-            equippedSkin: this.game.equippedSkins[this.game.selectedShopTower] || 'default'
+            mouseX: this.game.mousePos ? this.game.mousePos.x : 0,
+            mouseY: this.game.mousePos ? this.game.mousePos.y : 0,
+            selectedShopTower: this.game.selectedShopTower || null,
+            equippedSkin: equippedSkin
         };
 
         // Authoritative Co-op State Payload
@@ -886,10 +916,12 @@ export const Network = {
             try {
                 this.conn.send({
                     type: 'P_DATA',
-                    mouseX: this.game.mousePos.x,
-                    mouseY: this.game.mousePos.y,
-                    selectedShopTower: this.game.selectedShopTower,
-                    equippedSkin: this.game.equippedSkins[this.game.selectedShopTower] || 'default'
+                    mouseX: this.game.mousePos ? this.game.mousePos.x : 0,
+                    mouseY: this.game.mousePos ? this.game.mousePos.y : 0,
+                    selectedShopTower: this.game.selectedShopTower || null,
+                    equippedSkin: (this.game.equippedSkins && this.game.selectedShopTower) 
+                        ? (this.game.equippedSkins[this.game.selectedShopTower] || 'default') 
+                        : 'default'
                 });
             } catch (e) {
                 console.warn("Failed to send client cursor state:", e);

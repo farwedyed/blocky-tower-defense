@@ -293,6 +293,11 @@ export class EffectManager {
   }
 
   update(dt) {
+    // CAP ACTIVE PARTICLES: Prevents garbage collection stutter/tab-crash on mobile
+    if (this.particles.length > 150) {
+      this.particles.splice(0, this.particles.length - 150);
+    }
+
     for (let i = this.particles.length - 1; i >= 0; i--) {
       this.particles[i].update(dt);
       if (this.particles[i].life <= 0) {

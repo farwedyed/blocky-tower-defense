@@ -97,11 +97,6 @@ export class Grid {
       this.rows = 15;
     }
     
-    // Adjust checkpoints if needed. Let's make sure checkpoints on paths match boundary limits.
-    // grassland/desert/tundra/fallen_outpost end col is 20 (fits cols=20 and 25).
-    // Cyber city path ends on col 20. If cols=25, end point should adjust or map is drawn centered/correctly.
-    // Standard path checkpoints use cols coordinate relative to cell size.
-    // Let's force any coordinate matching col: 20 or row: 14 to adapt, but paths are already col/row based.
     this.pathCheckpoints = this.paths[mapId] || this.paths.grassland;
 
     // Adjust any path coordinate that goes outside bounds
@@ -124,7 +119,8 @@ export class Grid {
   // Generate continuous pixel points along center of path
   generatePixelPath() {
     const points = [];
-    for (const checkpoint of this.pathCheckpoints) {
+    const checkpoints = this.pathCheckpoints || [];
+    for (const checkpoint of checkpoints) {
       points.push({
         x: checkpoint.col * this.cellSize + this.cellSize / 2,
         y: checkpoint.row * this.cellSize + this.cellSize / 2
@@ -136,9 +132,10 @@ export class Grid {
   // Calculate grid coordinates of the path
   calculatePathTiles() {
     const tiles = new Set();
-    for (let i = 0; i < this.pathCheckpoints.length - 1; i++) {
-      const start = this.pathCheckpoints[i];
-      const end = this.pathCheckpoints[i + 1];
+    const checkpoints = this.pathCheckpoints || [];
+    for (let i = 0; i < checkpoints.length - 1; i++) {
+      const start = checkpoints[i];
+      const end = checkpoints[i + 1];
 
       const minCol = Math.min(start.col, end.col);
       const maxCol = Math.max(start.col, end.col);
@@ -170,7 +167,7 @@ export class Grid {
         key = `${col},${row}`;
         attempts++;
       } while (
-        (this.pathTiles.has(key) || 
+        (this.pathTiles && this.pathTiles.has(key) || 
          this.hasObstacleNear(col, row) || 
          (col === 2 && row === 2)) && // Explicitly exclude tutorial placement tile (2, 2)
         attempts < 100
@@ -199,6 +196,7 @@ export class Grid {
   }
 
   hasObstacleNear(col, row) {
+    if (!this.obstacles) return false;
     return this.obstacles.some(obs => Math.abs(obs.col - col) <= 1 && Math.abs(obs.row - row) <= 1);
   }
 
@@ -213,35 +211,44 @@ export class Grid {
       return false;
     }
     // Check if cell is path
-    if (this.pathTiles.has(`${col},${row}`)) {
+    if (this.pathTiles && this.pathTiles.has(`${col},${row}`)) {
       return false;
     }
     // Check if tower occupies it
-    if (this.towers.has(`${col},${row}`)) {
+    if (this.towers && this.towers.has(`${col},${row}`)) {
       return false;
     }
     // Check if background obstacles occupy it
-    const hasObstacle = this.obstacles.some(o => o.col === col && o.row === row);
-    if (hasObstacle) {
-      return false;
+    if (this.obstacles) {
+      const hasObstacle = this.obstacles.some(o => o.col === col && o.row === row);
+      if (hasObstacle) {
+        return false;
+      }
     }
     return true;
   }
 
   placeTower(col, row, tower) {
     if (this.isCellValidForPlacement(col, row)) {
-      this.towers.set(`${col},${row}`, tower);
-      return true;
+      if (this.towers) {
+        this.towers.set(`${col},${row}`, tower);
+        return true;
+      }
     }
     return false;
   }
 
   removeTower(col, row) {
-    return this.towers.delete(`${col},${row}`);
+    if (this.towers) {
+      return this.towers.delete(`${col},${row}`);
+    }
+    return false;
   }
 
   clear() {
-    this.towers.clear();
+    if (this.towers) {
+      this.towers.clear();
+    }
   }
 
   draw(ctx) {
@@ -279,35 +286,39 @@ export class Grid {
     }
 
     // 2. Draw Dirt Path with Blocky outlines
-    ctx.save();
-    ctx.lineCap = 'square';
-    ctx.lineJoin = 'miter';
+    if (this.pixelPath && this.pixelPath.length > 1) {
+      ctx.save();
+      ctx.lineCap = 'square';
+      ctx.lineJoin = 'miter';
 
-    // Black path border outline
-    ctx.strokeStyle = borderOutlineColor;
-    ctx.lineWidth = this.cellSize + 6;
-    ctx.beginPath();
-    ctx.moveTo(this.pixelPath[0].x, this.pixelPath[0].y);
-    for (let i = 1; i < this.pixelPath.length; i++) {
-      ctx.lineTo(this.pixelPath[i].x, this.pixelPath[i].y);
+      // Black path border outline
+      ctx.strokeStyle = borderOutlineColor;
+      ctx.lineWidth = this.cellSize + 6;
+      ctx.beginPath();
+      ctx.moveTo(this.pixelPath[0].x, this.pixelPath[0].y);
+      for (let i = 1; i < this.pixelPath.length; i++) {
+        ctx.lineTo(this.pixelPath[i].x, this.pixelPath[i].y);
+      }
+      ctx.stroke();
+
+      // Actual path fill
+      ctx.strokeStyle = pathColor;
+      ctx.lineWidth = this.cellSize;
+      ctx.beginPath();
+      ctx.moveTo(this.pixelPath[0].x, this.pixelPath[0].y);
+      for (let i = 1; i < this.pixelPath.length; i++) {
+        ctx.lineTo(this.pixelPath[i].x, this.pixelPath[i].y);
+      }
+      ctx.stroke();
+
+      ctx.restore();
     }
-    ctx.stroke();
-
-    // Actual path fill
-    ctx.strokeStyle = pathColor;
-    ctx.lineWidth = this.cellSize;
-    ctx.beginPath();
-    ctx.moveTo(this.pixelPath[0].x, this.pixelPath[0].y);
-    for (let i = 1; i < this.pixelPath.length; i++) {
-      ctx.lineTo(this.pixelPath[i].x, this.pixelPath[i].y);
-    }
-    ctx.stroke();
-
-    ctx.restore();
 
     // 3. Draw Decorative Obstacles (Blocky/Flat Vector Style)
-    for (const obs of this.obstacles) {
-      this.drawObstacle(ctx, obs);
+    if (this.obstacles) {
+      for (const obs of this.obstacles) {
+        this.drawObstacle(ctx, obs);
+      }
     }
   }
 
@@ -366,8 +377,7 @@ export class Grid {
         // Left arm
         ctx.fillRect(-12, -4, 7, 5);
         ctx.strokeRect(-12, -4, 7, 5);
-        ctx.fillRect(-12, -10, 5, 8);
-        ctx.strokeRect(-12, -10, 5, 8);
+        ctx.fillRect(this.x - this.cellSize * 0.4, this.y - this.cellSize * 0.4, this.cellSize * 0.8, this.cellSize * 0.8);
         // Right arm
         ctx.fillRect(5, 2, 7, 5);
         ctx.strokeRect(5, 2, 7, 5);

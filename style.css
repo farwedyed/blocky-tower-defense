@@ -33,6 +33,44 @@
   font-family: var(--font-body);
 }
 
+/* --- CRITICAL MOBILE VIEWPORT & PAN SAFETY OVERRIDES --- */
+html, body {
+  width: 100%;
+  height: 100dvh;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden !important; /* Prevents double scrolling/bouncing of the outer page */
+  touch-action: none;          /* Disables default browser double-tap zoom and swipe navigation */
+  overscroll-behavior: none;   /* Disables pull-to-refresh page reload triggers */
+  user-select: none;           /* Prevents text selection highlight during rapid tapping */
+  -webkit-user-select: none;
+  -webkit-text-size-adjust: 100%;
+  background: #1a2230;
+}
+
+/* Ensure only explicitly scrollable elements are allowed to scroll vertically */
+#lobby-panels, 
+#game-sidebar, 
+#quests-box,
+#leaderboard-box {
+  touch-action: pan-y !important; /* Re-enable precise vertical finger scrolling only on panels */
+  -webkit-overflow-scrolling: touch;
+}
+
+body {
+  background-color: var(--bg-lobby);
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.05) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 2px, transparent 2px);
+  background-size: 40px 40px;
+  color: var(--text-dark);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Global utility */
 .hidden {
   display: none !important;
@@ -108,22 +146,6 @@
 @keyframes warningPulse {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.03); }
-}
-
-body {
-  background-color: var(--bg-lobby);
-  background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.05) 2px, transparent 2px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 2px, transparent 2px);
-  background-size: 40px 40px;
-  color: var(--text-dark);
-  font-size: 16px;
-  height: 100dvh;
-  height: 100vh; /* fallback */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
 }
 
 /* App container */
@@ -216,25 +238,29 @@ body {
 
 /* XP Bar */
 .xp-item {
-  width: 160px;
+  width: 100%;
 }
+.xp-item {
+  width: 120px;
+}
+
 .xp-bar-container {
   width: 100%;
-  height: 24px;
-  background: #bdc3c7;
-  border: 2px solid var(--border-color);
-  border-radius: 8px;
-  position: relative;
+  height: 20px;
+  background: #cbd5e1;
+  border-radius: 10px;
   overflow: hidden;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.15);
+  position: relative;
+  border: 2px solid var(--border-color);
 }
+
 .xp-bar-fill {
   height: 100%;
   background: var(--primary-green);
-  border-right: 2px solid var(--border-color);
   width: 0%;
   transition: width 0.3s ease;
 }
+
 .xp-text {
   position: absolute;
   top: 50%;
@@ -481,11 +507,10 @@ body {
 
 .diff-bg-easy { background: linear-gradient(135deg, #2ecc71, #27ae60); }
 .diff-bg-casual { background: linear-gradient(135deg, #7f8c8d, #34495e); }
-.diff-bg-intermediate { background: linear-gradient(135deg, #00b894, #009432); }
-.diff-bg-molten { background: linear-gradient(135deg, #f1c40f, #e67e22, #e74c3c); }
-.diff-bg-fallen { background: linear-gradient(135deg, #9b59b6, #8e44ad, #1a1a2e); }
+.diff-bg-intermediate { background: linear-gradient(135deg, #2196f3, #0b7dda); }
+.diff-bg-molten { background: linear-gradient(135deg, #e67e22, #d35400); }
+.diff-bg-fallen { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
 
-/* Difficulty Card Stats & Boss canvas */
 .diff-card-body {
   padding: 10px;
   display: flex;
@@ -798,7 +823,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  /* Add safe padding at the bottom on PC so placement list never scrolls under absolute upgrade panel [4] */
+  /* Add safe padding at the bottom on PC so placement list never scrolls under absolute upgrade panel */
   padding-bottom: 180px;
 }
 
@@ -865,7 +890,7 @@ body {
   position: absolute;
   bottom: 20px;
   right: 20px;
-  width: 280px; /* Aligns inside the 320px wide sidebar with 20px padding on each side [4] */
+  width: 280px; /* Aligns inside the 320px wide sidebar with 20px padding on each side */
   z-index: 10;
   background: #fff8e1;
   border: 3px solid var(--primary-yellow-dark);
@@ -1314,61 +1339,48 @@ body {
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
-    font-size: 0.8rem;
-    color: #fff !important;
-    gap: 6px;
+    font-weight: 800;
+    font-size: 0.9rem;
+  }
+  #cg-profile-widget {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
   
-  #cg-profile-widget #cg-username {
-    color: #fff !important;
-    font-size: 0.75rem;
-    font-weight: 800;
-  }
-
   #cg-avatar {
-    width: 26px !important;
-    height: 26px !important;
-    border-color: #fff !important;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
   }
 
-  #btn-cg-auth {
-    display: block;
-  }
-
+  /* Compact top bar */
   .player-meta-box {
-    margin-top: 0 !important;
-    width: auto !important;
-    gap: 8px !important;
+    gap: 8px;
   }
 
   .meta-item .label {
-    display: none !important;
-  }
-
-  .badge {
-    font-size: 0.8rem !important;
-    padding: 2px 8px !important;
-    border-radius: 6px !important;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    box-shadow: none;
+    display: none; /* Hide labels for pure compact bar layout */
   }
 
   .xp-item {
-    width: 100px !important;
+    width: 80px;
   }
 
   .xp-bar-container {
-    height: 18px !important;
-    border-radius: 4px !important;
+    height: 14px;
+    border-radius: 7px;
   }
 
   .xp-text {
-    font-size: 0.6rem !important;
+    font-size: 0.6rem;
   }
 
-  /* Content area holds Panels on top, Tabs on bottom */
+  .badge {
+    font-size: 0.8rem;
+    padding: 2px 8px;
+  }
+
   #lobby-content {
     display: flex;
     flex-direction: column;
@@ -1377,80 +1389,69 @@ body {
     position: absolute;
     top: 48px;
     bottom: 0;
-    left: 0;
-    right: 0;
-    gap: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: hidden;
   }
 
-  /* Top Navigation Tabs Bar */
   #lobby-tabs {
+    flex-direction: row;
     width: 100%;
-    height: 48px;
-    flex-direction: row !important;
-    display: flex !important;
-    background: #fff;
-    border-top: none !important;
-    border-bottom: 3px solid var(--border-color);
-    box-shadow: 0 3px 0 var(--border-color);
-    z-index: 1000;
-    gap: 0 !important;
+    height: 44px;
+    gap: 4px;
+    padding: 0 4px;
   }
 
   .tab-btn {
     flex: 1;
-    height: 100%;
-    border: none !important;
-    border-radius: 0 !important;
-    background: #f8fafc;
-    color: var(--text-dark);
-    font-size: 0.75rem !important;
-    font-weight: 900;
-    padding: 0 !important;
-    margin: 0 !important;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    font-size: 0.75rem;
+    padding: 4px;
     justify-content: center;
-    box-shadow: none !important;
-    border-right: 1.5px solid var(--border-color) !important;
-    text-transform: uppercase;
-  }
-
-  .tab-btn:last-child {
-    border-right: none !important;
-  }
-
-  .tab-btn.active {
-    background: var(--primary-blue) !important;
-    color: #fff !important;
-    transform: none !important;
+    align-items: center;
+    border-radius: 8px;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    height: 100%;
   }
 
   .tab-icon {
-    display: none !important;
+    width: 16px;
+    height: 16px;
+    margin-right: 2px;
   }
 
-  /* Expandable panels situated perfectly in the center viewport */
   #lobby-panels {
-    flex: 1;
     width: 100%;
-    border: none !important;
-    border-radius: 0 !important;
-    background: #e4e9f0;
+    height: calc(100% - 44px);
+    border-radius: 0;
+    border: none;
     padding: 10px;
-    overflow-y: auto;
-    box-shadow: none !important;
-    position: relative;
   }
 
-  .lobby-panel h2 {
-    font-size: 1.15rem !important;
-    margin-bottom: 8px;
-    padding-bottom: 4px;
-    text-align: center;
+  .map-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .map-card {
+    padding: 6px;
+    gap: 4px;
+  }
+
+  .map-card canvas {
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  .map-info .name {
+    font-size: 0.8rem;
+  }
+
+  .map-info .difficulty {
+    font-size: 0.65rem;
+  }
+
+  .btn-deploy {
+    font-size: 1.1rem;
+    padding: 10px;
+    margin-top: 10px;
   }
 
   /* ─── ZERO-SCROLL HORIZONTAL SWIPEABLE DIFFICULTIES DECK (MOBILE LANDSCAPE) ─── */
@@ -1463,12 +1464,12 @@ body {
     padding: 4px !important;
     white-space: nowrap !important;
     scroll-snap-type: x mandatory;
-    height: 160px !important; /* Zero scrolling: card heights tightly constrained [4] */
+    height: 160px !important; /* Zero scrolling: card heights tightly constrained */
     margin: 5px 0 !important;
   }
 
   .diff-wizard-card {
-    flex: 0 0 130px !important; /* Extremely compact cards to ensure 100% visibility on mobile landscapes [4] */
+    flex: 0 0 130px !important; /* Extremely compact cards to ensure 100% visibility on mobile landscapes */
     height: 150px !important;
     scroll-snap-align: start;
     padding: 0 !important;
@@ -1714,7 +1715,7 @@ body {
     flex-wrap: wrap;
     gap: 6px;
     overflow-y: visible;
-    padding-bottom: 0 !important; /* No extra padding on mobile [4] */
+    padding-bottom: 0 !important; /* No extra padding on mobile */
   }
 
   .placement-btn {
@@ -1741,10 +1742,10 @@ body {
     font-size: 0.7rem;
   }
 
-  /* ─── FLOATING ZERO-SCROLL DETACHED UPGRADE MODIFIER (MOBILE VIEWPORT) ─── */
+  /* ─── FLOATING ZERO-SCROLL DETACHED UPGRADE MENU (MOBILE LANDSCAPE) ─── */
   #selection-panel {
     position: absolute;
-    bottom: 12px;
+    bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
     width: 90vw;

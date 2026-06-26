@@ -55,7 +55,11 @@ export class LobbyUI {
 
     // Sync CrazyGames Auth Status
     CrazyGamesManager.onAuthChanged((user) => {
-      this.updateCgProfileUI(user);
+      try {
+        this.updateCgProfileUI(user);
+      } catch (e) {
+        console.warn("[LobbyUI] Failed to update profile UI safely:", e);
+      }
     });
 
     // Default Lobby UI to clean Splash State on startup
@@ -248,8 +252,12 @@ export class LobbyUI {
   }
 
   showSplashState() {
-    document.getElementById('lobby-splash-container').style.display = 'flex';
-    document.getElementById('coop-matchmaking-panel').classList.add('hidden');
+    const splash = document.getElementById('lobby-splash-container');
+    if (splash) splash.style.display = 'flex';
+    
+    const matchmaking = document.getElementById('coop-matchmaking-panel');
+    if (matchmaking) matchmaking.classList.add('hidden');
+    
     this.toggleSoloElements(false);
 
     // Tutorial Step 0: Point to PLAY SOLO button
@@ -266,9 +274,6 @@ export class LobbyUI {
   }
 
   toggleSoloElements(visible) {
-    const parentPanel = document.getElementById('panel-maps');
-    if (!parentPanel) return;
-
     const mapsStep = document.getElementById('wizard-step-maps');
     const diffStep = document.getElementById('wizard-step-diff');
     const prepStep = document.getElementById('wizard-step-prep');
@@ -313,9 +318,11 @@ export class LobbyUI {
     if (this.btnNextMaps) {
       this.btnNextMaps.addEventListener('click', () => {
         soundManager.playTick();
-        this.stepMaps.classList.add('hidden');
-        this.stepDiff.classList.remove('hidden');
-        this.stepDiff.classList.add('active');
+        if (this.stepMaps) this.stepMaps.classList.add('hidden');
+        if (this.stepDiff) {
+          this.stepDiff.classList.remove('hidden');
+          this.stepDiff.classList.add('active');
+        }
         this.drawAllBossPreviews();
 
         // Tutorial Step 2: Point directly to PREPARATION button
@@ -336,9 +343,11 @@ export class LobbyUI {
     if (this.btnBackDiff) {
       this.btnBackDiff.addEventListener('click', () => {
         soundManager.playTick();
-        this.stepDiff.classList.add('hidden');
-        this.stepMaps.classList.remove('hidden');
-        this.stepMaps.classList.add('active');
+        if (this.stepDiff) this.stepDiff.classList.add('hidden');
+        if (this.stepMaps) {
+          this.stepMaps.classList.remove('hidden');
+          this.stepMaps.classList.add('active');
+        }
         this.triggerStep1Pointer();
       });
     }
@@ -347,9 +356,11 @@ export class LobbyUI {
     if (this.btnNextDiff) {
       this.btnNextDiff.addEventListener('click', () => {
         soundManager.playTick();
-        this.stepDiff.classList.add('hidden');
-        this.stepPrep.classList.remove('hidden');
-        this.stepPrep.classList.add('active');
+        if (this.stepDiff) this.stepDiff.classList.add('hidden');
+        if (this.stepPrep) {
+          this.stepPrep.classList.remove('hidden');
+          this.stepPrep.classList.add('active');
+        }
 
         // Tutorial Step 3: Point to DEPLOY TO MATCH button
         if (!this.game.tutorialCompleted) {
@@ -369,9 +380,11 @@ export class LobbyUI {
     if (this.btnBackPrep) {
       this.btnBackPrep.addEventListener('click', () => {
         soundManager.playTick();
-        this.stepPrep.classList.add('hidden');
-        this.stepDiff.classList.remove('hidden');
-        this.stepDiff.classList.add('active');
+        if (this.stepPrep) this.stepPrep.classList.add('hidden');
+        if (this.stepDiff) {
+          this.stepDiff.classList.remove('hidden');
+          this.stepDiff.classList.add('active');
+        }
 
         if (!this.game.tutorialCompleted) {
           this.parentUI.hidePointer();
@@ -426,15 +439,19 @@ export class LobbyUI {
     if (btnSelectSolo) {
       btnSelectSolo.addEventListener('click', () => {
         Network.mode = 'OFFLINE';
-        document.getElementById('lobby-splash-container').style.display = 'none';
+        const splash = document.getElementById('lobby-splash-container');
+        if (splash) splash.style.display = 'none';
         this.toggleSoloElements(true);
       });
     }
 
     if (btnSelectCoop) {
       btnSelectCoop.addEventListener('click', () => {
-        document.getElementById('lobby-splash-container').style.display = 'none';
-        document.getElementById('coop-matchmaking-panel').classList.remove('hidden');
+        const splash = document.getElementById('lobby-splash-container');
+        if (splash) splash.style.display = 'none';
+        
+        const matchmaking = document.getElementById('coop-matchmaking-panel');
+        if (matchmaking) matchmaking.classList.remove('hidden');
       });
     }
 
@@ -453,30 +470,50 @@ export class LobbyUI {
         
         Network.mode = 'HOST';
         window.lobbyPlayers.p1 = name + ` [Lv. ${this.game.playerLevel}]`;
-        document.getElementById('coop-setup-controls').classList.add('hidden');
-        document.getElementById('coop-lobby-status-container').classList.remove('hidden');
-        document.getElementById('username-container').style.display = 'none';
+        
+        const coopControls = document.getElementById('coop-setup-controls');
+        if (coopControls) coopControls.classList.add('hidden');
+        
+        const coopLobbyStatus = document.getElementById('coop-lobby-status-container');
+        if (coopLobbyStatus) coopLobbyStatus.classList.remove('hidden');
+        
+        const usernameContainer = document.getElementById('username-container');
+        if (usernameContainer) usernameContainer.style.display = 'none';
         
         const labelStatus = document.getElementById('label-lobby-status');
-        labelStatus.textContent = "ESTABLISHING SIGNAL...";
-        labelStatus.style.color = "var(--primary-orange)";
+        if (labelStatus) {
+          labelStatus.textContent = "ESTABLISHING SIGNAL...";
+          labelStatus.style.color = "var(--primary-orange)";
+        }
 
         if (Network.peer && Network.peer.id) {
           const roomCode = Network.peer.id.toUpperCase();
-          document.getElementById('label-room-code').textContent = `ROOM CODE: ${roomCode}`;
-          document.getElementById('btn-copy-code').classList.remove('hidden');
-          labelStatus.textContent = "HOSTING LOBBY";
-          labelStatus.style.color = "var(--primary-green-dark)";
+          const labelRoomCode = document.getElementById('label-room-code');
+          if (labelRoomCode) labelRoomCode.textContent = `ROOM CODE: ${roomCode}`;
+          
+          const copyCodeBtn = document.getElementById('btn-copy-code');
+          if (copyCodeBtn) copyCodeBtn.classList.remove('hidden');
+          
+          if (labelStatus) {
+            labelStatus.textContent = "HOSTING LOBBY";
+            labelStatus.style.color = "var(--primary-green-dark)";
+          }
           this.updateCoopPlayerList();
           this.toggleSoloElements(true);
           CrazyGamesManager.updateRoomPresence(roomCode.toLowerCase(), true);
         } else {
           Network.init(this.game, (id) => {
             const roomCode = id.toUpperCase();
-            document.getElementById('label-room-code').textContent = `ROOM CODE: ${roomCode}`;
-            document.getElementById('btn-copy-code').classList.remove('hidden');
-            labelStatus.textContent = "HOSTING LOBBY";
-            labelStatus.style.color = "var(--primary-green-dark)";
+            const labelRoomCode = document.getElementById('label-room-code');
+            if (labelRoomCode) labelRoomCode.textContent = `ROOM CODE: ${roomCode}`;
+            
+            const copyCodeBtn = document.getElementById('btn-copy-code');
+            if (copyCodeBtn) copyCodeBtn.classList.remove('hidden');
+            
+            if (labelStatus) {
+              labelStatus.textContent = "HOSTING LOBBY";
+              labelStatus.style.color = "var(--primary-green-dark)";
+            }
             this.updateCoopPlayerList();
             this.toggleSoloElements(true);
             CrazyGamesManager.updateRoomPresence(roomCode.toLowerCase(), true);
@@ -503,18 +540,30 @@ export class LobbyUI {
         }
 
         Network.mode = 'CLIENT';
-        document.getElementById('coop-setup-controls').classList.add('hidden');
-        document.getElementById('coop-lobby-status-container').classList.remove('hidden');
-        document.getElementById('username-container').style.display = 'none';
+        
+        const coopControls = document.getElementById('coop-setup-controls');
+        if (coopControls) coopControls.classList.add('hidden');
+        
+        const coopLobbyStatus = document.getElementById('coop-lobby-status-container');
+        if (coopLobbyStatus) coopLobbyStatus.classList.remove('hidden');
+        
+        const usernameContainer = document.getElementById('username-container');
+        if (usernameContainer) usernameContainer.style.display = 'none';
         
         const labelStatus = document.getElementById('label-lobby-status');
-        labelStatus.textContent = "CONNECTING...";
-        labelStatus.style.color = "var(--primary-orange)";
+        if (labelStatus) {
+          labelStatus.textContent = "CONNECTING...";
+          labelStatus.style.color = "var(--primary-orange)";
+        }
 
         Network.join(code, name, () => {
-          document.getElementById('label-room-code').textContent = `CONNECTED TO HOST`;
-          labelStatus.textContent = "IN SQUAD (WAITING FOR HOST)";
-          labelStatus.style.color = "var(--primary-blue)";
+          const labelRoomCode = document.getElementById('label-room-code');
+          if (labelRoomCode) labelRoomCode.textContent = `CONNECTED TO HOST`;
+          
+          if (labelStatus) {
+            labelStatus.textContent = "IN SQUAD (WAITING FOR HOST)";
+            labelStatus.style.color = "var(--primary-blue)";
+          }
           this.updateCoopPlayerList();
           this.toggleSoloElements(false);
           CrazyGamesManager.updateRoomPresence(code, true);
@@ -879,7 +928,7 @@ export class LobbyUI {
   }
 
   drawBossPreview(canvas, bossType) {
-    if (!canvas) return; // Defensive null-guard to prevent visual initialization crashes
+    if (!canvas) return; 
     const ctx = canvas.getContext('2d');
     if (!ctx) return; 
     const w = canvas.width;
@@ -978,7 +1027,7 @@ export class LobbyUI {
   }
 
   drawMapPreview(canvas, mapId) {
-    if (!canvas) return; // Defensive null-guard to prevent visual initialization crashes
+    if (!canvas) return; 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const w = canvas.width;
@@ -990,7 +1039,8 @@ export class LobbyUI {
 
     let terrainColor = '#7dcd40';
     let pathColor = '#dfc39e';
-    let borderOutlineColor = '#22';
+    let borderOutlineColor = '#222222';
+    
     if (mapId === 'desert') {
       terrainColor = '#f9e79f';
       pathColor = '#e5c494';
@@ -1085,7 +1135,7 @@ export class LobbyUI {
   }
 
   drawAgentPreview(canvas, agentType) {
-    if (!canvas) return; // Defensive null-guard to prevent visual initialization crashes
+    if (!canvas) return; 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const w = canvas.width;
@@ -1385,7 +1435,7 @@ export class LobbyUI {
 
     const loop = (timestamp) => {
       if (!startTime) startTime = timestamp;
-      const dt = Math.min(0.1, (timestamp - startTime) / 1000.0) * this.speedMultiplier;
+      const dt = Math.min(0.1, (timestamp - startTime) / 1000.0);
       startTime = timestamp;
 
       ctx.clearRect(0, 0, w, h);
@@ -1499,6 +1549,7 @@ export class LobbyUI {
         }
       }
 
+      // Draw active unboxing particles
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.x += p.vx * dt;
@@ -1524,42 +1575,51 @@ export class LobbyUI {
         ctx.restore();
       }
 
-      if (state === 'dropping' || state === 'shaking') {
+      // Draw the blocky toy crate dropping and shaking!
+      if (state === 'dropping' || state === 'shaking' || state === 'bursting') {
         ctx.save();
         ctx.translate(w / 2 + shakeOffset.x, crateY + shakeOffset.y);
-
-        let crateColor = '#8d6e63';
-        let bandColor = '#784212';
-        if (crateType === 'elite') {
-          crateColor = '#2980b9';
-          bandColor = '#1f3a52';
-        } else if (crateType === 'deluxe') {
-          crateColor = '#9b59b6';
-          bandColor = '#f1c40f';
-        }
-
-        ctx.fillStyle = crateColor;
+        
+        // Draw crate body base
         ctx.strokeStyle = '#222';
         ctx.lineWidth = 4;
-        ctx.fillRect(-40, -40, 80, 80);
-        ctx.strokeRect(-40, -40, 80, 80);
+        ctx.fillStyle = '#8d6e63'; // Wood brown
+        ctx.fillRect(-35, -35, 70, 70);
+        ctx.strokeRect(-35, -35, 70, 70);
+        
+        // Wood grain panel diagonal crosses
+        ctx.strokeStyle = '#5d4037';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(-28, -28); ctx.lineTo(28, 28);
+        ctx.moveTo(28, -28); ctx.lineTo(-28, 28);
+        ctx.stroke();
 
-        ctx.fillStyle = bandColor;
-        ctx.fillRect(-10, -40, 20, 80);
-        ctx.strokeRect(-10, -40, 20, 80);
-        ctx.fillRect(-40, -10, 80, 20);
-        ctx.strokeRect(-40, -10, 80, 20);
+        // Corner blocky reinforcements
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 4;
+        ctx.fillStyle = '#5d4037'; // Dark brown trim
+        ctx.fillRect(-35, -35, 12, 70);
+        ctx.strokeRect(-35, -35, 12, 70);
+        ctx.fillRect(23, -35, 12, 70);
+        ctx.strokeRect(23, -35, 12, 70);
+        ctx.fillRect(-35, -35, 70, 12);
+        ctx.strokeRect(-35, -35, 70, 12);
+        ctx.fillRect(-35, 23, 70, 12);
+        ctx.strokeRect(-35, 23, 70, 12);
 
-        ctx.fillStyle = '#bdc3c7';
-        ctx.fillRect(-8, -8, 16, 16);
-        ctx.strokeRect(-8, -8, 16, 16);
+        // Center Lock latch
+        ctx.fillStyle = '#f1c40f'; // Golden latch lock
+        ctx.fillRect(-10, -8, 20, 16);
+        ctx.strokeRect(-10, -8, 20, 16);
         ctx.fillStyle = '#222';
-        ctx.fillRect(-2, -2, 4, 8);
-
+        ctx.fillRect(-3, -2, 6, 6);
+        
         ctx.restore();
       }
 
-      if (state !== 'revealed' || particles.length > 0) {
+      // Request next frame recursively if not fully revealed yet
+      if (state !== 'revealed') {
         requestAnimationFrame(loop);
       }
     };
@@ -1644,12 +1704,13 @@ export class LobbyUI {
       this.game.leaderboard[mapId] = freshRecords;
       this._renderLeaderboardRows(listEl, mapLabel, freshRecords);
     }).catch(e => {
-      console.warn('[Leaderboard] Fetch error:', e);
+      console.warn('[Leaderboard] Fetch error safely ignored:', e);
     });
   }
 
   _renderLeaderboardRows(listEl, mapLabel, records) {
-    if (records.length === 0) {
+    const safeRecords = Array.isArray(records) ? records : [];
+    if (safeRecords.length === 0) {
       listEl.innerHTML = `<div style="color:#7f8c8d;font-size:0.82rem;">
         No records yet for <strong>${mapLabel}</strong>.<br>Complete the map to set one!
       </div>`;
@@ -1659,7 +1720,7 @@ export class LobbyUI {
     const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
     listEl.innerHTML = `
       <div style="font-size:0.72rem;color:#7f8c8d;margin-bottom:4px;">📍 ${mapLabel}</div>
-      ${records.map((entry, i) => `
+      ${safeRecords.map((entry, i) => `
         <div style="
           display:flex;justify-content:space-between;align-items:center;
           padding:5px 8px;

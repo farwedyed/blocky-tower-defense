@@ -8,27 +8,50 @@ class SoundManager {
     this._ctx = null;
     this._lastPlayed = {};
 
-    const resume = () => {
-      if (this._ctx && this._ctx.state === 'suspended') this._ctx.resume();
-      if (!this._ctx) this._initContext();
+    const resume = (e) => {
+      // ONLY allow genuine, trusted user gestures to initialize AudioContext
+      if (e && !e.isTrusted) return; 
+
+      try {
+        if (!this._ctx) {
+          this._initContext();
+        }
+        if (this._ctx && this._ctx.state === 'suspended') {
+          this._ctx.resume().catch(err => {
+            console.warn("[SoundManager] Active AudioContext resume attempt was blocked or interrupted:", err);
+          });
+        }
+      } catch (err) {
+        console.warn("[SoundManager] Unhandled exception during audio interaction check:", err);
+      }
     };
-    document.addEventListener('click',     resume, { once: false });
-    document.addEventListener('touchstart', resume, { once: false, passive: true });
-    document.addEventListener('keydown',   resume, { once: false });
+    
+    // Bind to physical interactions to unlock Web Audio on mobile engines (especially iOS WebKit)
+    document.addEventListener('click', resume, { once: false, passive: true });
+    document.addEventListener('touchend', resume, { once: false, passive: true });
+    document.addEventListener('keydown', resume, { once: false, passive: true });
   }
 
   _initContext() {
+    if (this._ctx) return;
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (AudioContext) this._ctx = new AudioContext();
+      if (AudioContext) {
+        this._ctx = new AudioContext();
+        console.log("[SoundManager] AudioContext successfully initialized after user interaction.");
+      }
     } catch (e) {
-      console.info('[SoundManager] AudioContext unavailable:', e.message);
+      console.info('[SoundManager] AudioContext unavailable on this environment:', e.message);
     }
   }
 
   _getCtx() {
     if (!this._ctx) this._initContext();
-    if (this._ctx && this._ctx.state === 'suspended') this._ctx.resume();
+    if (this._ctx && this._ctx.state === 'suspended') {
+      this._ctx.resume().catch(err => {
+        console.warn("[SoundManager] AudioContext resume failed inside _getCtx():", err);
+      });
+    }
     return this._ctx;
   }
 
@@ -43,19 +66,23 @@ class SoundManager {
   _makeOsc(type, freqStart, freqEnd, duration, gainPeak, gainEnd = 0.0001) {
     const ctx = this._getCtx();
     if (!ctx) return;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freqStart, now);
-    osc.frequency.exponentialRampToValueAtTime(Math.max(freqEnd, 0.01), now + duration);
-    const gain = ctx.createGain();
-    const vol = gainPeak * this.masterVolume;
-    gain.gain.setValueAtTime(vol, now);
-    gain.gain.exponentialRampToValueAtTime(Math.max(gainEnd * this.masterVolume, 0.0001), now + duration);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + duration + 0.01);
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freqStart, now);
+      osc.frequency.exponentialRampToValueAtTime(Math.max(freqEnd, 0.01), now + duration);
+      const gain = ctx.createGain();
+      const vol = gainPeak * this.masterVolume;
+      gain.gain.setValueAtTime(vol, now);
+      gain.gain.exponentialRampToValueAtTime(Math.max(gainEnd * this.masterVolume, 0.0001), now + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + duration + 0.01);
+    } catch (e) {
+      console.warn("[SoundManager] Failed to synthesize procedural audio clip:", e);
+    }
   }
 
   // ── playPlace: solid wood-like thud ─────────────────────────────────────
@@ -69,22 +96,26 @@ class SoundManager {
     if (!this._canPlay('upgrade', 200)) return;
     const ctx = this._getCtx();
     if (!ctx) return;
-    const notes = [261.63, 329.63, 392.00, 523.25];
-    notes.forEach((freq, i) => {
-      const now = ctx.currentTime + i * 0.055;
-      const dur = 0.18;
-      const osc = ctx.createOscillator();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, now);
-      const gain = ctx.createGain();
-      const vol = 0.55 * this.masterVolume;
-      gain.gain.setValueAtTime(vol, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + dur + 0.01);
-    });
+    try {
+      const notes = [261.63, 329.63, 392.00, 523.25];
+      notes.forEach((freq, i) => {
+        const now = ctx.currentTime + i * 0.055;
+        const dur = 0.18;
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now);
+        const gain = ctx.createGain();
+        const vol = 0.55 * this.masterVolume;
+        gain.gain.setValueAtTime(vol, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + dur + 0.01);
+      });
+    } catch (e) {
+      console.warn("[SoundManager] Upgrade audio playback error:", e);
+    }
   }
 
   // ── playShoot: fast physical zap (800→50Hz, 0.08s) ─────────────────────
@@ -104,21 +135,25 @@ class SoundManager {
     if (!this._canPlay('crateReveal', 400)) return;
     const ctx = this._getCtx();
     if (!ctx) return;
-    const now = ctx.currentTime;
-    const dur = 0.40;
-    const osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(440, now);
-    osc.frequency.linearRampToValueAtTime(1200, now + dur);
-    const gain = ctx.createGain();
-    const vol = 0.55 * this.masterVolume;
-    gain.gain.setValueAtTime(vol, now);
-    gain.gain.setValueAtTime(vol, now + dur * 0.7);
-    gain.gain.linearRampToValueAtTime(0, now + dur);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + dur + 0.02);
+    try {
+      const now = ctx.currentTime;
+      const dur = 0.40;
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.linearRampToValueAtTime(1200, now + dur);
+      const gain = ctx.createGain();
+      const vol = 0.55 * this.masterVolume;
+      gain.gain.setValueAtTime(vol, now);
+      gain.gain.setValueAtTime(vol, now + dur * 0.7);
+      gain.gain.linearRampToValueAtTime(0, now + dur);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + dur + 0.02);
+    } catch (e) {
+      console.warn("[SoundManager] Crate unboxing audio playback error:", e);
+    }
   }
 
   // ── playTick: rapid high-pitched coin/score tick (1800→1000Hz, 0.02s) ───
@@ -132,24 +167,28 @@ class SoundManager {
     if (!this._canPlay('victory', 1000)) return;
     const ctx = this._getCtx();
     if (!ctx) return;
-    const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
-    notes.forEach((freq, i) => {
-      const now = ctx.currentTime + i * 0.08;
-      const dur = 0.30;
-      const osc = ctx.createOscillator();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, now);
-      osc.frequency.setValueAtTime(freq, now + dur * 0.7);
-      osc.frequency.exponentialRampToValueAtTime(freq * 1.01, now + dur);
-      const gain = ctx.createGain();
-      const vol = 0.5 * this.masterVolume;
-      gain.gain.setValueAtTime(vol, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + dur + 0.01);
-    });
+    try {
+      const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+      notes.forEach((freq, i) => {
+        const now = ctx.currentTime + i * 0.08;
+        const dur = 0.30;
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now);
+        osc.frequency.setValueAtTime(freq, now + dur * 0.7);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.01, now + dur);
+        const gain = ctx.createGain();
+        const vol = 0.5 * this.masterVolume;
+        gain.gain.setValueAtTime(vol, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + dur + 0.01);
+      });
+    } catch (e) {
+      console.warn("[SoundManager] Victory audio playback error:", e);
+    }
   }
 
   // ── playDefeat: dissonant descending sawtooth rumble (180→45Hz, 0.8s) ────
