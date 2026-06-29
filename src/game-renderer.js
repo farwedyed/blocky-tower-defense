@@ -9,22 +9,6 @@ import {
   CrookBoss, MilitaryBase, Ranger, Turret 
 } from './tower.js';
 
-// ─── 1. TOWER ASSET MAP & PRELOADER ───
-const SPRITE_SHEETS = {
-  combat1: new Image(),
-  combat2: new Image(),
-  combat3: new Image(),
-  support: new Image(),
-  static: new Image()
-};
-
-// Paths to your generated assets
-SPRITE_SHEETS.combat1.src = 'assets/sprites/combat1.png';
-SPRITE_SHEETS.combat2.src = 'assets/sprites/combat2.png';
-SPRITE_SHEETS.combat3.src = 'assets/sprites/combat3.png';
-SPRITE_SHEETS.support.src = 'assets/sprites/support.png';
-SPRITE_SHEETS.static.src = 'assets/sprites/static.png';
-
 const TOWER_SPRITE_MAP = {
   // Folder: combat1 (4 rows, 5 columns)
   scout: { sheet: 'combat1', row: 0 },
@@ -94,7 +78,7 @@ const ENEMY_SPRITE_MAP = {
   molten_titan: { sheet: 'bosses', row: 1, col: 1 },
   fallen_guardian: { sheet: 'bosses', row: 2, col: 0 },
   fallen_king: { sheet: 'bosses', row: 2, col: 1 },
-  frost_spirit: { sheet: 'bosses', row: 3, col: 0 },
+  frost_spirit: { sheet: 'bosses', row: 3, col: 1 }, // Map matched layout index
   void_reaver: { sheet: 'bosses', row: 3, col: 1 }
 };
 
@@ -121,16 +105,6 @@ function getEnemySprite(sheetName, rowIndex, colIndex) {
 // ─── 3. PRELOADING SYSTEM ───
 export function preloadAllAssets(onProgress, onComplete) {
   const queue = [];
-
-  // Add Sheets
-  Object.keys(SPRITE_SHEETS).forEach(key => {
-    queue.push({
-      type: 'sheet',
-      key: key,
-      url: SPRITE_SHEETS[key].src,
-      img: SPRITE_SHEETS[key]
-    });
-  });
 
   // Add all individual Agent Sprites (5 columns per agent row)
   Object.keys(TOWER_SPRITE_MAP).forEach(type => {

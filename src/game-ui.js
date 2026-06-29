@@ -327,748 +327,753 @@ export class GameUI {
     try {
       this.equippedAgentsList.innerHTML = '';
 
-          this.game.equippedAgents.forEach(type => {
-            // Defensive type guard to prevent undefined/null elements in the inventory list from throwing errors
-            if (!type || typeof type !== 'string') return;
+      this.game.equippedAgents.forEach(type => {
+        // Defensive type guard to prevent undefined/null elements in the inventory list from throwing errors
+        if (!type || typeof type !== 'string') return;
 
-            const btn = document.createElement('button');
-            btn.className = `placement-btn ${this.game.selectedShopTower === type ? 'active' : ''}`;
-            btn.setAttribute('data-type', type);
+        const btn = document.createElement('button');
+        btn.className = `placement-btn ${this.game.selectedShopTower === type ? 'active' : ''}`;
+        btn.setAttribute('data-type', type);
 
-            let name = type.replace('_', ' ').toUpperCase();
-            if (type === 'dj') name = 'DJ Booth';
-            const cost = this.game.getTowerCost(type);
+        let name = type.replace('_', ' ').toUpperCase();
+        if (type === 'dj') name = 'DJ Booth';
+        const cost = this.game.getTowerCost(type);
 
-            btn.innerHTML = `
-              <div class="icon"><canvas width="45" height="45"></canvas></div>
-              <div class="info">
-                <span class="name" style="text-transform: uppercase;">${name}</span>
-                <span class="cost">$${cost}</span>
-              </div>
-            `;
-
-            const cvs = btn.querySelector('canvas');
-            
-            if (this.parentUI.lobby) {
-              this.parentUI.lobby.drawAgentPreview(cvs, type);
-            }
-
-            btn.addEventListener('click', () => {
-              document.querySelectorAll('.placement-btn').forEach(b => b.classList.remove('active'));
-              btn.classList.add('active');
-              this.game.setSelectedShopTower(type);
-              this.game.setSelectedPlacedTower(null);
-            });
-
-            this.equippedAgentsList.appendChild(btn);
-          });
-        } catch (e) {
-          console.error("Defensive Guard: Error caught in renderPlacementShop():", e);
-        }
-      }
-
-      updateHUD(lives, gold, wave, maxWaves) {
-        try {
-          if (this.hudLives) {
-            const valEl = document.getElementById('hud-lives-val');
-            if (valEl) {
-              valEl.textContent = Math.max(0, lives);
-            } else {
-              this.hudLives.textContent = `❤️ ${Math.max(0, lives)}`;
-            }
-          }
-          if (this.hudGold) {
-            const valEl = document.getElementById('hud-gold-val');
-            if (valEl) {
-              valEl.textContent = `$${gold}`;
-            } else {
-              this.hudGold.textContent = `💵 $${gold}`;
-            }
-          }
-          if (this.hudWave) {
-            const valEl = document.getElementById('hud-wave-val');
-            if (valEl) {
-              valEl.textContent = `${wave} / ${maxWaves}`;
-            } else {
-              this.hudWave.textContent = `🌊 ${wave} / ${maxWaves}`;
-            }
-          }
-
-          const placementBtns = document.querySelectorAll('.placement-btn');
-          placementBtns.forEach(btn => {
-            const type = btn.getAttribute('data-type');
-            const cost = this.game.getTowerCost(type);
-            if (gold < cost) {
-              btn.style.opacity = '0.4';
-            } else {
-              btn.style.opacity = '1.0';
-            }
-          });
-
-          if (this.btnSkipWave) {
-            const showSkip = this.game.waveInProgress && this.game.wave < this.game.maxWaves;
-            if (showSkip) {
-              this.btnSkipWave.style.display = 'block';
-              this.btnSkipWave.classList.remove('hidden');
-
-              if (this.game.skipCooldown > 0) {
-                this.btnSkipWave.disabled = true;
-                this.btnSkipWave.style.opacity = '0.5';
-                this.btnSkipWave.textContent = `COOLDOWN (${Math.ceil(this.game.skipCooldown)}s)`;
-              } else {
-                this.btnSkipWave.disabled = false;
-                this.btnSkipWave.style.opacity = '1.0';
-                const votesCount = Network.mode === 'CLIENT' ? (this.game.skipVotesCount || 0) : (this.game.skipVotes ? this.game.skipVotes.size : 0);
-                const votesReq = Network.mode === 'CLIENT' ? (this.game.skipVotesRequired || 1) : Math.ceil((Network.conns.filter(c => c && c.open).length + 1) / 2);
-                
-                if (votesCount > 0) {
-                  this.btnSkipWave.textContent = `SKIP VOTE (${votesCount}/${votesReq})`;
-                } else {
-                  this.btnSkipWave.textContent = "SKIP WAVE";
-                }
-              }
-            } else {
-              this.btnSkipWave.style.display = 'none';
-              this.btnSkipWave.classList.add('hidden');
-            }
-          }
-
-          if (this.btnSpeed) {
-            if (Network.mode === 'CLIENT') {
-              this.btnSpeed.disabled = true;
-              this.btnSpeed.style.opacity = '0.6';
-            } else {
-              this.btnSpeed.disabled = false;
-              this.btnSpeed.style.opacity = '1.0';
-            }
-          }
-
-          if (this.game.selectedPlacedTower) {
-            this.updateSelectionPanel(this.game.selectedPlacedTower);
-          }
-        } catch (e) {
-          console.error("Defensive Guard: Error caught in updateHUD():", e);
-        }
-      }
-
-      updateSelectionPanel(agent) {
-        if (!agent) {
-          this.selectionPanel.classList.add('hidden');
-          return;
-        }
-
-        this.selectionPanel.classList.remove('hidden');
-        document.querySelectorAll('.placement-btn').forEach(b => b.classList.remove('active'));
-
-        this.selectTargeting.value = agent.targetingStrategy;
-
-        const upgradeCost = agent.getUpgradeCost();
-        const sellValue = agent.getSellValue();
-
-        let displayName = agent.name;
-        if (agent.type === 'crook_boss') displayName = 'Crook Boss';
-        else if (agent.type === 'military_base') displayName = 'Military Base';
-        else if (agent.type === 'dj') displayName = 'DJ Booth';
-
-        let detailsHtml = `
-          <p class="unit-name" style="text-transform: uppercase;">${displayName} <span style="color: #f39c12">Lvl ${agent.level}</span></p>
-          <p class="unit-stats">Damage: ${Math.round(agent.damage)} | Range: ${Math.round(agent.range * (agent.djRangeBuffed ? 1.15 : 1.0))}px | Rate: ${(agent.fireRate * (agent.commanderSpeedBuffed ? 1.35 : 1.0)).toFixed(1)}/s</p>
+        btn.innerHTML = `
+          <div class="icon"><canvas width="45" height="45"></canvas></div>
+          <div class="info">
+            <span class="name" style="text-transform: uppercase;">${name}</span>
+            <span class="cost">$${cost}</span>
+          </div>
         `;
 
-        // Specialized Agent details description
-        if (agent.type === 'commander') {
-          detailsHtml += `<p class="unit-stats" style="color: #e74c3c">Call to Arms: Active speed buffs for nearby agents.</p>`;
-        } else if (agent.type === 'dj') {
-          detailsHtml += `<p class="unit-stats" style="color: #9b59b6">Plays Tracks: Range expansion & upgrade cost discount inside aura.</p>`;
-        } else if (agent.type === 'pyromancer') {
-          const burnDps = 15 + agent.level * 4;
-          detailsHtml += `<p class="unit-stats" style="color: #e67e22">Fire Spray DoT: ${burnDps} Dmg/sec. Removes lead armors.</p>`;
-        } else if (agent.type === 'farm') {
-          const income = agent.getHarvestIncome();
-          detailsHtml += `<p class="unit-stats" style="color: #2ecc71">Wave Harvest Income: +$${income}</p>`;
-        } else if (agent.type === 'gladiator') {
-          detailsHtml += `<p class="unit-stats" style="color: #7f8c8d">Centurion Plume: Extreme fast melee cleave swings.</p>`;
-        } else if (agent.type === 'soldier') {
-          detailsHtml += `<p class="unit-stats" style="color: #27ae60">Assault Rifle: Rapid burst-fire configurations.</p>`;
-        } else if (agent.type === 'sniper') {
-          detailsHtml += `<p class="unit-stats" style="color: #e67e22">Sniper Scope: Heavy slow long-range armor-piercing tracer bullets.</p>`;
-        } else if (agent.type === 'medic') {
-          detailsHtml += `<p class="unit-stats" style="color: #2ecc71">Syringe Gun: Active heals base HP & cleanses active stun locks.</p>`;
-        } else if (agent.type === 'rocketeer') {
-          detailsHtml += `<p class="unit-stats" style="color: #95a5a6">Rocket Launcher: Slow high-damage heavy explosive splash impact.</p>`;
-        } else if (agent.type === 'demoman') {
-          detailsHtml += `<p class="unit-stats" style="color: #e67e22">Demolition Grenades: Quick area splash explosions.</p>`;
-        } else if (agent.type === 'freezer') {
-          detailsHtml += `<p class="unit-stats" style="color: #3498db">Freezing Beams: Sells freeze slow effects to stun marching zombies.</p>`;
-        } else if (agent.type === 'shotgunner') {
-          detailsHtml += `<p class="unit-stats" style="color: #34495e">Shotgun Spread: Launches multiple pellets in close-range cones.</p>`;
-        } else if (agent.type === 'crook_boss') {
-          detailsHtml += `<p class="unit-stats" style="color: #d4ac0d">Reinforcements Call: Tommy gun fire and periodic guard deployments.</p>`;
-        } else if (agent.type === 'military_base') {
-          detailsHtml += `<p class="unit-stats" style="color: #27ae60">Heavy Assembly: Deploys heavy armored military vehicles along path.</p>`;
-        } else if (agent.type === 'ranger') {
-          detailsHtml += `<p class="unit-stats" style="color: #ff0055">Heavy Railgun: Massive single-target damage, but cannot detect Camo.</p>`;
-        } else if (agent.type === 'turret') {
-          detailsHtml += `<p class="unit-stats" style="color: #00ffe0">Laser Gatling: Blazing-fast rapid laser bullet output stream.</p>`;
-        }
-
-        const targetingContainer = document.querySelector('.targeting-container');
-        if (targetingContainer) {
-          if (agent.type === 'farm' || agent.type === 'military_base') {
-            targetingContainer.style.display = 'none';
-          } else {
-            targetingContainer.style.display = 'flex';
-          }
-        }
-
-        this.selectionInfo.innerHTML = detailsHtml;
-
-        if (agent.level >= 5) {
-          this.btnUpgrade.textContent = "MAX LEVEL";
-          this.btnUpgrade.disabled = true;
-          this.btnUpgrade.style.opacity = '0.5';
-        } else {
-          this.btnUpgrade.textContent = `UPGRADE ($${upgradeCost})`;
-          if (this.game.gold < upgradeCost) {
-            this.btnUpgrade.disabled = true;
-            this.btnUpgrade.style.opacity = '0.5';
-          } else {
-            this.btnUpgrade.disabled = false;
-            this.btnUpgrade.style.opacity = '1.0';
-          }
-        }
-
-        this.btnSell.textContent = `SELL ($${sellValue})`;
-
-        let btnAbility = document.getElementById('btn-ability');
-        if (!btnAbility) {
-          btnAbility = document.createElement('button');
-          btnAbility.id = 'btn-ability';
-          btnAbility.className = 'btn btn-secondary';
-          btnAbility.style.marginTop = '8px';
-          btnAbility.style.width = '100%';
-          this.selectionPanel.appendChild(btnAbility);
-        }
-
-        if (agent.type === 'commander' || agent.type === 'gladiator' || agent.type === 'medic') {
-          btnAbility.className = 'btn btn-secondary';
-          if (agent.isAbilityActive) {
-            btnAbility.textContent = `ACTIVE (${Math.ceil(agent.abilityActiveTimer)}s)`;
-            btnAbility.disabled = true;
-            btnAbility.style.opacity = '0.7';
-            btnAbility.style.background = '#e74c3c';
-          } else if (agent.abilityCooldownTimer > 0) {
-            btnAbility.textContent = `COOLDOWN (${Math.ceil(agent.abilityCooldownTimer)}s)`;
-            btnAbility.disabled = true;
-            btnAbility.style.opacity = '0.5';
-            btnAbility.style.background = '#7f8c8d';
-          } else {
-            btnAbility.textContent = "ABILITY";
-            btnAbility.disabled = false;
-            btnAbility.style.opacity = '1.0';
-            btnAbility.style.background = '#f39c12';
-            btnAbility.style.color = '#fff';
-          }
-
-          btnAbility.onclick = () => {
-            const handled = agent.activateAbility(this.game.effectManager, this.game);
-            if (handled) {
-              this.updateSelectionPanel(agent);
-            }
-          };
-        } else {
-          btnAbility.className = 'btn btn-secondary hidden';
-        }
-      }
-
-      hideSelectionPanel() {
-        this.selectionPanel.classList.add('hidden');
-      }
-
-      updateWaveButton(waveInProgress) {
-        if (waveInProgress) {
-          this.btnNextWave.textContent = "DEFENDING...";
-          this.btnNextWave.disabled = true;
-          this.btnNextWave.style.opacity = '0.5';
-        } else {
-          if (Network.mode === 'CLIENT') {
-            this.btnNextWave.textContent = "WAITING FOR HOST";
-            this.btnNextWave.disabled = true;
-            this.btnNextWave.style.opacity = '0.6';
-          } else {
-            this.btnNextWave.textContent = "START WAVE";
-            this.btnNextWave.disabled = false;
-            this.btnNextWave.style.opacity = '1.0';
-          }
-        }
-      }
-
-      updateSpeedButton(multiplier) {
-        if (this.btnSpeed) {
-          this.btnSpeed.textContent = `SPEED x${multiplier}`;
-        }
-      }
-
-      updateAutoWaveButton(isOn) {
-        if (!this.btnAutoWave) return;
-        if (isOn) {
-          this.btnAutoWave.textContent = 'AUTO WAVE: ON';
-          this.btnAutoWave.style.background = '#27ae60';
-          this.btnAutoWave.style.color = '#fff';
-          this.btnAutoWave.style.opacity = '1.0';
-        } else {
-          this.btnAutoWave.textContent = 'AUTO WAVE: OFF';
-          this.btnAutoWave.style.background = '#7f8c8d';
-          this.btnAutoWave.style.color = '#fff';
-          this.btnAutoWave.style.opacity = '0.85';
-        }
-      }
-
-      showAutoCountdown(seconds) {
-        if (!this.btnNextWave) return;
-        let remaining = seconds;
+        const cvs = btn.querySelector('canvas');
         
+        if (this.parentUI.lobby) {
+          this.parentUI.lobby.drawAgentPreview(cvs, type);
+        }
+
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.placement-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          this.game.setSelectedShopTower(type);
+          this.game.setSelectedPlacedTower(null);
+        });
+
+        this.equippedAgentsList.appendChild(btn);
+      });
+    } catch (e) {
+      console.error("Defensive Guard: Error caught in renderPlacementShop():", e);
+    }
+  }
+
+  updateHUD(lives, gold, wave, maxWaves) {
+    try {
+      if (this.hudLives) {
+        const valEl = document.getElementById('hud-lives-val');
+        if (valEl) {
+          valEl.textContent = Math.max(0, lives);
+        } else {
+          this.hudLives.textContent = `❤️ ${Math.max(0, lives)}`;
+        }
+      }
+      if (this.hudGold) {
+        const valEl = document.getElementById('hud-gold-val');
+        if (valEl) {
+          valEl.textContent = `$${gold}`;
+        } else {
+          this.hudGold.textContent = `💵 $${gold}`;
+        }
+      }
+      if (this.hudWave) {
+        const valEl = document.getElementById('hud-wave-val');
+        if (valEl) {
+          valEl.textContent = `${wave} / ${maxWaves}`;
+        } else {
+          this.hudWave.textContent = `🌊 ${wave} / ${maxWaves}`;
+        }
+      }
+
+      const placementBtns = document.querySelectorAll('.placement-btn');
+      placementBtns.forEach(btn => {
+        const type = btn.getAttribute('data-type');
+        const cost = this.game.getTowerCost(type);
+        if (gold < cost) {
+          btn.style.opacity = '0.4';
+        } else {
+          btn.style.opacity = '1.0';
+        }
+      });
+
+      if (this.btnSkipWave) {
+        const showSkip = this.game.waveInProgress && this.game.wave < this.game.maxWaves;
+        if (showSkip) {
+          this.btnSkipWave.style.display = 'block';
+          this.btnSkipWave.classList.remove('hidden');
+
+          if (this.game.skipCooldown > 0) {
+            this.btnSkipWave.disabled = true;
+            this.btnSkipWave.style.opacity = '0.5';
+            this.btnSkipWave.textContent = `COOLDOWN (${Math.ceil(this.game.skipCooldown)}s)`;
+          } else {
+            this.btnSkipWave.disabled = false;
+            this.btnSkipWave.style.opacity = '1.0';
+            const votesCount = Network.mode === 'CLIENT' ? (this.game.skipVotesCount || 0) : (this.game.skipVotes ? this.game.skipVotes.size : 0);
+            const votesReq = Network.mode === 'CLIENT' ? (this.game.skipVotesRequired || 1) : Math.ceil((Network.conns.filter(c => c && c.open).length + 1) / 2);
+            
+            if (votesCount > 0) {
+              this.btnSkipWave.textContent = `SKIP VOTE (${votesCount}/${votesReq})`;
+            } else {
+              this.btnSkipWave.textContent = "SKIP WAVE";
+            }
+          }
+        } else {
+          this.btnSkipWave.style.display = 'none';
+          this.btnSkipWave.classList.add('hidden');
+        }
+      }
+
+      if (this.btnSpeed) {
+        if (Network.mode === 'CLIENT') {
+          this.btnSpeed.disabled = true;
+          this.btnSpeed.style.opacity = '0.6';
+        } else {
+          this.btnSpeed.disabled = false;
+          this.btnSpeed.style.opacity = '1.0';
+        }
+      }
+
+      if (this.game.selectedPlacedTower) {
+        this.updateSelectionPanel(this.game.selectedPlacedTower);
+      }
+    } catch (e) {
+      console.error("Defensive Guard: Error caught in updateHUD():", e);
+    }
+  }
+
+  updateSelectionPanel(agent) {
+    if (!agent) {
+      this.selectionPanel.classList.add('hidden');
+      return;
+    }
+
+    this.selectionPanel.classList.remove('hidden');
+    document.querySelectorAll('.placement-btn').forEach(b => b.classList.remove('active'));
+
+    this.selectTargeting.value = agent.targetingStrategy;
+
+    const upgradeCost = agent.getUpgradeCost();
+    const sellValue = agent.getSellValue();
+
+    let displayName = agent.name;
+    if (agent.type === 'crook_boss') displayName = 'Crook Boss';
+    else if (agent.type === 'military_base') displayName = 'Military Base';
+    else if (agent.type === 'dj') displayName = 'DJ Booth';
+
+    let detailsHtml = `
+      <p class="unit-name" style="text-transform: uppercase;">${displayName} <span style="color: #f39c12">Lvl ${agent.level}</span></p>
+      <p class="unit-stats">Damage: ${Math.round(agent.damage)} | Range: ${Math.round(agent.range * (agent.djRangeBuffed ? 1.15 : 1.0))}px | Rate: ${(agent.fireRate * (agent.commanderSpeedBuffed ? 1.35 : 1.0)).toFixed(1)}/s</p>
+    `;
+
+    // Specialized Agent details description
+    if (agent.type === 'commander') {
+      detailsHtml += `<p class="unit-stats" style="color: #e74c3c">Call to Arms: Active speed buffs for nearby agents.</p>`;
+    } else if (agent.type === 'dj') {
+      detailsHtml += `<p class="unit-stats" style="color: #9b59b6">Plays Tracks: Range expansion & upgrade cost discount inside aura.</p>`;
+    } else if (agent.type === 'pyromancer') {
+      const burnDps = 15 + agent.level * 4;
+      detailsHtml += `<p class="unit-stats" style="color: #e67e22">Fire Spray DoT: ${burnDps} Dmg/sec. Removes lead armors.</p>`;
+    } else if (agent.type === 'farm') {
+      const income = agent.getHarvestIncome();
+      detailsHtml += `<p class="unit-stats" style="color: #2ecc71">Wave Harvest Income: +$${income}</p>`;
+    } else if (agent.type === 'gladiator') {
+      detailsHtml += `<p class="unit-stats" style="color: #7f8c8d">Centurion Plume: Extreme fast melee cleave swings.</p>`;
+    } else if (agent.type === 'soldier') {
+      detailsHtml += `<p class="unit-stats" style="color: #27ae60">Assault Rifle: Rapid burst-fire configurations.</p>`;
+    } else if (agent.type === 'sniper') {
+      detailsHtml += `<p class="unit-stats" style="color: #e67e22">Sniper Scope: Heavy slow long-range armor-piercing tracer bullets.</p>`;
+    } else if (agent.type === 'medic') {
+      detailsHtml += `<p class="unit-stats" style="color: #2ecc71">Syringe Gun: Active heals base HP & cleanses active stun locks.</p>`;
+    } else if (agent.type === 'rocketeer') {
+      detailsHtml += `<p class="unit-stats" style="color: #95a5a6">Rocket Launcher: Slow high-damage heavy explosive splash impact.</p>`;
+    } else if (agent.type === 'demoman') {
+      detailsHtml += `<p class="unit-stats" style="color: #e67e22">Demolition Grenades: Quick area splash explosions.</p>`;
+    } else if (agent.type === 'freezer') {
+      detailsHtml += `<p class="unit-stats" style="color: #3498db">Freezing Beams: Sells freeze slow effects to stun marching zombies.</p>`;
+    } else if (agent.type === 'shotgunner') {
+      detailsHtml += `<p class="unit-stats" style="color: #34495e">Shotgun Spread: Launches multiple pellets in close-range cones.</p>`;
+    } else if (agent.type === 'crook_boss') {
+      detailsHtml += `<p class="unit-stats" style="color: #d4ac0d">Reinforcements Call: Tommy gun fire and periodic guard deployments.</p>`;
+    } else if (agent.type === 'military_base') {
+      detailsHtml += `<p class="unit-stats" style="color: #27ae60">Heavy Assembly: Deploys heavy armored military vehicles along path.</p>`;
+    } else if (agent.type === 'ranger') {
+      detailsHtml += `<p class="unit-stats" style="color: #ff0055">Heavy Railgun: Massive single-target damage, but cannot detect Camo.</p>`;
+    } else if (agent.type === 'turret') {
+      detailsHtml += `<p class="unit-stats" style="color: #00ffe0">Laser Gatling: Blazing-fast rapid laser bullet output stream.</p>`;
+    }
+
+    const targetingContainer = document.querySelector('.targeting-container');
+    if (targetingContainer) {
+      if (agent.type === 'farm' || agent.type === 'military_base') {
+        targetingContainer.style.display = 'none';
+      } else {
+        targetingContainer.style.display = 'flex';
+      }
+    }
+
+    this.selectionInfo.innerHTML = detailsHtml;
+
+    // Detect if device is a standard computer (non-touch/mouse-pointer Fine)
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
+    const hotkeySuffixUpgrade = !isMobile ? ' [U]' : '';
+    const hotkeySuffixSell = !isMobile ? ' [S]' : '';
+
+    if (agent.level >= 5) {
+      this.btnUpgrade.textContent = "MAX LEVEL";
+      this.btnUpgrade.disabled = true;
+      this.btnUpgrade.style.opacity = '0.5';
+    } else {
+      this.btnUpgrade.textContent = `UPGRADE ($${upgradeCost})${hotkeySuffixUpgrade}`;
+      if (this.game.gold < upgradeCost) {
+        this.btnUpgrade.disabled = true;
+        this.btnUpgrade.style.opacity = '0.5';
+      } else {
+        this.btnUpgrade.disabled = false;
+        this.btnUpgrade.style.opacity = '1.0';
+      }
+    }
+
+    this.btnSell.textContent = `SELL ($${sellValue})${hotkeySuffixSell}`;
+
+    let btnAbility = document.getElementById('btn-ability');
+    if (!btnAbility) {
+      btnAbility = document.createElement('button');
+      btnAbility.id = 'btn-ability';
+      btnAbility.className = 'btn btn-secondary';
+      btnAbility.style.marginTop = '8px';
+      btnAbility.style.width = '100%';
+      this.selectionPanel.appendChild(btnAbility);
+    }
+
+    if (agent.type === 'commander' || agent.type === 'gladiator' || agent.type === 'medic') {
+      btnAbility.className = 'btn btn-secondary';
+      if (agent.isAbilityActive) {
+        btnAbility.textContent = `ACTIVE (${Math.ceil(agent.abilityActiveTimer)}s)`;
+        btnAbility.disabled = true;
+        btnAbility.style.opacity = '0.7';
+        btnAbility.style.background = '#e74c3c';
+      } else if (agent.abilityCooldownTimer > 0) {
+        btnAbility.textContent = `COOLDOWN (${Math.ceil(agent.abilityCooldownTimer)}s)`;
+        btnAbility.disabled = true;
+        btnAbility.style.opacity = '0.5';
+        btnAbility.style.background = '#7f8c8d';
+      } else {
+        btnAbility.textContent = "ABILITY";
+        btnAbility.disabled = false;
+        btnAbility.style.opacity = '1.0';
+        btnAbility.style.background = '#f39c12';
+        btnAbility.style.color = '#fff';
+      }
+
+      btnAbility.onclick = () => {
+        const handled = agent.activateAbility(this.game.effectManager, this.game);
+        if (handled) {
+          this.updateSelectionPanel(agent);
+        }
+      };
+    } else {
+      btnAbility.className = 'btn btn-secondary hidden';
+    }
+  }
+
+  hideSelectionPanel() {
+    this.selectionPanel.classList.add('hidden');
+  }
+
+  updateWaveButton(waveInProgress) {
+    if (waveInProgress) {
+      this.btnNextWave.textContent = "DEFENDING...";
+      this.btnNextWave.disabled = true;
+      this.btnNextWave.style.opacity = '0.5';
+    } else {
+      if (Network.mode === 'CLIENT') {
+        this.btnNextWave.textContent = "WAITING FOR HOST";
+        this.btnNextWave.disabled = true;
+        this.btnNextWave.style.opacity = '0.6';
+      } else {
+        this.btnNextWave.textContent = "START WAVE";
+        this.btnNextWave.disabled = false;
+        this.btnNextWave.style.opacity = '1.0';
+      }
+    }
+  }
+
+  updateSpeedButton(multiplier) {
+    if (this.btnSpeed) {
+      this.btnSpeed.textContent = `SPEED x${multiplier}`;
+    }
+  }
+
+  updateAutoWaveButton(isOn) {
+    if (!this.btnAutoWave) return;
+    if (isOn) {
+      this.btnAutoWave.textContent = 'AUTO WAVE: ON';
+      this.btnAutoWave.style.background = '#27ae60';
+      this.btnAutoWave.style.color = '#fff';
+      this.btnAutoWave.style.opacity = '1.0';
+    } else {
+      this.btnAutoWave.textContent = 'AUTO WAVE: OFF';
+      this.btnAutoWave.style.background = '#7f8c8d';
+      this.btnAutoWave.style.color = '#fff';
+      this.btnAutoWave.style.opacity = '0.85';
+    }
+  }
+
+  showAutoCountdown(seconds) {
+    if (!this.btnNextWave) return;
+    let remaining = seconds;
+    
+    if (Network.mode === 'CLIENT') {
+      this.btnNextWave.textContent = "WAITING FOR HOST";
+      this.btnNextWave.disabled = true;
+      this.btnNextWave.style.opacity = '0.6';
+    } else {
+      this.btnNextWave.textContent = `NEXT WAVE IN ${remaining}s...`;
+      this.btnNextWave.disabled = true;
+      this.btnNextWave.style.opacity = '0.7';
+    }
+
+    const interval = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        clearInterval(interval);
+      } else {
         if (Network.mode === 'CLIENT') {
           this.btnNextWave.textContent = "WAITING FOR HOST";
-          this.btnNextWave.disabled = true;
-          this.btnNextWave.style.opacity = '0.6';
         } else {
           this.btnNextWave.textContent = `NEXT WAVE IN ${remaining}s...`;
-          this.btnNextWave.disabled = true;
-          this.btnNextWave.style.opacity = '0.7';
-        }
-
-        const interval = setInterval(() => {
-          remaining--;
-          if (remaining <= 0) {
-            clearInterval(interval);
-          } else {
-            if (Network.mode === 'CLIENT') {
-              this.btnNextWave.textContent = "WAITING FOR HOST";
-            } else {
-              this.btnNextWave.textContent = `NEXT WAVE IN ${remaining}s...`;
-            }
-          }
-        }, 1000);
-      }
-
-      showOverlay(title, subtitle) {
-        this.overlayTitle.textContent = title;
-        this.overlaySubtitle.textContent = subtitle;
-        this.overlay.className = 'overlay-content';
-      }
-
-      hideOverlay() {
-        this.overlay.className = 'overlay-content hidden';
-      }
-
-      showGameLayout(mapName) {
-        if (this.parentUI.lobby) {
-          this.parentUI.lobby.lobbyView.classList.add('hidden');
-        }
-        this.parentUI.gameView.classList.remove('hidden');
-        this.hudMapName.textContent = mapName.toUpperCase();
-        
-        CrazyGamesManager.gameplayStart();
-        this.hidePointer();
-
-        if (this.game.tutorialActive) {
-          this.showTutorialHint(0.5); 
         }
       }
+    }, 1000);
+  }
 
-      showLobbyLayout() {
-        this.parentUI.gameView.classList.add('hidden');
-        this.parentUI.lobbyView.classList.remove('hidden');
+  showOverlay(title, subtitle) {
+    this.overlayTitle.textContent = title;
+    this.overlaySubtitle.textContent = subtitle;
+    this.overlay.className = 'overlay-content';
+  }
+
+  hideOverlay() {
+    this.overlay.className = 'overlay-content hidden';
+  }
+
+  showGameLayout(mapName) {
+    if (this.parentUI.lobby) {
+      this.parentUI.lobby.lobbyView.classList.add('hidden');
+    }
+    this.parentUI.gameView.classList.remove('hidden');
+    this.hudMapName.textContent = mapName.toUpperCase();
+    
+    CrazyGamesManager.gameplayStart();
+    this.hidePointer();
+
+    if (this.game.tutorialActive) {
+      this.showTutorialHint(0.5); 
+    }
+  }
+
+  showLobbyLayout() {
+    this.parentUI.gameView.classList.add('hidden');
+    this.parentUI.lobbyView.classList.remove('hidden');
+    this.dismissCommanderDialog(); 
+    
+    if (this.parentUI.lobby) {
+      this.parentUI.lobby.drawAllStaticPreviews();
+      this.parentUI.lobby.renderDailyQuests();
+      this.parentUI.lobby.renderLeaderboard(this.game.selectedMap);
+    }
+    CrazyGamesManager.gameplayStop();
+    if (this.parentUI.lobby) {
+      this.parentUI.lobby.showSplashState();
+    }
+  }
+
+  showTutorialHint(step) {
+    this.dismissCommanderDialog(); 
+    if (!this.commanderWrapper) return;
+
+    this.commanderWrapper.classList.remove('hidden');
+    this.drawCommanderFace();
+
+    const messages = {
+      0.5: "Welcome to the battleground, rookie! I am your Commander. Tap anywhere on the map grid to clear the direction directives and ready up.",
+      1: "Let's set up a perimeter. Select the Scout from your troops panel on the right.",
+      1.5: "Excellent. Now, place your Scout near the path (like the highlighted tile). You can place him anywhere valid!",
+      2: "Good job! Now, tap directly on your placed Scout to select him.",
+      2.5: "Great! Now press UPGRADE in your action panel to power him up before starting the wave.",
+      3: "Looking strong! Now, press 'START WAVE' to summon the training zombies!",
+      4: "Superb work, rookie. You've mastered the basics of Blocky tactical defenses. Dismissed!"
+    };
+
+    this.commanderText.textContent = messages[step] || "Awaiting operational instructions...";
+
+    if (this.btnCommanderSkip) {
+      if (step >= 0.5 && step < 4) {
+        this.btnCommanderSkip.style.display = 'block';
+      } else {
+        this.btnCommanderSkip.style.display = 'none';
+      }
+    }
+
+    if (step === 4) {
+      this.btnCommanderAction.textContent = "FINISH TUTORIAL ✓";
+      this.btnCommanderAction.onclick = () => {
+        this.game.tutorialCompleted = true;
+        this.game.tutorialActive = false; // Deactivate active session flag
+        this.game.saveStatsToStorage();
+        this.dismissTutorial(); 
+      };
+    } else {
+      this.btnCommanderAction.textContent = "GOT IT ✓";
+      this.btnCommanderAction.onclick = () => {
         this.dismissCommanderDialog(); 
-        
-        if (this.parentUI.lobby) {
-          this.parentUI.lobby.drawAllStaticPreviews();
-          this.parentUI.lobby.renderDailyQuests();
-          this.parentUI.lobby.renderLeaderboard(this.game.selectedMap);
-        }
-        CrazyGamesManager.gameplayStop();
-        if (this.parentUI.lobby) {
-          this.parentUI.lobby.showSplashState();
-        }
-      }
+      };
+    }
 
-      showTutorialHint(step) {
-        this.dismissCommanderDialog(); 
-        if (!this.commanderWrapper) return;
+    this.activateStepPointers(step);
+  }
 
-        this.commanderWrapper.classList.remove('hidden');
-        this.drawCommanderFace();
+  showCommanderAnnouncement(msg) {
+    if (!this.commanderWrapper) return;
 
-        const messages = {
-          0.5: "Welcome to the battleground, rookie! I am your Commander. Tap anywhere on the map grid to clear the direction directives and ready up.",
-          1: "Let's set up a perimeter. Select the Scout from your troops panel on the right.",
-          1.5: "Excellent. Now, place your Scout near the path (like the highlighted tile). You can place him anywhere valid!",
-          2: "Good job! Now, tap directly on your placed Scout to select him.",
-          2.5: "Great! Now press UPGRADE in your action panel to power him up before starting the wave.",
-          3: "Looking strong! Now, press 'START WAVE' to summon the training zombies!",
-          4: "Superb work, rookie. You've mastered the basics of Blocky tactical defenses. Dismissed!"
+    // Clean up skip button visibility
+    if (this.btnCommanderSkip) {
+      this.btnCommanderSkip.style.display = 'none';
+    }
+
+    this.commanderWrapper.classList.remove('hidden');
+    this.drawCommanderFace();
+    this.commanderText.textContent = msg;
+    this.btnCommanderAction.textContent = "DISMISS ✓";
+    this.btnCommanderAction.onclick = () => {
+      this.dismissCommanderDialog();
+    };
+  }
+
+  activateStepPointers(step) {
+    this.hidePointer();
+
+    if (step === 0.5) {
+      this.showPointerAtCanvasCenter(); 
+    }
+    else if (step === 1) {
+      const scoutBtn = this.equippedAgentsList.querySelector('.placement-btn[data-type="scout"]');
+      if (scoutBtn) {
+        this.showPointerAt(scoutBtn, 'right');
+        scoutBtn.classList.add('tut-highlight');
+
+        const onScoutSelect = () => {
+          scoutBtn.removeEventListener('click', onScoutSelect);
+          scoutBtn.classList.remove('tut-highlight');
+          this.hidePointer();
+          this.game.tutorialStep = 1.5;
+          this.showTutorialHint(1.5);
         };
-
-        this.commanderText.textContent = messages[step] || "Awaiting operational instructions...";
-
-        if (this.btnCommanderSkip) {
-          if (step >= 0.5 && step < 4) {
-            this.btnCommanderSkip.style.display = 'block';
-          } else {
-            this.btnCommanderSkip.style.display = 'none';
-          }
-        }
-
-        if (step === 4) {
-          this.btnCommanderAction.textContent = "FINISH TUTORIAL ✓";
-          this.btnCommanderAction.onclick = () => {
-            this.game.tutorialCompleted = true;
-            this.game.tutorialActive = false; // Deactivate active session flag
-            this.game.saveStatsToStorage();
-            this.dismissTutorial(); 
-          };
-        } else {
-          this.btnCommanderAction.textContent = "GOT IT ✓";
-          this.btnCommanderAction.onclick = () => {
-            this.dismissCommanderDialog(); 
-          };
-        }
-
-        this.activateStepPointers(step);
+        scoutBtn.addEventListener('click', onScoutSelect);
       }
-
-      showCommanderAnnouncement(msg) {
-        if (!this.commanderWrapper) return;
-
-        // Clean up skip button visibility
-        if (this.btnCommanderSkip) {
-          this.btnCommanderSkip.style.display = 'none';
-        }
-
-        this.commanderWrapper.classList.remove('hidden');
-        this.drawCommanderFace();
-        this.commanderText.textContent = msg;
-        this.btnCommanderAction.textContent = "DISMISS ✓";
-        this.btnCommanderAction.onclick = () => {
-          this.dismissCommanderDialog();
-        };
-      }
-
-      activateStepPointers(step) {
-        this.hidePointer();
-
-        if (step === 0.5) {
-          this.showPointerAtCanvasCenter(); 
-        }
-        else if (step === 1) {
-          const scoutBtn = this.equippedAgentsList.querySelector('.placement-btn[data-type="scout"]');
-          if (scoutBtn) {
-            this.showPointerAt(scoutBtn, 'right');
-            scoutBtn.classList.add('tut-highlight');
-
-            const onScoutSelect = () => {
-              scoutBtn.removeEventListener('click', onScoutSelect);
-              scoutBtn.classList.remove('tut-highlight');
-              this.hidePointer();
-              this.game.tutorialStep = 1.5;
-              this.showTutorialHint(1.5);
-            };
-            scoutBtn.addEventListener('click', onScoutSelect);
-          }
-        } 
-        else if (step === 1.5) {
-          this.showPointerAtCanvasTile(2, 2); 
-        }
-        else if (step === 2) {
-          let scout = null;
-          for (const t of this.game.grid.towers.values()) {
-            if (t.type === 'scout') {
-              scout = t;
-              break;
-            }
-          }
-          if (scout) {
-            this.showPointerAtCanvasTile(scout.gridX, scout.gridY);
-          } else {
-            this.showPointerAtCanvasTile(2, 2);
-          }
-        }
-        else if (step === 2.5) {
-          if (this.btnUpgrade) {
-            this.showPointerAt(this.btnUpgrade, 'left');
-            this.btnUpgrade.classList.add('tut-highlight');
-          }
-        }
-        else if (step === 3) {
-          if (this.btnNextWave) {
-            this.showPointerAt(this.btnNextWave, 'down');
-            this.btnNextWave.classList.add('tut-highlight');
-          }
+    } 
+    else if (step === 1.5) {
+      this.showPointerAtCanvasTile(2, 2); 
+    }
+    else if (step === 2) {
+      let scout = null;
+      for (const t of this.game.grid.towers.values()) {
+        if (t.type === 'scout') {
+          scout = t;
+          break;
         }
       }
-
-      dismissCommanderDialog() {
-        if (this.commanderWrapper) {
-          this.commanderWrapper.classList.add('hidden'); 
-        }
+      if (scout) {
+        this.showPointerAtCanvasTile(scout.gridX, scout.gridY);
+      } else {
+        this.showPointerAtCanvasTile(2, 2);
       }
-
-      dismissTutorial() {
-        document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
-        this.hidePointer();
-
-        // Explicitly hide the skip button on dismissal
-        if (this.btnCommanderSkip) {
-          this.btnCommanderSkip.style.display = 'none';
-        }
-
-        this.dismissCommanderDialog(); 
+    }
+    else if (step === 2.5) {
+      if (this.btnUpgrade) {
+        this.showPointerAt(this.btnUpgrade, 'left');
+        this.btnUpgrade.classList.add('tut-highlight');
       }
+    }
+    else if (step === 3) {
+      if (this.btnNextWave) {
+        this.showPointerAt(this.btnNextWave, 'down');
+        this.btnNextWave.classList.add('tut-highlight');
+      }
+    }
+  }
 
-      showMatchSummaryCard(isVictory) {
-        this.overlay.classList.remove('hidden');
-        this.overlayTitle.classList.add('hidden');
-        this.overlaySubtitle.classList.add('hidden');
+  dismissCommanderDialog() {
+    if (this.commanderWrapper) {
+      this.commanderWrapper.classList.add('hidden'); 
+    }
+  }
 
-        let oldCard = document.getElementById('match-summary-card');
-        if (oldCard) oldCard.remove();
+  dismissTutorial() {
+    document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
+    this.hidePointer();
 
-        const summaryCard = document.createElement('div');
-        summaryCard.id = 'match-summary-card';
-        summaryCard.className = 'summary-card-anim';
-        summaryCard.style.cssText = `
-          background: rgba(20, 30, 50, 0.98);
-          border: 4px solid ${isVictory ? '#f1c40f' : '#e74c3c'};
-          box-shadow: 0 0 25px ${isVictory ? 'rgba(241,196,15,0.4)' : 'rgba(231,76,60,0.4)'};
-          border-radius: 16px;
-          padding: 16px 20px 20px 20px;
-          width: 360px;
-          max-width: 90%;
-          max-height: 95vh;
-          overflow-y: auto;
-          text-align: center;
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          z-index: 10000;
+    // Explicitly hide the skip button on dismissal
+    if (this.btnCommanderSkip) {
+      this.btnCommanderSkip.style.display = 'none';
+    }
+
+    this.dismissCommanderDialog(); 
+  }
+
+  showMatchSummaryCard(isVictory) {
+    this.overlay.classList.remove('hidden');
+    this.overlayTitle.classList.add('hidden');
+    this.overlaySubtitle.classList.add('hidden');
+
+    let oldCard = document.getElementById('match-summary-card');
+    if (oldCard) oldCard.remove();
+
+    const summaryCard = document.createElement('div');
+    summaryCard.id = 'match-summary-card';
+    summaryCard.className = 'summary-card-anim';
+    summaryCard.style.cssText = `
+      background: rgba(20, 30, 50, 0.98);
+      border: 4px solid ${isVictory ? '#f1c40f' : '#e74c3c'};
+      box-shadow: 0 0 25px ${isVictory ? 'rgba(241,196,15,0.4)' : 'rgba(231,76,60,0.4)'};
+      border-radius: 16px;
+      padding: 16px 20px 20px 20px;
+      width: 360px;
+      max-width: 90%;
+      max-height: 95vh;
+      overflow-y: auto;
+      text-align: center;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10000;
+      color: #fff;
+      -webkit-overflow-scrolling: touch;
+    `;
+
+    const mapName = this.game.selectedMap.replace('_', ' ').toUpperCase();
+    const finalWave = this.game.wave;
+    const durationM = Math.floor(this.game.matchTime / 60);
+    const durationS = Math.floor(this.game.matchTime % 60);
+    const durationStr = `${String(durationM).padStart(2, '0')}:${String(durationS).padStart(2, '0')}`;
+
+    const mapMult = this.game.selectedMap === 'tundra' ? 1.5 : this.game.selectedMap === 'desert' ? 1.25 : 1.0;
+    const isHc = this.game.isHardcore;
+
+    let baseCoins = Math.round((10 + finalWave * 5) * mapMult);
+    let baseXP = Math.round((15 + finalWave * 4) * mapMult);
+
+    if (isVictory && isHc) {
+      baseCoins *= 3;
+      baseXP *= 3;
+    }
+
+    let reviveButtonHtml = '';
+    if (!isVictory && !this.game.hasRevivedThisMatch) {
+      reviveButtonHtml = `
+        <button id="btn-summary-revive" class="btn" style="
+          background: #27ae60;
           color: #fff;
-          -webkit-overflow-scrolling: touch;
-        `;
+          width: 100%;
+          font-size: 1.1rem;
+          margin-bottom: 8px;
+          box-shadow: 0 4px 0 #219653, 0 4px 0 var(--border-color);
+        ">📺 WATCH AD TO REVIVE (+50 LIVES)</button>
+      `;
+    }
 
-        const mapName = this.game.selectedMap.replace('_', ' ').toUpperCase();
-        const finalWave = this.game.wave;
-        const durationM = Math.floor(this.game.matchTime / 60);
-        const durationS = Math.floor(this.game.matchTime % 60);
-        const durationStr = `${String(durationM).padStart(2, '0')}:${String(durationS).padStart(2, '0')}`;
+    const feedbackSubmittedBefore = localStorage.getItem('tds_feedback_submitted') === 'true';
+    let feedbackFormHtml = '';
 
-        const mapMult = this.game.selectedMap === 'tundra' ? 1.5 : this.game.selectedMap === 'desert' ? 1.25 : 1.0;
-        const isHc = this.game.isHardcore;
-
-        let baseCoins = Math.round((10 + finalWave * 5) * mapMult);
-        let baseXP = Math.round((15 + finalWave * 4) * mapMult);
-
-        if (isVictory && isHc) {
-          baseCoins *= 3;
-          baseXP *= 3;
-        }
-
-        let reviveButtonHtml = '';
-        if (!isVictory && !this.game.hasRevivedThisMatch) {
-          reviveButtonHtml = `
-            <button id="btn-summary-revive" class="btn" style="
-              background: #27ae60;
-              color: #fff;
-              width: 100%;
-              font-size: 1.1rem;
-              margin-bottom: 8px;
-              box-shadow: 0 4px 0 #219653, 0 4px 0 var(--border-color);
-            ">📺 WATCH AD TO REVIVE (+50 LIVES)</button>
-          `;
-        }
-
-        const feedbackSubmittedBefore = localStorage.getItem('tds_feedback_submitted') === 'true';
-        let feedbackFormHtml = '';
-
-        if (!feedbackSubmittedBefore) {
-          feedbackFormHtml = `
-            <div id="summary-feedback-container" style="
-              margin-top: 14px;
-              background: rgba(241, 196, 15, 0.04);
-              border: 2px dashed rgba(241, 196, 15, 0.3);
-              border-radius: 10px;
-              padding: 10px 12px;
-              text-align: left;
-              transition: all 0.2s ease;
-            ">
-              <label for="input-feedback-msg" style="
-                font-family: var(--font-title);
-                font-size: 0.8rem;
-                font-weight: 900;
-                color: #f1c40f;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                margin-bottom: 6px;
-                text-shadow: 1px 1px 0 #000;
-              ">
-                📝 HELP IMPROVE THE GAME! (SUGGESTIONS & BUGS)
-              </label>
-              <div style="display:flex; gap:6px; align-items: center;">
-                <input type="text" id="input-feedback-msg" placeholder="Write feedback here..." style="
-                  flex: 1;
-                  font-size: 0.8rem;
-                  padding: 6px;
-                  border: 2px solid var(--border-color);
-                  border-radius: 6px;
-                  outline: none;
-                "/>
-                <button id="btn-submit-feedback" class="btn btn-primary" style="font-size: 0.72rem; padding: 6px 12px; margin: 0; min-height: 32px;">SEND</button>
-              </div>
-            </div>
-          `;
-        }
-
-        summaryCard.innerHTML = `
-          <h2 style="font-family:var(--font-title); font-size:1.8rem; margin-bottom:15px; color:${isVictory ? 'var(--primary-yellow)' : 'var(--primary-red)'}">${isVictory ? '🏆 VICTORY' : '💀 DEFEAT'}</h2>
-          <div style="font-size:0.9rem; font-weight:800; margin-bottom:15px;">
-            <p>MAP: <span style="color:var(--primary-blue)">${mapName}</span></p>
-            <p>WAVES DEFENDED: <span style="color:var(--primary-yellow-dark)" id="tally-wave">0</span></p>
-            <p>TIME ELAPSED: <span style="color:#00ffe0" id="tally-time">--:--</span></p>
+    if (!feedbackSubmittedBefore) {
+      feedbackFormHtml = `
+        <div id="summary-feedback-container" style="
+          margin-top: 14px;
+          background: rgba(241, 196, 15, 0.04);
+          border: 2px dashed rgba(241, 196, 15, 0.3);
+          border-radius: 10px;
+          padding: 10px 12px;
+          text-align: left;
+          transition: all 0.2s ease;
+        ">
+          <label for="input-feedback-msg" style="
+            font-family: var(--font-title);
+            font-size: 0.8rem;
+            font-weight: 900;
+            color: #f1c40f;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 6px;
+            text-shadow: 1px 1px 0 #000;
+          ">
+            📝 HELP IMPROVE THE GAME! (SUGGESTIONS & BUGS)
+          </label>
+          <div style="display:flex; gap:6px; align-items: center;">
+            <input type="text" id="input-feedback-msg" placeholder="Write feedback here..." style="
+              flex: 1;
+              font-size: 0.8rem;
+              padding: 6px;
+              border: 2px solid var(--border-color);
+              border-radius: 6px;
+              outline: none;
+            "/>
+            <button id="btn-submit-feedback" class="btn btn-primary" style="font-size: 0.72rem; padding: 6px 12px; margin: 0; min-height: 32px;">SEND</button>
           </div>
-          <div style="display:flex; gap:10px; justify-content:center; font-weight:900; margin-bottom:20px;">
-            <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px; border:2.5px solid var(--border-color); flex:1;">
-              <span style="font-size:0.75rem; color:var(--text-muted)">REWARD COINS</span>
-              <p style="font-size:1.3rem; color:var(--primary-yellow)" id="tally-coins">+🪙 0</p>
-            </div>
-            <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px; border:2.5px solid var(--border-color); flex:1;">
-              <span style="font-size:0.75rem; color:var(--text-muted)">REWARD XP</span>
-              <p style="font-size:1.3rem; color:var(--primary-green)" id="tally-xp">+🌟 0</p>
-            </div>
-          </div>
-          ${reviveButtonHtml}
-          ${feedbackFormHtml}
-          <button id="btn-summary-close" class="btn btn-primary" style="width:100%; font-size:1.1rem; padding:12px; margin-top:10px; box-shadow:0 4px 0 var(--primary-blue-dark), 0 4px 0 var(--border-color);">RETURN TO LOBBY</button>
-        `;
+        </div>
+      `;
+    }
 
-        this.overlay.appendChild(summaryCard);
+    summaryCard.innerHTML = `
+      <h2 style="font-family:var(--font-title); font-size:1.8rem; margin-bottom:15px; color:${isVictory ? 'var(--primary-yellow)' : 'var(--primary-red)'}">${isVictory ? '🏆 VICTORY' : '💀 DEFEAT'}</h2>
+      <div style="font-size:0.9rem; font-weight:800; margin-bottom:15px;">
+        <p>MAP: <span style="color:var(--primary-blue)">${mapName}</span></p>
+        <p>WAVES DEFENDED: <span style="color:var(--primary-yellow-dark)" id="tally-wave">0</span></p>
+        <p>TIME ELAPSED: <span style="color:#00ffe0" id="tally-time">--:--</span></p>
+      </div>
+      <div style="display:flex; gap:10px; justify-content:center; font-weight:900; margin-bottom:20px;">
+        <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px; border:2.5px solid var(--border-color); flex:1;">
+          <span style="font-size:0.75rem; color:var(--text-muted)">REWARD COINS</span>
+          <p style="font-size:1.3rem; color:var(--primary-yellow)" id="tally-coins">+🪙 0</p>
+        </div>
+        <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px; border:2.5px solid var(--border-color); flex:1;">
+          <span style="font-size:0.75rem; color:var(--text-muted)">REWARD XP</span>
+          <p style="font-size:1.3rem; color:var(--primary-green)" id="tally-xp">+🌟 0</p>
+        </div>
+      </div>
+      ${reviveButtonHtml}
+      ${feedbackFormHtml}
+      <button id="btn-summary-close" class="btn btn-primary" style="width:100%; font-size:1.1rem; padding:12px; margin-top:10px; box-shadow:0 4px 0 var(--primary-blue-dark), 0 4px 0 var(--border-color);">RETURN TO LOBBY</button>
+    `;
 
-        // Active Input Glow Effects
-        const feedbackInput = document.getElementById('input-feedback-msg');
-        const feedbackContainer = document.getElementById('summary-feedback-container');
-        if (feedbackInput && feedbackContainer) {
-          feedbackInput.addEventListener('focus', () => {
-            feedbackContainer.style.borderColor = '#f1c40f';
-            feedbackContainer.style.background = 'rgba(241, 196, 15, 0.08)';
-            feedbackInput.style.borderColor = '#f1c40f';
-          });
-          feedbackInput.addEventListener('blur', () => {
-            feedbackContainer.style.borderColor = 'rgba(241, 196, 15, 0.3)';
-            feedbackContainer.style.background = 'rgba(241, 196, 15, 0.04)';
-            feedbackInput.style.borderColor = 'var(--border-color)';
-          });
-        }
+    this.overlay.appendChild(summaryCard);
 
-        const btnSubmitFeedback = document.getElementById('btn-submit-feedback');
-        const inputFeedbackMsg = document.getElementById('input-feedback-msg');
-        
-        if (btnSubmitFeedback && inputFeedbackMsg) {
-          btnSubmitFeedback.addEventListener('click', () => {
-            const text = inputFeedbackMsg.value.trim();
-            if (!text) return;
+    // Active Input Glow Effects
+    const feedbackInput = document.getElementById('input-feedback-msg');
+    const feedbackContainer = document.getElementById('summary-feedback-container');
+    if (feedbackInput && feedbackContainer) {
+      feedbackInput.addEventListener('focus', () => {
+        feedbackContainer.style.borderColor = '#f1c40f';
+        feedbackContainer.style.background = 'rgba(241, 196, 15, 0.08)';
+        feedbackInput.style.borderColor = '#f1c40f';
+      });
+      feedbackInput.addEventListener('blur', () => {
+        feedbackContainer.style.borderColor = 'rgba(241, 196, 15, 0.3)';
+        feedbackContainer.style.background = 'rgba(241, 196, 15, 0.04)';
+        feedbackInput.style.borderColor = 'var(--border-color)';
+      });
+    }
 
-            import('./firebase.js').then((fb) => {
-              const contextMeta = {
-                mapId: this.game.selectedMap,
-                finalWave: finalWave,
-                isVictory: isVictory
-              };
-              fb.uploadFeedback(text, isVictory ? 5 : 3, contextMeta);
+    const btnSubmitFeedback = document.getElementById('btn-submit-feedback');
+    const inputFeedbackMsg = document.getElementById('input-feedback-msg');
+    
+    if (btnSubmitFeedback && inputFeedbackMsg) {
+      btnSubmitFeedback.addEventListener('click', () => {
+        const text = inputFeedbackMsg.value.trim();
+        if (!text) return;
 
-              localStorage.setItem('tds_feedback_submitted', 'true');
+        import('./firebase.js').then((fb) => {
+          const contextMeta = {
+            mapId: this.game.selectedMap,
+            finalWave: finalWave,
+            isVictory: isVictory
+          };
+          fb.uploadFeedback(text, isVictory ? 5 : 3, contextMeta);
 
-              btnSubmitFeedback.textContent = "✓ SENT";
-              btnSubmitFeedback.disabled = true;
-              btnSubmitFeedback.style.background = "#27ae60";
-              btnSubmitFeedback.style.borderColor = "#27ae60";
-              btnSubmitFeedback.style.boxShadow = "none";
-              btnSubmitFeedback.style.color = "#fff";
-              inputFeedbackMsg.disabled = true;
-              inputFeedbackMsg.value = "Thank you for the support!";
-            }).catch(err => console.warn('Failed to load firebase context:', err));
-          });
-        }
+          localStorage.setItem('tds_feedback_submitted', 'true');
 
-        const reviveBtn = document.getElementById('btn-summary-revive');
-        if (reviveBtn) {
-          reviveBtn.addEventListener('click', () => {
-            CrazyGamesManager.requestRewardedAd(() => {
-              this.game.revivePlayer();
-              summaryCard.remove();
-              this.overlay.className = 'overlay-content hidden';
-              this.overlayTitle.classList.remove('hidden');
-              this.overlaySubtitle.classList.remove('hidden');
-            });
-          });
-        }
+          btnSubmitFeedback.textContent = "✓ SENT";
+          btnSubmitFeedback.disabled = true;
+          btnSubmitFeedback.style.background = "#27ae60";
+          btnSubmitFeedback.style.borderColor = "#27ae60";
+          btnSubmitFeedback.style.boxShadow = "none";
+          btnSubmitFeedback.style.color = "#fff";
+          inputFeedbackMsg.disabled = true;
+          inputFeedbackMsg.value = "Thank you for the support!";
+        }).catch(err => console.warn('Failed to load firebase context:', err));
+      });
+    }
 
-        const closeBtn = document.getElementById('btn-summary-close');
-        closeBtn.addEventListener('click', () => {
+    const reviveBtn = document.getElementById('btn-summary-revive');
+    if (reviveBtn) {
+      reviveBtn.addEventListener('click', () => {
+        CrazyGamesManager.requestRewardedAd(() => {
+          this.game.revivePlayer();
           summaryCard.remove();
           this.overlay.className = 'overlay-content hidden';
           this.overlayTitle.classList.remove('hidden');
           this.overlaySubtitle.classList.remove('hidden');
-          this.game.quitToLobby();
         });
+      });
+    }
 
-        setTimeout(() => {
-          let currentWave = 0;
-          let currentCoins = 0;
-          let currentXP = 0;
+    const closeBtn = document.getElementById('btn-summary-close');
+    closeBtn.addEventListener('click', () => {
+      summaryCard.remove();
+      this.overlay.className = 'overlay-content hidden';
+      this.overlayTitle.classList.remove('hidden');
+      this.overlaySubtitle.classList.remove('hidden');
+      this.game.quitToLobby();
+    });
 
-          const waveEl = document.getElementById('tally-wave');
-          const timeEl = document.getElementById('tally-time');
-          const coinsEl = document.getElementById('tally-coins');
-          const xpEl = document.getElementById('tally-xp');
+    setTimeout(() => {
+      let currentWave = 0;
+      let currentCoins = 0;
+      let currentXP = 0;
 
-          const waveTally = setInterval(() => {
-            if (currentWave < finalWave) {
-              currentWave++;
-              waveEl.textContent = currentWave;
+      const waveEl = document.getElementById('tally-wave');
+      const timeEl = document.getElementById('tally-time');
+      const coinsEl = document.getElementById('tally-coins');
+      const xpEl = document.getElementById('tally-xp');
+
+      const waveTally = setInterval(() => {
+        if (currentWave < finalWave) {
+          currentWave++;
+          waveEl.textContent = currentWave;
+          soundManager.playTick();
+        } else {
+          clearInterval(waveTally);
+          timeEl.textContent = durationStr;
+          soundManager.playTick();
+
+          if (isVictory) {
+            CrazyGamesManager.happytime();
+          }
+
+          const coinsTally = setInterval(() => {
+            if (currentCoins < baseCoins) {
+              currentCoins += Math.ceil(baseCoins / 15);
+              if (currentCoins >= baseCoins) currentCoins = baseCoins;
+              coinsEl.textContent = `+🪙 ${currentCoins}`;
               soundManager.playTick();
             } else {
-              clearInterval(waveTally);
-              timeEl.textContent = durationStr;
-              soundManager.playTick();
+              clearInterval(coinsTally);
 
-              if (isVictory) {
-                CrazyGamesManager.happytime();
-              }
-
-              const coinsTally = setInterval(() => {
-                if (currentCoins < baseCoins) {
-                  currentCoins += Math.ceil(baseCoins / 15);
-                  if (currentCoins >= baseCoins) currentCoins = baseCoins;
-                  coinsEl.textContent = `+🪙 ${currentCoins}`;
+              const xpTally = setInterval(() => {
+                if (currentXP < baseXP) {
+                  currentXP += Math.ceil(baseXP / 15);
+                  if (currentXP >= baseXP) currentXP = baseXP;
+                  xpEl.textContent = `+🌟 ${currentXP} XP`;
                   soundManager.playTick();
                 } else {
-                  clearInterval(coinsTally);
-
-                  const xpTally = setInterval(() => {
-                    if (currentXP < baseXP) {
-                      currentXP += Math.ceil(baseXP / 15);
-                      if (currentXP >= baseXP) currentXP = baseXP;
-                      xpEl.textContent = `+🌟 ${currentXP} XP`;
-                      soundManager.playTick();
-                    } else {
-                      clearInterval(xpTally);
-                    }
-                  }, 40);
+                  clearInterval(xpTally);
                 }
               }, 40);
             }
-          }, 70);
-        }, 400);
-      }
-    }
+          }, 40);
+        }
+      }, 70);
+    }, 400);
+  }
+}

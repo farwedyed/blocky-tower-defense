@@ -315,11 +315,20 @@ class Game {
     Network.mode = 'CLIENT';
     const nameInput = document.getElementById('input-player-name');
     const name = nameInput ? nameInput.value.trim() : "";
-    const activeName = name || localStorage.getItem('tds_player_username') || "Guest";
+    const activeName = (CrazyGamesManager.currentUser && CrazyGamesManager.currentUser.username)
+        || name || localStorage.getItem('tds_player_username') || "Guest";
     
     const joinCodeInput = document.getElementById('input-join-code');
     if (joinCodeInput) joinCodeInput.value = roomId.toUpperCase();
     if (nameInput && !nameInput.value) nameInput.value = activeName;
+
+    // Hide splash container so the invite lobby is visible instantly
+    const splash = document.getElementById('lobby-splash-container');
+    if (splash) splash.style.display = 'none';
+
+    // Unhide the parent co-op matchmaking panel
+    const coopMatchmakingPanel = document.getElementById('coop-matchmaking-panel');
+    if (coopMatchmakingPanel) coopMatchmakingPanel.classList.remove('hidden');
     
     const coopControls = document.getElementById('coop-setup-controls');
     if (coopControls) coopControls.classList.add('hidden');
@@ -477,6 +486,28 @@ class Game {
         this.mouseGrid = { col: -1, row: -1 };
       }, 250);
     }, { passive: false });
+
+    // Keyboard hotkeys for desktop clients
+    window.addEventListener('keydown', (e) => {
+      if (this.state !== 'playing') return;
+      
+      const activeTag = document.activeElement ? document.activeElement.tagName : '';
+      if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+      if (key === 'u') {
+        e.preventDefault();
+        this.upgradeSelectedTower();
+      } else if (key === 's') {
+        e.preventDefault();
+        this.sellSelectedTower();
+      } else if (key === 'escape') {
+        e.preventDefault();
+        this.setSelectedPlacedTower(null);
+      }
+    });
   }
 
   setSelectedMap(mapId) {
@@ -686,6 +717,25 @@ class Game {
     const dt = Math.min(0.1, (timestamp - this.lastTime) / 1000.0) * this.speedMultiplier;
     this.lastTime = timestamp;
 
+    // Frame rate monitoring diagnostics
+    if (this.state === 'playing') {
+      if (!this.fpsTicks) {
+        this.fpsTicks = 0;
+        this.fpsAccumulator = 0;
+      }
+      this.fpsTicks++;
+      this.fpsAccumulator += dt;
+
+      if (this.fpsAccumulator >= 5.0) { // Every 5 seconds of active gameplay
+        const avgFps = Math.round(this.fpsTicks / this.fpsAccumulator);
+        if (avgFps < 20) {
+          console.warn(`[Performance Alert] Low FPS detected: ${avgFps} FPS over last 5s.`);
+        }
+        this.fpsTicks = 0;
+        this.fpsAccumulator = 0;
+      }
+    }
+
     if (this.state === 'playing' || this.state === 'victory' || this.state === 'gameover') {
       this.matchTime += dt;
       this.update(dt);
@@ -803,6 +853,9 @@ class Game {
           soundManager.playDefeat();
           this.ui.showMatchSummaryCard(false);
           this.saveStatsToStorage();
+          if (Network.mode === 'HOST') {
+            Network.broadcastGameOver(this.wave);
+          }
         } else {
           this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
         }
@@ -895,10 +948,7 @@ class Game {
 
         this.ui.showMatchSummaryCard(true);
         if (Network.mode === 'HOST') {
-          Network.broadcastToAll({
-            type: 'MATCH_OVER',
-            isVictory: true
-          });
+          Network.broadcastGameOver(this.wave);
         }
       } else {
         this.autoStartTimer = this.selectedDifficulty === 'easy' ? 6.0 : 4.0;

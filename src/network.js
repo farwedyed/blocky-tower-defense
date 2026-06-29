@@ -32,6 +32,7 @@ export const Network = {
     pendingEvents: [], // Queue for replicated visual and audio events
     _effectsIntercepted: false,
     _soundsIntercepted: false,
+    connectionTimeout: null, // Timeout tracker to prevent infinite connecting locks
     
     init: function(gameInstance, onOpen) {
         this.game = gameInstance;
@@ -50,14 +51,6 @@ export const Network = {
         this.interceptEffects();
         this.interceptSounds();
 
-        // Provider 1: Metered.ca Credentials
-        const METERED_USER = "ec41d9c5a5a8f7a1a1b19e9e";
-        const METERED_PASS = "rzCBD4AfbDn7JjG8";
-
-        // Provider 2: ExpressTURN Credentials
-        const EXPRESSTURN_USER = "000000002095335910";
-        const EXPRESSTURN_PASS = "GK3y4yS5fDUutl+1ITp1BTxZgR4=";
-
         // Reset tracking variables
         this.peerIds = {};
         this.isMigrating = false;
@@ -66,44 +59,30 @@ export const Network = {
         // Generate a clean, native 6-character ID so connections can be made using simple room codes
         const cleanShortId = Math.random().toString(36).substring(2, 8).toLowerCase();
 
+        // Dynamic origin detection to use PeerJS Cloud primarily in CrazyGames sandbox iframes
+        const useCloud = window.location.hostname.includes('crazygames') || window.location.hostname.includes('game-files');
+        const peerHost = useCloud ? '0.peerjs.com' : 'farwedd-zombie-dombie-server.hf.space';
+        const peerPort = 443;
+        const peerPath = useCloud ? '/' : '/peerjs/myapp';
+        const peerSecure = true;
+
+        console.log(`[Network Status] Instantiating PeerJS. Host: ${peerHost}, Path: ${peerPath}`);
+
         try {
             this.peer = new Peer(cleanShortId, { 
-                host: 'farwedd-zombie-dombie-server.hf.space',
-                port: 443,
-                path: '/peerjs/myapp',
-                secure: true,
+                host: peerHost,
+                port: peerPort,
+                path: peerPath,
+                secure: peerSecure,
                 debug: 1,
                 config: {
                     iceServers: [
-                        // --- STUN SERVERS ---
+                        // --- HIGH-REPUTATION FREE STUN SERVERS ---
                         { urls: 'stun:stun.l.google.com:19302' },
                         { urls: 'stun:global.stun.twilio.com:3478' },
                         { urls: 'stun:stun.relay.metered.ca:80' },
-                        { urls: 'stun:free.expressturn.com:3478' },
-                        
-                        // --- METERED.CA TURN SERVERS ---
-                        { 
-                            urls: 'turn:standard.relay.metered.ca:80', 
-                            username: METERED_USER, 
-                            credential: METERED_PASS 
-                        },
-                        { 
-                            urls: 'turn:standard.relay.metered.ca:80?transport=tcp', 
-                            username: METERED_USER, 
-                            credential: METERED_PASS 
-                        },
-                        { 
-                            urls: 'turn:standard.relay.metered.ca:443', 
-                            username: METERED_USER, 
-                            credential: METERED_PASS 
-                        },
-                        { 
-                            urls: 'turns:standard.relay.metered.ca:443?transport=tcp', 
-                            username: METERED_USER, 
-                            credential: METERED_PASS 
-                        },
 
-                        // --- METERED.CA OPEN RELAY PROJECT ---
+                        // --- METERED.CA OPEN RELAY PROJECT (GUARANTEED HIGH-UPTIME TURN fallback) ---
                         { 
                             urls: 'turn:openrelay.metered.ca:80', 
                             username: 'openrelayproject', 
@@ -118,18 +97,6 @@ export const Network = {
                             urls: 'turns:openrelay.metered.ca:443?transport=tcp', 
                             username: 'openrelayproject', 
                             credential: 'openrelayproject' 
-                        },
-
-                        // --- EXPRESSTURN FREE TIER ---
-                        { 
-                            urls: 'turn:free.expressturn.com:3478', 
-                            username: EXPRESSTURN_USER, 
-                            credential: EXPRESSTURN_PASS 
-                        },
-                        { 
-                            urls: 'turn:free.expressturn.com:3478?transport=tcp', 
-                            username: EXPRESSTURN_USER, 
-                            credential: EXPRESSTURN_PASS 
                         }
                     ]
                 }
@@ -144,6 +111,21 @@ export const Network = {
         if (this.peer) {
             this.peer.on('error', (err) => {
                 console.warn(`[Network Error] PeerJS global error. Type: ${err.type}, Message: ${err.message}`);
+                
+                // If a client connection attempt fails (e.g. host is offline / unavailable)
+                if (err.type === 'peer-unavailable') {
+                    console.warn("[Network Status] Target host room is unavailable or offline.");
+                    this.handleJoinFailure();
+                    return;
+                }
+
+                // Fallback automatically to high-reputation PeerJS Cloud if custom signaling server drops or is blocked by an iframe
+                if (err.type === 'server-error' || err.type === 'network' || err.type === 'unavailable-id') {
+                    if (this.peer && !this.peer.destroyed) {
+                        try { this.peer.destroy(); } catch(e) {}
+                    }
+                    this.fallbackToCloudServer(gameInstance, onOpen);
+                }
             });
 
             this.peer.on('open', (id) => { 
@@ -156,7 +138,8 @@ export const Network = {
             });
 
             this.peer.on('disconnected', () => {
-                console.warn("[Network Status] PeerJS disconnected from signaling server.");
+                console.warn("[Network Status] PeerJS disconnected from signaling server. Reconnecting...");
+                this.peer.reconnect();
             });
 
             this.peer.on('connection', (c) => {
@@ -171,6 +154,109 @@ export const Network = {
                 this.setupHostConnection(c);
             });
         }
+    },
+
+    fallbackToCloudServer: function(gameInstance, onOpen) {
+        console.log("[Network Status] Fallback triggered: establishing PeerJS Cloud socket connection...");
+        const cleanShortId = Math.random().toString(36).substring(2, 8).toLowerCase();
+        try {
+            this.peer = new Peer(cleanShortId, {
+                host: '0.peerjs.com',
+                port: 443,
+                secure: true,
+                path: '/',
+                debug: 1,
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:global.stun.twilio.com:3478' },
+                        { 
+                            urls: 'turn:openrelay.metered.ca:80', 
+                            username: 'openrelayproject', 
+                            credential: 'openrelayproject' 
+                        },
+                        { 
+                            urls: 'turn:openrelay.metered.ca:443', 
+                            username: 'openrelayproject', 
+                            credential: 'openrelayproject' 
+                        }
+                    ]
+                }
+            });
+
+            this.peer.on('error', (err) => {
+                console.warn(`[Network Error][Cloud] PeerJS Cloud error: ${err.message}`);
+                if (err.type === 'peer-unavailable') {
+                    this.handleJoinFailure();
+                }
+            });
+
+            this.peer.on('open', (id) => {
+                this.peerIds[window.myPlayerId] = id;
+                console.log(`[Network Status][Cloud] Connected to PeerJS Cloud with ID: ${id}`);
+                if (onOpen) onOpen(id);
+                CrazyGamesManager.updateRoomPresence(id.toLowerCase(), true);
+            });
+
+            this.peer.on('disconnected', () => {
+                console.warn("[Network Status][Cloud] PeerJS Cloud disconnected from signaling server. Reconnecting...");
+                this.peer.reconnect();
+            });
+
+            this.peer.on('connection', (c) => {
+                if (this.conns.length >= 7) {
+                    try { c.close(); } catch(e) {}
+                    return;
+                }
+                this.conns.push(c);
+                this.setupHostConnection(c);
+            });
+
+        } catch (e) {
+            console.error("[Network Status] Cloud fallback setup failed:", e);
+            this.mode = 'OFFLINE';
+        }
+    },
+
+    handleJoinFailure: function() {
+        if (this.connectionTimeout) {
+            clearTimeout(this.connectionTimeout);
+            this.connectionTimeout = null;
+        }
+
+        console.warn("[Network Status] Join handshake failed or timed out. Reverting state...");
+
+        // Dismiss loading text labels
+        const labelStatus = document.getElementById('label-lobby-status');
+        if (labelStatus) {
+            labelStatus.textContent = "OFFLINE";
+            labelStatus.style.color = "#7f8c8d";
+        }
+
+        // Toggle form panels to let players try again
+        const coopControls = document.getElementById('coop-setup-controls');
+        if (coopControls) coopControls.classList.remove('hidden');
+
+        const coopLobbyStatus = document.getElementById('coop-lobby-status-container');
+        if (coopLobbyStatus) coopLobbyStatus.classList.add('hidden');
+
+        const usernameContainer = document.getElementById('username-container');
+        if (usernameContainer) usernameContainer.style.display = 'flex';
+
+        // Re-reveal select gameplay mode splash menu safely
+        const splash = document.getElementById('lobby-splash-container');
+        if (splash) splash.style.display = 'flex';
+
+        const coopMatchmakingPanel = document.getElementById('coop-matchmaking-panel');
+        if (coopMatchmakingPanel) coopMatchmakingPanel.classList.add('hidden');
+
+        this.mode = 'OFFLINE';
+        if (this.conn) {
+            try { this.conn.close(); } catch(e) {}
+            this.conn = null;
+        }
+
+        alert("⚠️ The co-op room is no longer active or the host has disconnected.");
     },
 
     interceptEffects: function() {
@@ -233,8 +319,30 @@ export const Network = {
             return;
         }
 
+        // If client's peer is not yet registered on signaling, queue the join request until peer is open
+        if (!this.peer.id || this.peer.disconnected) {
+            console.log("[Network Status] Client Peer socket is not yet open. Queuing join request...");
+            this.peer.once('open', () => {
+                console.log("[Network Status] Client Peer open, executing queued join request...");
+                this.join(hostId, playerName, onConnected);
+            });
+            return;
+        }
+
         this.mode = 'CLIENT';
         console.log(`[Network Status] Connecting as CLIENT to host room: ${hostId}`);
+
+        // Set up connection timeout to prevent infinite connecting locks if host is dead
+        const self = this;
+        this.connectionWatchdog = setTimeout(() => {
+            if (self.conn && !self.conn.open) {
+                console.warn("[Network Status] Connection request timed out. Discarding handshake.");
+                try { self.conn.close(); } catch(e) {}
+                self.conn = null;
+                self.handleDisconnectFallback("⚠️ Failed to establish communication: Host is unreachable.");
+            }
+        }, 6000);
+
         try {
             this.conn = this.peer.connect(hostId, {
                 reliable: true,
@@ -242,6 +350,7 @@ export const Network = {
             });
         } catch (err) {
             console.error("[Network Status] Connection request failed:", err);
+            clearTimeout(this.connectionWatchdog);
             this.handleDisconnectFallback("⚠️ Failed to initiate connection.");
             return;
         }
@@ -251,6 +360,7 @@ export const Network = {
         });
 
         this.conn.on('open', () => {
+            clearTimeout(this.connectionWatchdog);
             this.lastGameStateTime = Date.now();
             console.log(`[Network Status] Connection opened to host: ${hostId}`);
             if(onConnected) onConnected();
@@ -274,7 +384,7 @@ export const Network = {
         if (!window.lobbyPlayers.p2 || window.lobbyPlayers.p2 === "Reserved") { assignedId = "p2"; }
         else if (!window.lobbyPlayers.p3 || window.lobbyPlayers.p3 === "Reserved") { assignedId = "p3"; }
         else if (!window.lobbyPlayers.p4 || window.lobbyPlayers.p4 === "Reserved") { assignedId = "p4"; }
-        else if (!window.lobbyPlayers.p5 || window.lobbyPlayers.p5 === "Reserved") { assignedId = "p5"; }
+        else if (!window.lobbyPlayers.p5 === "Reserved") { assignedId = "p5"; }
         else if (!window.lobbyPlayers.p6 || window.lobbyPlayers.p6 === "Reserved") { assignedId = "p6"; }
         else if (!window.lobbyPlayers.p7 || window.lobbyPlayers.p7 === "Reserved") { assignedId = "p7"; }
         else if (!window.lobbyPlayers.p8 || window.lobbyPlayers.p8 === "Reserved") { assignedId = "p8"; }
@@ -319,6 +429,20 @@ export const Network = {
                         peerIds: this.peerIds,
                         hostPlayerId: this.hostPlayerId
                     });
+
+                    // If the host is already playing in match, immediately push START packet to load client directly onto canvas
+                    if (this.game && this.game.state === 'playing') {
+                        c.send({
+                            type: 'START',
+                            selectedMap: this.game.selectedMap,
+                            isHardcore: this.game.isHardcore,
+                            playerWallets: this.game.playerWallets,
+                            obstacles: this.game.grid.obstacles,
+                            lives: this.game.lives,
+                            gold: this.game.gold,
+                            maxWaves: this.game.maxWaves
+                        });
+                    }
                 } catch(e) {
                     console.warn("[Network Status] Failed to send LOBBY_WELCOME:", e);
                 }
@@ -352,11 +476,12 @@ export const Network = {
             }
             else if (data.type === 'PLACE_TOWER') {
                 if (this.game) {
-                    const cost = this.game.getTowerCost(data.towerType);
+                    const type = data.towerType || data.targetShopTower;
+                    const cost = this.game.getTowerCost(type);
                     const wallet = this.game.playerWallets ? this.game.playerWallets[c.playerId] : this.game.gold;
                     
-                    if (wallet >= cost && this.game.grid.isCellValidForPlacement(data.col, data.row)) {
-                        this.game.selectedShopTower = data.towerType;
+                    if (wallet >= cost && this.game.grid.isCellValidForPlacement(data.col, row)) {
+                        this.game.selectedShopTower = type;
                         this.game.placeShopAgent(data.col, data.row, c.playerId);
                     }
                 }
@@ -436,14 +561,6 @@ export const Network = {
                     console.warn(`[Network Status] Failed to broadcast packet to ${c.playerId || "unknown guest"}:`, e);
                 }
             }
-        });
-    },
-
-    broadcastGameOver: function(finalWave) {
-        this.broadcastToAll({
-            type: 'GAME_OVER',
-            finalWave: finalWave,
-            isVictory: this.game ? this.game.state === 'victory' : false
         });
     },
 
@@ -566,6 +683,7 @@ export const Network = {
                 }
             }
             else if (data.type === 'START') {
+                this.lastGameStateTime = Date.now(); // Reset watchdog timer on match start
                 this.game.selectedMap = data.selectedMap;
                 this.game.isHardcore = data.isHardcore;
                 this.game.playerWallets = data.playerWallets || {};
@@ -705,7 +823,7 @@ export const Network = {
                 data.enemies.forEach(eData => {
                     let enemy = this.game.enemies.find(e => e.id === eData.id);
                     if (!enemy) {
-                        const EnemyClass = getEnemyClass(eData.name);
+                        const EnemyClass = getEnemyClass(name);
                         enemy = new EnemyClass(eData.x, eData.y);
                         enemy.id = eData.id;
                         enemy.x = eData.x;
@@ -798,7 +916,9 @@ export const Network = {
         });
 
         this.conn.on('close', () => {
-            this.attemptHostMigration();
+            if (this.mode !== 'HOST') {
+                this.attemptHostMigration();
+            }
         });
     },
 
@@ -853,7 +973,11 @@ export const Network = {
         this.pendingEvents = [];
 
         if (this.conn) {
-            try { this.conn.close(); } catch(e) {}
+            try {
+                // Clear the close listener to prevent triggering infinite migration loops on close
+                this.conn.off('close'); 
+                this.conn.close(); 
+            } catch(e) {}
             this.conn = null;
         }
 
@@ -863,6 +987,10 @@ export const Network = {
 
         if (this.game) {
             this.game.effectManager.spawnText(400, 200, "⚠️ YOU ARE THE SQUAD LEADER!", '#ffd700');
+            // Refresh UI HUD and unlock the "START WAVE" button immediately for the new host
+            if (this.game.ui) {
+                this.game.ui.updateHUD(this.game.lives, this.game.gold, this.game.wave, this.game.maxWaves);
+            }
         }
 
         this.interceptEffects();
@@ -875,7 +1003,10 @@ export const Network = {
         console.log(`[Network Status] Migrating connection to new host: ${peerId} (${hostPlayerId})`);
 
         if (this.conn) {
-            try { this.conn.close(); } catch(e) {}
+            try {
+                this.conn.off('close');
+                this.conn.close();
+            } catch(e) {}
             this.conn = null;
         }
 
