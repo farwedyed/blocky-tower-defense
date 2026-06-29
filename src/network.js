@@ -41,7 +41,7 @@ export const Network = {
 
         // Graceful adblocker safeguard for PeerJS CDN failures
         if (typeof Peer === 'undefined') {
-            console.warn("[Network] PeerJS SDK failed to load or was blocked by an adblocker. Running in offline fallback.");
+            console.warn("[Network Status] PeerJS SDK failed to load or was blocked by an adblocker. Running in offline fallback.");
             this.mode = 'OFFLINE';
             return;
         }
@@ -135,7 +135,7 @@ export const Network = {
                 }
             });
         } catch (err) {
-            console.error("[Network] Failed to initialize Peer connection:", err);
+            console.error("[Network Status] Failed to initialize Peer connection:", err);
             this.mode = 'OFFLINE';
             return;
         }
@@ -143,69 +143,61 @@ export const Network = {
         // Global Signaling Error Boundary
         if (this.peer) {
             this.peer.on('error', (err) => {
-                console.warn("PeerJS global error caught gracefully:", err);
+                console.warn(`[Network Error] PeerJS global error. Type: ${err.type}, Message: ${err.message}`);
             });
 
             this.peer.on('open', (id) => { 
                 this.peerIds[window.myPlayerId] = id;
+                console.log(`[Network Status] PeerJS open with signaling ID: ${id}`);
                 if (onOpen) onOpen(id); 
 
                 // Sync host room state to CrazyGames safely using our dedicated manager
                 CrazyGamesManager.updateRoomPresence(id.toLowerCase(), true);
             });
 
+            this.peer.on('disconnected', () => {
+                console.warn("[Network Status] PeerJS disconnected from signaling server.");
+            });
+
             this.peer.on('connection', (c) => {
                 if (this.conns.length >= 7) {
-                    return; // Max squad size of 8 (1 host + 7 guests)
+                    console.warn("[Network Status] Connection refused: lobby is full (max 8 players).");
+                    setTimeout(() => {
+                        try { c.close(); } catch(e) {}
+                    }, 500);
+                    return;
                 }
+                this.conns.push(c);
                 this.setupHostConnection(c);
             });
         }
     },
 
     interceptEffects: function() {
-        if (this._effectsIntercepted || !this.game || !this.game.effectManager) return;
+        if (!this.game || !this.game.effectManager || this._effectsIntercepted) return;
         this._effectsIntercepted = true;
 
         const em = this.game.effectManager;
-        const originalSparks = em.spawnPlacementSparks;
-        const originalImpact = em.spawnImpact;
-        const originalNote = em.spawnMusicNote;
-        const originalMuzzle = em.spawnMuzzleFlash;
-        const originalExplosion = em.spawnExplosion;
-        const originalSwing = em.spawnSwingArc;
-        const originalText = em.spawnText;
-
         const self = this;
 
-        em.spawnPlacementSparks = function(...args) {
-            originalSparks.apply(em, args);
-            if (self.mode === 'HOST') self.pendingEvents.push({ type: 'placementSparks', args });
+        const wrap = (methodName, type) => {
+            const original = em[methodName];
+            if (!original) return;
+            em[methodName] = function(...args) {
+                original.apply(this, args);
+                if (self.mode === 'HOST') {
+                    self.pendingEvents.push({ type, args });
+                }
+            };
         };
-        em.spawnImpact = function(...args) {
-            originalImpact.apply(em, args);
-            if (self.mode === 'HOST') self.pendingEvents.push({ type: 'impact', args });
-        };
-        em.spawnMusicNote = function(...args) {
-            originalNote.apply(em, args);
-            if (self.mode === 'HOST') self.pendingEvents.push({ type: 'musicNote', args });
-        };
-        em.spawnMuzzleFlash = function(...args) {
-            originalMuzzle.apply(em, args);
-            if (self.mode === 'HOST') self.pendingEvents.push({ type: 'muzzleFlash', args });
-        };
-        em.spawnExplosion = function(...args) {
-            originalExplosion.apply(em, args);
-            if (self.mode === 'HOST') self.pendingEvents.push({ type: 'explosion', args });
-        };
-        em.spawnSwingArc = function(...args) {
-            originalSwing.apply(em, args);
-            if (self.mode === 'HOST') self.pendingEvents.push({ type: 'swingArc', args });
-        };
-        em.spawnText = function(...args) {
-            originalText.apply(em, args);
-            if (self.mode === 'HOST') self.pendingEvents.push({ type: 'text', args });
-        };
+
+        wrap('spawnPlacementSparks', 'placementSparks');
+        wrap('spawnImpact', 'impact');
+        wrap('spawnMusicNote', 'musicNote');
+        wrap('spawnMuzzleFlash', 'muzzleFlash');
+        wrap('spawnExplosion', 'explosion');
+        wrap('spawnSwingArc', 'swingArc');
+        wrap('spawnText', 'text');
     },
 
     interceptSounds: function() {
@@ -217,7 +209,7 @@ export const Network = {
             const original = soundManager[methodName];
             if (!original) return;
             soundManager[methodName] = function(...args) {
-                original.apply(soundManager, args);
+                original.apply(this, args);
                 if (self.mode === 'HOST') {
                     self.pendingEvents.push({ type: 'sound', name: methodName, args });
                 }
@@ -236,28 +228,31 @@ export const Network = {
 
     join: function(hostId, playerName, onConnected) {
         if (typeof Peer === 'undefined' || !this.peer) {
+            console.warn("[Network Status] Join canceled: PeerJS is undefined.");
             this.handleDisconnectFallback("⚠️ Multiplayer is unavailable because the network SDK was blocked by an adblocker.");
             return;
         }
 
         this.mode = 'CLIENT';
+        console.log(`[Network Status] Connecting as CLIENT to host room: ${hostId}`);
         try {
             this.conn = this.peer.connect(hostId, {
                 reliable: true,
                 serialization: 'json'
             });
         } catch (err) {
-            console.error("[Network] Failed to connect to host:", err);
+            console.error("[Network Status] Connection request failed:", err);
             this.handleDisconnectFallback("⚠️ Failed to initiate connection.");
             return;
         }
 
         this.conn.on('error', (err) => {
-            console.warn("Client data channel error caught gracefully:", err);
+            console.warn("[Network Error] Client data channel error:", err);
         });
 
         this.conn.on('open', () => {
             this.lastGameStateTime = Date.now();
+            console.log(`[Network Status] Connection opened to host: ${hostId}`);
             if(onConnected) onConnected();
             this.setupClient();
 
@@ -267,7 +262,7 @@ export const Network = {
             try {
                 this.conn.send({ type: 'JOIN_LOBBY', name: playerName, level: this.game.playerLevel });
             } catch (e) {
-                console.warn("Failed to send JOIN_LOBBY packet:", e);
+                console.warn("[Network Status] Failed to send JOIN_LOBBY packet:", e);
             }
         });
     },
@@ -284,17 +279,17 @@ export const Network = {
         else if (!window.lobbyPlayers.p7 || window.lobbyPlayers.p7 === "Reserved") { assignedId = "p7"; }
         else if (!window.lobbyPlayers.p8 || window.lobbyPlayers.p8 === "Reserved") { assignedId = "p8"; }
         else {
-            console.warn("Incoming connection rejected: All lobby player slots from P1 to P8 are full.");
+            console.warn("[Network Status] Incoming connection rejected: All lobby player slots from P1 to P8 are full.");
             try { c.close(); } catch(e) {}
             return;
         }
         
-        console.log(`Lobby slot matched! Assigning peer connection to slot: ${assignedId}`);
+        console.log(`[Network Status] Lobby slot matched! Assigning peer connection to slot: ${assignedId}`);
         c.playerId = assignedId;
         window.lobbyPlayers[assignedId] = "Reserved";
 
         c.on('error', (err) => {
-            console.warn(`Host Connection Error for ${c.playerId} caught gracefully:`, err);
+            console.warn(`[Network Error] Connection channel error for player ${c.playerId || "unknown"}:`, err);
         });
 
         c.on('data', (data) => {
@@ -306,7 +301,7 @@ export const Network = {
                 // Initialize starting cash pool and cursors
                 if (this.game) {
                     if (!this.game.playerWallets) this.game.playerWallets = {};
-                    this.game.playerWallets[c.playerId] = this.game.isHardcore ? 250 : 600;
+                    this.game.playerWallets[c.playerId] = this.game.isHardcore ? 250 : 100;
 
                     // Force Host UI redraw to show newly joined client
                     if (this.game.ui) {
@@ -325,7 +320,7 @@ export const Network = {
                         hostPlayerId: this.hostPlayerId
                     });
                 } catch(e) {
-                    console.warn("Failed to send LOBBY_WELCOME:", e);
+                    console.warn("[Network Status] Failed to send LOBBY_WELCOME:", e);
                 }
 
                 this.broadcastToAll({
@@ -361,8 +356,8 @@ export const Network = {
                     const wallet = this.game.playerWallets ? this.game.playerWallets[c.playerId] : this.game.gold;
                     
                     if (wallet >= cost && this.game.grid.isCellValidForPlacement(data.col, data.row)) {
-                        // FIX: Explicitly pass data.towerType to placeShopAgent to bypass Host selection hijacking!
-                        this.game.placeShopAgent(data.col, data.row, c.playerId, data.towerType);
+                        this.game.selectedShopTower = data.towerType;
+                        this.game.placeShopAgent(data.col, data.row, c.playerId);
                     }
                 }
             }
@@ -413,7 +408,7 @@ export const Network = {
         });
         
         c.on('close', () => {
-            console.log(c.playerId + " Disconnected from Host");
+            console.log(`[Network Status] Player ${c.playerId || "unknown"} disconnected from Host`);
             window.lobbyPlayers[c.playerId] = "";
             delete this.peerIds[c.playerId];
             delete window.playerCursors[c.playerId];
@@ -438,7 +433,7 @@ export const Network = {
                 try {
                     c.send(data);
                 } catch (e) {
-                    console.warn(`Failed to broadcast packet to ${c.playerId || "unknown guest"}:`, e);
+                    console.warn(`[Network Status] Failed to broadcast packet to ${c.playerId || "unknown guest"}:`, e);
                 }
             }
         });
@@ -538,7 +533,7 @@ export const Network = {
                 try {
                     c.send(statePayload);
                 } catch(e) {
-                    console.warn(`Failed to send state payload to ${c.playerId || "unknown guest"}:`, e);
+                    console.warn(`[Network Status] Failed to send state payload to ${c.playerId || "unknown guest"}:`, e);
                 }
             }
         });
@@ -812,7 +807,7 @@ export const Network = {
         
         const elapsed = Date.now() - this.lastGameStateTime;
         if (elapsed > 4000) { 
-            console.warn("Watchdog: Host heartbeat lost. Attempting host migration...");
+            console.warn(`[Network Status] Host heartbeat lost. No signal received for ${elapsed}ms. Migrating...`);
             this.attemptHostMigration();
         }
     },
@@ -821,7 +816,7 @@ export const Network = {
         if (this.isMigrating) return;
         this.isMigrating = true;
 
-        console.log("Host disconnected! Evaluating migration candidates...");
+        console.log("[Network Status] Host disconnected! Evaluating migration candidates...");
         const activePlayerIds = Object.keys(this.peerIds || {}).filter(pId => pId !== 'p1');
         
         activePlayerIds.sort((a, b) => {
@@ -829,13 +824,13 @@ export const Network = {
         });
 
         if (activePlayerIds.length === 0) {
-            console.log("No surviving clients remaining to migrate hosting to.");
+            console.log("[Network Status] No surviving clients remaining to migrate hosting to.");
             this.handleDisconnectFallback("⚠️ Connection Lost: Host dropped and lobby is empty.");
             return;
         }
 
         const nextHostId = activePlayerIds[0];
-        console.log("Next elected squad leader is:", nextHostId);
+        console.log("[Network Status] Next elected squad leader is:", nextHostId);
 
         if (window.myPlayerId === nextHostId) {
             this.becomeNewHost();
@@ -851,7 +846,7 @@ export const Network = {
     },
 
     becomeNewHost: function() {
-        console.log("I am taking over as the new lobby host!");
+        console.log("[Network Status] Migrating hosting: taking over as new lobby host!");
         this.mode = 'HOST';
         this.isMigrating = false;
         this.hostPlayerId = window.myPlayerId;
@@ -877,6 +872,7 @@ export const Network = {
     connectToNewHost: function(peerId, hostPlayerId) {
         this.mode = 'CLIENT';
         this.hostPlayerId = hostPlayerId; 
+        console.log(`[Network Status] Migrating connection to new host: ${peerId} (${hostPlayerId})`);
 
         if (this.conn) {
             try { this.conn.close(); } catch(e) {}
@@ -889,7 +885,7 @@ export const Network = {
         });
 
         this.conn.on('error', (err) => {
-            console.warn("Connection to migrated host failed:", err);
+            console.warn("[Network Error] Connection to migrated host failed:", err);
             this.isMigrating = false;
             this.handleDisconnectFallback("⚠️ Host Migration Failed: Selected leader is unreachable.");
         });
@@ -897,7 +893,7 @@ export const Network = {
         this.conn.on('open', () => {
             this.lastGameStateTime = Date.now();
             this.isMigrating = false;
-            console.log("Connected to migrated host successfully!");
+            console.log("[Network Status] Reconnected to migrated host successfully!");
             
             try {
                 this.conn.send({
@@ -906,7 +902,7 @@ export const Network = {
                     name: "Survivor_" + window.myPlayerId
                 });
             } catch(e) {
-                console.warn("Failed to transmit re-join packet:", e);
+                console.warn("[Network Status] Failed to transmit re-join packet:", e);
             }
         });
 
@@ -937,7 +933,7 @@ export const Network = {
                         : 'default'
                 });
             } catch (e) {
-                console.warn("Failed to send client cursor state:", e);
+                console.warn("[Network Status] Failed to send client cursor state:", e);
             }
         }
     },

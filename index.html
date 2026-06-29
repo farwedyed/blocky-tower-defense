@@ -13,6 +13,18 @@
   <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
 </head>
 <body>
+  <!-- LOADING SCREEN OVERLAY -->
+  <div id="loading-screen">
+    <div class="loading-content">
+      <h1 class="blocky-title loading-logo">BTD 2D</h1>
+      <span class="tagline" style="color: #cbd5e1; margin-bottom: 25px;">SQUAD TACTICAL DEFENSE TERMINAL</span>
+      <div class="loading-bar-container">
+        <div id="loading-bar-fill"></div>
+      </div>
+      <p id="loading-status">Booting Tactical Engine...</p>
+    </div>
+  </div>
+
   <!-- LANDSCAPE ONLY WARNING OVERLAY -->
   <div id="orientation-warning">
     <div class="warning-content">
@@ -118,7 +130,7 @@
               <button id="btn-wizard-next-maps" class="btn btn-deploy" style="margin-top: 20px;">CHOOSE DIFFICULTY ➔</button>
             </div>
 
-            <!-- STEP 2: CHOOSE DIFFICULTY (EMPTY PLACEHOLDER CARDS REMOVED) -->
+            <!-- STEP 2: CHOOSE DIFFICULTY -->
             <div id="wizard-step-diff" class="wizard-step-content hidden">
               <h2>CHOOSE DIFFICULTY</h2>
               <div class="difficulty-wizard-deck">
@@ -333,9 +345,9 @@
                   <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="sniper"></canvas>
                   <div class="agent-info">
                     <span class="name">Sniper</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 400</span>
+                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 250</span>
                   </div>
-                  <button class="btn btn-shop-action" data-cost="400">BUY</button>
+                  <button class="btn btn-shop-action" data-cost="250">BUY</button>
                 </div>
 
                 <div class="shop-card" data-agent-type="demoman">
@@ -454,45 +466,45 @@
                   <div class="agent-info">
                     <span class="name">DJ Booth</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 4,000</span>
+                  </div>
+                  <button class="btn btn-shop-action" data-cost="4000">BUY</button>
                 </div>
-                <button class="btn btn-shop-action" data-cost="4000">BUY</button>
-              </div>
 
-              <div class="shop-card" data-agent-type="ranger">
-                <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="ranger"></canvas>
-                <div class="agent-info">
-                  <span class="name">Ranger</span>
-                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 6,000</span>
+                <div class="shop-card" data-agent-type="ranger">
+                  <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="ranger"></canvas>
+                  <div class="agent-info">
+                    <span class="name">Ranger</span>
+                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 6,000</span>
+                  </div>
+                  <button class="btn btn-shop-action" data-cost="6000">BUY</button>
                 </div>
-                <button class="btn btn-shop-action" data-cost="6000">BUY</button>
-              </div>
 
-              <div class="shop-card" data-agent-type="turret">
-                <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="turret"></canvas>
-                <div class="agent-info">
-                  <span class="name">Turret</span>
-                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 5,000</span>
+                <div class="shop-card" data-agent-type="turret">
+                  <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="turret"></canvas>
+                  <div class="agent-info">
+                    <span class="name">Turret</span>
+                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 5,000</span>
+                  </div>
+                  <button class="btn btn-shop-action" data-cost="5000">BUY</button>
                 </div>
-                <button class="btn btn-shop-action" data-cost="5000">BUY</button>
+              </div>
+            </div>
+
+            <!-- SPECIAL EVENT CATEGORY -->
+            <div class="shop-category" style="margin-bottom: 16px;">
+              <h3 style="font-family: var(--font-title); font-size: 1.2rem; color: #9b59b6; margin-bottom: 10px; border-bottom: 2px solid #9b59b6; padding-bottom: 4px;">SPECIAL EVENT AGENTS</h3>
+              <div class="shop-grid">
+                <div class="shop-card" data-agent-type="gladiator">
+                  <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="gladiator"></canvas>
+                  <div class="agent-info">
+                    <span class="name">Gladiator</span>
+                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 5,000</span>
+                  </div>
+                  <button class="btn btn-shop-action" data-cost="5000">BUY</button>
+                </div>
               </div>
             </div>
           </div>
-
-          <!-- EVENT CATEGORY -->
-          <div class="shop-category" style="margin-bottom: 16px;">
-            <h3 style="font-family: var(--font-title); font-size: 1.2rem; color: #9b59b6; margin-bottom: 10px; border-bottom: 2px solid #9b59b6; padding-bottom: 4px;">SPECIAL EVENT AGENTS</h3>
-            <div class="shop-grid">
-              <div class="shop-card" data-agent-type="gladiator">
-                <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="gladiator"></canvas>
-                <div class="agent-info">
-                  <span class="name">Gladiator</span>
-                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 5,000</span>
-                </div>
-                <button class="btn btn-shop-action" data-cost="5000">BUY</button>
-              </div>
-            </div>
-          </div>
-        </div>
 
           <!-- CRATES UNBOXING PANEL -->
           <div id="panel-crates" class="lobby-panel">
@@ -660,6 +672,238 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.4.7/peerjs.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <!-- ─── ROBUST TELEMETRY ENGINE ─── -->
+  <script type="module">
+    import { startSessionTelemetry, updateSessionTelemetry } from './src/firebase.js';
+
+    const sessionStartTime = Date.now();
+    let isTracking = false;
+    let isFlushing = false;
+    let isSessionInitialized = false; // Prevents premature flushing
+
+    // Local buffers to hold events in memory
+    let localClicks = [];
+    let localLogs = [];
+    let pendingMetadata = {};
+
+    // 1. Determine Tracking Eligibility (100% Mobile/Tablet, 15% Desktop)
+    const ua = navigator.userAgent;
+    const isMobileOrTablet = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
+    
+    if (isMobileOrTablet) {
+      isTracking = true; // Track every single mobile player
+    } else {
+      isTracking = Math.random() < 0.15; // Track 15% of desktop players
+    }
+
+    // 2. Helper to log events locally with millisecond timestamps
+    function logEvent(type, details = {}) {
+      if (!isTracking) return;
+      const elapsedMs = Date.now() - sessionStartTime;
+      const logEntry = {
+        time: (elapsedMs / 1000).toFixed(2) + 's',
+        type: type,
+        ...details
+      };
+      localLogs.push(logEntry);
+    }
+
+    // 3. Telemetry Flushing Pipeline (Batches data to save write quota)
+    async function flushTelemetry(isExiting = false) {
+      // Ensure we do not write to the document before it is created
+      if (!isTracking || !isSessionInitialized || isFlushing) return;
+      isFlushing = true;
+
+      const elapsed = Math.round((Date.now() - sessionStartTime) / 1000);
+      const payload = {
+        totalSessionTime: elapsed,
+        ...pendingMetadata
+      };
+
+      // Append click events in a single batch as a raw array
+      if (localClicks.length > 0) {
+        payload.click = localClicks;
+        localClicks = [];
+      }
+
+      // Append general timeline events in a single batch as a raw array
+      if (localLogs.length > 0) {
+        payload.log = localLogs;
+        localLogs = [];
+      }
+
+      // Reset pending metadata overrides
+      pendingMetadata = {};
+
+      try {
+        if (isExiting && navigator.sendBeacon) {
+          // If the player is closing the page, attempt a safe beacon save
+          updateSessionTelemetry(payload);
+        } else {
+          await updateSessionTelemetry(payload);
+        }
+      } catch (e) {
+        // Fail silently to avoid interrupting the player's session
+      } finally {
+        isFlushing = false;
+      }
+    }
+
+    // 4. Initialize Telemetry on Page Load
+    window.addEventListener('DOMContentLoaded', async () => {
+      if (!isTracking) return;
+
+      const savedUser = localStorage.getItem('tds_player_username') || "Guest";
+      
+      try {
+        // Initialize the database document immediately
+        await startSessionTelemetry(savedUser, false);
+        isSessionInitialized = true; // Safe to flush now
+      } catch (e) {
+        isTracking = false; // Disable telemetry if initial write fails
+        return;
+      }
+
+      // Log initial layout details (Helps spot resolution or scaling bugs)
+      logEvent('device_initialize', {
+        deviceType: isMobileOrTablet ? 'Mobile/Tablet' : 'Desktop',
+        width: window.innerWidth,
+        height: window.innerHeight,
+        pixelRatio: window.devicePixelRatio,
+        orientation: window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'
+      });
+
+      // A one-time Quick-Flush at 4 seconds to capture players who bounce immediately!
+      setTimeout(() => {
+        logEvent('early_bounce_check');
+        flushTelemetry();
+      }, 4000);
+
+      // Flush every 60 seconds (Saves database writes)
+      setInterval(() => {
+        flushTelemetry();
+      }, 60000);
+    });
+
+    // 5. Track Viewport and Orientation Rotations (Crucial for mobile rotation lock audits)
+    window.addEventListener('resize', () => {
+      logEvent('viewport_resize', {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        orientation: window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'
+      });
+    });
+
+    // 6. Detailed Interactive Click & Touch Event Logger
+    window.addEventListener('click', (e) => {
+      if (!isTracking) return;
+      const target = e.target.closest('button, select, input, [role="button"], .map-card, .diff-wizard-card, .placement-btn');
+      if (target) {
+        let label = '';
+        if (target.tagName === 'INPUT') {
+          label = `Input[${target.id || target.placeholder || 'text'}]`;
+        } else if (target.tagName === 'SELECT') {
+          label = `Select[Value: ${target.value}]`;
+        } else {
+          label = target.innerText ? target.innerText.trim() : '';
+          if (!label && target.id) label = target.id;
+          if (!label && target.className) label = target.className;
+        }
+
+        const elapsed = (Date.now() - sessionStartTime) / 1000;
+        localClicks.push({
+          element: target.tagName,
+          label: label.substring(0, 100) || 'Unlabelled',
+          time: elapsed.toFixed(2) + 's'
+        });
+
+        // If they click the deploy button, flush immediately so we record match transitions
+        if (target.id === 'btn-deploy') {
+          pendingMetadata.deployed = true;
+          logEvent('deployment_triggered');
+          flushTelemetry();
+        }
+      }
+    });
+
+    // 7. Track Mobile Tab visibility changes (Detects if they tab out of the game in frustration)
+    document.addEventListener('visibilitychange', () => {
+      logEvent('visibility_changed', { state: document.visibilityState });
+      flushTelemetry();
+    });
+
+    // 8. Capture Console Output, Warnings, and JS Engine Errors
+    const origLog = console.log;
+    const origWarn = console.warn;
+    const origError = console.error;
+
+    function formatConsoleMessage(args) {
+      return Array.from(args)
+        .map(arg => {
+          if (typeof arg === 'object' && arg !== null) {
+            try { return JSON.stringify(arg); } catch (e) { return String(arg); }
+          }
+          return String(arg);
+        })
+        .join(' ');
+    }
+
+    console.log = function(...args) {
+      origLog.apply(console, args);
+      if (isTracking) {
+        const msg = formatConsoleMessage(args);
+        if (!msg.toLowerCase().includes('firebase') && !msg.toLowerCase().includes('firestore')) {
+          logEvent('console_log', { message: msg.substring(0, 200) });
+        }
+      }
+    };
+
+    console.warn = function(...args) {
+      origWarn.apply(console, args);
+      if (isTracking) {
+        logEvent('console_warn', { message: formatConsoleMessage(args).substring(0, 250) });
+      }
+    };
+
+    console.error = function(...args) {
+      origError.apply(console, args);
+      if (isTracking) {
+        logEvent('console_error', { message: formatConsoleMessage(args).substring(0, 300) });
+        flushTelemetry(); // Flush errors immediately to help audit crashes
+      }
+    };
+
+    // 9. Global Exception Boundary (Essential for catching silent mobile page crashes)
+    window.onerror = function(message, source, lineno, colno, error) {
+      if (isTracking) {
+        logEvent('uncaught_exception', {
+          message: message,
+          source: source,
+          line: lineno,
+          col: colno,
+          stack: error && error.stack ? error.stack.substring(0, 400) : ''
+        });
+        flushTelemetry();
+      }
+      return false; 
+    };
+
+    window.addEventListener('unhandledrejection', function(event) {
+      if (isTracking) {
+        logEvent('unhandled_promise', {
+          message: event.reason && event.reason.message ? event.reason.message : String(event.reason),
+          stack: event.reason && event.reason.stack ? event.reason.stack.substring(0, 400) : ''
+        });
+        flushTelemetry();
+      }
+    });
+
+    // 10. Flush remaining logs when closing the tab
+    window.addEventListener('pagehide', () => {
+      flushTelemetry(true);
+    });
+  </script>
 
   <script type="module" src="src/main.js"></script>
 </body>

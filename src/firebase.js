@@ -12,6 +12,8 @@ const firebaseConfig = {
 
 let db = null;
 let isUsingFirebase = false;
+let currentSessionId = null;
+let currentDeviceId = null; // Tracks parent device reference across updates
 
 function initFirebase() {
   if (db) return;
@@ -34,10 +36,119 @@ function initFirebase() {
 }
 
 /**
- * Upload an optional, anonymous player feedback submission directly to Firestore.
- * @param {string} text - The text comment provided by the player.
- * @param {number} rating - Auto-generated context rating based on win/loss status.
- * @param {object} metadata - Context data containing mapId, finalWave, and isVictory.
+ * Retrieves an existing device ID from local storage, or generates a persistent one.
+ */
+function getOrCreateDeviceId() {
+  let deviceId = localStorage.getItem('tds_device_id');
+  if (!deviceId) {
+    deviceId = 'dev_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now().toString(36);
+    localStorage.setItem('tds_device_id', deviceId);
+  }
+  return deviceId;
+}
+
+function generateSessionId() {
+  return 'sess_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now().toString(36);
+}
+
+/**
+ * Initializes a persistent device log and nests the page-load session inside it.
+ */
+export async function startSessionTelemetry(username, isLoggedIn) {
+  initFirebase();
+  if (!isUsingFirebase || !db) return null;
+
+  if (!currentSessionId) {
+    currentSessionId = generateSessionId();
+  }
+  if (!currentDeviceId) {
+    currentDeviceId = getOrCreateDeviceId();
+  }
+
+  // Browser and Device type tracking
+  const ua = navigator.userAgent;
+  let browser = "Unknown";
+  if (ua.indexOf("Chrome") > -1) browser = "Chrome";
+  else if (ua.indexOf("Safari") > -1) browser = "Safari";
+  else if (ua.indexOf("Firefox") > -1) browser = "Firefox";
+  else if (ua.indexOf("Edge") > -1) browser = "Edge";
+
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  const deviceType = isMobile ? "Mobile" : "Desktop";
+
+  try {
+    // 1. Create/Update the master device document
+    await db.collection('devices').doc(currentDeviceId).set({
+      deviceId: currentDeviceId,
+      username: username || "Guest",
+      isLoggedIn: !!isLoggedIn,
+      deviceType: deviceType,
+      browser: browser,
+      userAgent: ua,
+      lastActive: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    // 2. Nest the individual session document inside the device's subcollection
+    await db.collection('devices').doc(currentDeviceId).collection('sessions').doc(currentSessionId).set({
+      sessionId: currentSessionId,
+      startTime: firebase.firestore.FieldValue.serverTimestamp(),
+      totalSessionTime: 0,
+      deployed: false,
+      selectedMap: "none",
+      clicks: [],
+      consoleLogs: [],
+      lastActive: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    console.log('[Firebase Telemetry] Device registered:', currentDeviceId, 'Session nested:', currentSessionId);
+    return currentSessionId;
+  } catch (e) {
+    console.error('[Firebase Telemetry] Session initialization failed:', e);
+    return null;
+  }
+}
+
+/**
+ * Appends interactive clicks and console telemetry to the active nested session document.
+ */
+export async function updateSessionTelemetry(updates) {
+  initFirebase();
+  if (!isUsingFirebase || !db || !currentSessionId || !currentDeviceId) return;
+
+  try {
+    const docRef = db.collection('devices').doc(currentDeviceId).collection('sessions').doc(currentSessionId);
+    const formattedUpdates = { ...updates };
+    formattedUpdates.lastActive = firebase.firestore.FieldValue.serverTimestamp();
+
+    // Process and unpack the raw batch array of click objects
+    if (updates.click) {
+      if (Array.isArray(updates.click)) {
+        formattedUpdates.clicks = firebase.firestore.FieldValue.arrayUnion(...updates.click);
+      } else {
+        formattedUpdates.clicks = firebase.firestore.FieldValue.arrayUnion(updates.click);
+      }
+      delete formattedUpdates.click;
+    }
+
+    // Process and unpack the raw batch array of log objects
+    if (updates.log) {
+      if (Array.isArray(updates.log)) {
+        formattedUpdates.consoleLogs = firebase.firestore.FieldValue.arrayUnion(...updates.log);
+      } else {
+        formattedUpdates.consoleLogs = firebase.firestore.FieldValue.arrayUnion(updates.log);
+      }
+      delete formattedUpdates.log;
+    }
+
+    // Use set with merge: true to avoid "No document to update" errors entirely
+    await docRef.set(formattedUpdates, { merge: true });
+  } catch (e) {
+    console.warn('[Firebase Telemetry] Update failed:', e.message);
+  }
+}
+
+/**
+ * Uploads player feedback to Firestore.
  */
 export async function uploadFeedback(text, rating, metadata = {}) {
   initFirebase();
@@ -52,7 +163,7 @@ export async function uploadFeedback(text, rating, metadata = {}) {
         playerName: localStorage.getItem('tds_player_username') || "Guest",
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-      console.log('[Firebase] Feedback uploaded successfully.');
+      console.log('[Firebase] Feedback uploaded.');
     } catch (e) {
       console.error('[Firebase] Failed to send feedback:', e);
     }
@@ -62,13 +173,10 @@ export async function uploadFeedback(text, rating, metadata = {}) {
 }
 
 /**
- * Upload a speedrun record to Firestore (and always cache locally).
- * @param {string} mapId  - e.g. 'grassland', 'desert', 'tundra'
- * @param {object} entry  - { name, time, timeRaw, date }
+ * Uploads speedrun records locally and to Firestore.
  */
 export async function uploadRecord(mapId, entry) {
   initFirebase();
-  // Always cache locally first so we have an instant, reliable offline backup
   _localSave(mapId, entry);
 
   if (isUsingFirebase && db) {
@@ -92,10 +200,7 @@ export async function uploadRecord(mapId, entry) {
 }
 
 /**
- * Fetch the top 5 speedrun records for a given map.
- * Syncs local records up to Firestore if the online database is empty.
- * @param {string} mapId
- * @returns {Promise<Array>} sorted array of { name, time, timeRaw, date }
+ * Fetches the top 5 records for a map.
  */
 export async function fetchTopRecords(mapId) {
   initFirebase();
@@ -121,10 +226,8 @@ export async function fetchTopRecords(mapId) {
       console.log('[Firebase] Fetched ' + records.length + ' record(s) online for "' + mapId + '".');
       
       if (records.length === 0) {
-        // Firestore is empty. Check if we have offline records from when rules were closed.
         const localRecords = _localLoad(mapId);
         if (localRecords.length > 0) {
-          console.log('[Firebase] Local cache found while database is empty. Syncing records to database...');
           for (const entry of localRecords) {
             db.collection('leaderboards')
               .doc(mapId)
@@ -140,7 +243,6 @@ export async function fetchTopRecords(mapId) {
           return localRecords;
         }
       } else {
-        // Sync local cache with latest database records to keep them in perfect alignment
         const raw = localStorage.getItem('tds_leaderboard') || '{}';
         const lb = JSON.parse(raw);
         lb[mapId] = records;
@@ -163,7 +265,6 @@ function _localSave(mapId, entry) {
     const lb = JSON.parse(raw);
     if (!Array.isArray(lb[mapId])) lb[mapId] = [];
     
-    // Prevent duplicate score entries
     const exists = lb[mapId].some(item => item.timeRaw === entry.timeRaw && item.date === entry.date);
     if (!exists) {
       lb[mapId].push(entry);

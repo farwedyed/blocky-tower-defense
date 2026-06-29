@@ -76,6 +76,81 @@ body {
   display: none !important;
 }
 
+/* --- LOADING SCREEN --- */
+#loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  width: 100dvw;
+  height: 100dvh;
+  background-color: #1a2230;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.03) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 2px, transparent 2px);
+  background-size: 30px 30px;
+  z-index: 999999; /* Lowered slightly to sit under system overlays if needed */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+#loading-screen.fade-out {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.05);
+}
+
+.loading-content {
+  text-align: center;
+  max-width: 450px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.loading-logo {
+  font-size: 3.5rem !important;
+  margin-bottom: 5px;
+  animation: logoPulse 1.5s infinite ease-in-out;
+}
+
+@keyframes logoPulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px rgba(0, 136, 255, 0.3)); }
+  50% { transform: scale(1.05); filter: drop-shadow(0 0 20px rgba(0, 136, 255, 0.6)); }
+}
+
+.loading-bar-container {
+  width: 100%;
+  height: 24px;
+  background: #2c3e50;
+  border: 3px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 4px 0 var(--border-color);
+  margin-bottom: 12px;
+}
+
+#loading-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--primary-green), var(--primary-green-dark));
+  transition: width 0.1s ease;
+}
+
+#loading-status {
+  font-family: var(--font-title);
+  font-size: 1.1rem;
+  color: var(--primary-yellow);
+  text-shadow: 1.5px 1.5px 0 #000;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
 /* Portrait Orientation Warning Overlay */
 #orientation-warning {
   display: none;
@@ -99,8 +174,8 @@ body {
   padding: 20px;
 }
 
-/* Only display when the device is in portrait orientation */
-@media (orientation: portrait) {
+/* Enforce Aspect-Ratio checks to filter out false-positive mobile viewport changes */
+@media (max-aspect-ratio: 115/100) and (pointer: coarse) {
   #orientation-warning {
     display: flex !important;
   }
@@ -193,7 +268,7 @@ body {
   letter-spacing: 1px;
 }
 
-.tagline {
+.current-map-badge, .tagline {
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 2px;
@@ -237,9 +312,6 @@ body {
 }
 
 /* XP Bar */
-.xp-item {
-  width: 100%;
-}
 .xp-item {
   width: 120px;
 }
@@ -734,13 +806,6 @@ body {
   align-items: center;
   border-bottom: 2px dashed #e2e8f0;
   padding-bottom: 12px;
-}
-
-.current-map-badge {
-  font-family: var(--font-title);
-  font-size: 1.1rem;
-  font-weight: 900;
-  color: var(--text-dark);
 }
 
 .btn-exit {
@@ -1445,13 +1510,7 @@ body {
   }
 
   .map-info .difficulty {
-    font-size: 0.65rem;
-  }
-
-  .btn-deploy {
-    font-size: 1.1rem;
-    padding: 10px;
-    margin-top: 10px;
+    display: none !important;
   }
 
   /* ─── ZERO-SCROLL HORIZONTAL SWIPEABLE DIFFICULTIES DECK (MOBILE LANDSCAPE) ─── */
@@ -1586,6 +1645,7 @@ body {
     padding: 8px !important;
     max-width: 130px !important;
     margin: 0 auto !important;
+    padding: 6px !important;
   }
 
   .loadout-grid {
@@ -1742,7 +1802,7 @@ body {
     font-size: 0.7rem;
   }
 
-  /* ─── FLOATING ZERO-SCROLL DETACHED UPGRADE MENU (MOBILE LANDSCAPE) ─── */
+  /* ─── FLOATING ZERO-SCROLL UPGRADE MENU (MOBILE LANDSCAPE) ─── */
   #selection-panel {
     position: absolute;
     bottom: 20px;
@@ -1827,7 +1887,7 @@ body {
     font-size: 1.3rem !important;
   }
 
-  #tutorial-hint-box div[style*="font-size:1rem"] {
+  #tutorial-hint-box idv[style*="font-size:1rem"] {
     font-size: 0.8rem !important;
     color: #d4ac0d !important;
   }
@@ -1844,6 +1904,37 @@ body {
     padding: 3px 8px !important;
     background: #f1c40f !important;
     color: #1a1a2e !important;
+  }
+
+  /* ─── MOBILE LANDSCAPE COMPACT COMMANDER DIALOGUE OVERRIDES ─── */
+  @media (max-height: 480px) and (orientation: landscape) {
+    #commander-dialog-wrapper {
+      bottom: 8px !important;
+      left: 8px !important;
+      max-width: 280px !important;
+      gap: 6px !important;
+    }
+    #commander-face-canvas {
+      width: 40px !important;
+      height: 40px !important;
+    }
+    .commander-name-tag {
+      font-size: 0.55rem !important;
+      padding: 1px 4px !important;
+    }
+    .commander-speech-balloon {
+      padding: 6px 8px !important;
+      border-radius: 8px 8px 8px 0px !important;
+    }
+    #commander-dialog-text {
+      font-size: 0.68rem !important;
+      line-height: 1.25 !important;
+    }
+    #btn-commander-action {
+      font-size: 0.6rem !important;
+      padding: 2px 6px !important;
+      min-height: 24px !important;
+    }
   }
 }
 
@@ -1890,5 +1981,15 @@ body {
     width: 100%;
     flex-direction: row;
     flex-shrink: 0 !important;
+  }
+
+  #selection-panel {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    transform: none !important;
+    width: 250px !important;
+    max-width: 40vw !important;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
   }
 }
