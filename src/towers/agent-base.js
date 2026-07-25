@@ -3,6 +3,29 @@
 
 import { soundManager } from '../sound.js';
 
+// Unified upgrade costs map matching the tactical curve of Roblox TDS.
+// Consists of exactly 4 upgrade steps to scale from Level 1 up to Level 5.
+const UPGRADE_COSTS_MAP = {
+  scout: [50, 375, 1350, 2200],
+  soldier: [150, 450, 1200, 2200],
+  sniper: [200, 350, 1500, 2450],
+  demoman: [150, 400, 1100, 2400],
+  farm: [250, 650, 1500, 3500],
+  medic: [200, 600, 1400, 3000],
+  pyromancer: [150, 500, 1200, 2600],
+  rocketeer: [250, 700, 1800, 3800],
+  freezer: [100, 400, 1000, 2200],
+  shotgunner: [150, 500, 1300, 2700],
+  crook_boss: [250, 800, 2000, 4200],
+  military_base: [300, 900, 2400, 4800],
+  minigunner: [500, 1000, 2500, 5000],
+  commander: [200, 650, 1600, 3200],
+  dj: [300, 900, 2200, 4500],
+  ranger: [600, 1500, 3500, 7000],
+  turret: [500, 1200, 3000, 6500],
+  gladiator: [200, 500, 1200, 2800]
+};
+
 export class Agent {
   constructor(gridX, gridY, cellSize, stats) {
     this.gridX = gridX;
@@ -70,11 +93,15 @@ export class Agent {
   }
 
   acquireTarget(enemies) {
+    // Camo status checks. DJ level 3+ grants Camo Detection.
+    // Note: Ranger has "this.camoDetection = false" natively and relies on support.
     const hasCamoDetection = this.camoDetection || this.djCamoDetectionBuffed;
 
     const inRange = enemies.filter(enemy => {
       if (enemy.health <= 0) return false;
       if (this.isMeleeOnly && enemy.isFlying) return false;
+      
+      // Specialized Camo immunity check:
       if (enemy.isCamo && !hasCamoDetection) return false;
 
       const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
@@ -162,7 +189,7 @@ export class Agent {
   }
 
   fire(effectManager, bullets) {
-    // Overwritten by subclasses
+    // To be overridden by subclasses
   }
 
   upgrade(effectManager) {
@@ -174,28 +201,7 @@ export class Agent {
   getUpgradeCost() {
     if (this.level >= 5) return 0;
     
-    const costsMap = {
-      scout: [50, 550, 1350, 1400, 2500],
-      soldier: [150, 450, 1200, 2200, 4500],
-      sniper: [100, 350, 950, 2500, 5500],
-      demoman: [150, 400, 1100, 2400, 5000],
-      farm: [250, 650, 1500, 3500, 7500],
-      medic: [200, 600, 1400, 3000, 6500],
-      pyromancer: [150, 500, 1200, 2600, 5500],
-      rocketeer: [250, 700, 1800, 3800, 8000],
-      freezer: [100, 400, 1000, 2200, 4800],
-      shotgunner: [150, 500, 1300, 2700, 5800],
-      crook_boss: [250, 800, 2000, 4200, 9000],
-      military_base: [300, 900, 2400, 4800, 10000],
-      minigunner: [500, 1000, 2500, 5000, 9500],
-      commander: [200, 650, 1600, 3200, 7000],
-      dj: [300, 900, 2200, 4500, 9500],
-      ranger: [600, 1500, 3500, 7000, 14000],
-      turret: [500, 1200, 3000, 6500, 13000],
-      gladiator: [200, 500, 1200, 2800, 6000]
-    };
-
-    const costs = costsMap[this.type] || [100, 300, 800, 1800, 4000];
+    const costs = UPGRADE_COSTS_MAP[this.type] || [100, 300, 800, 1800];
     const baseCost = costs[this.level - 1] || 500;
     const discount = this.djRangeBuffed ? (this.level >= 5 ? 0.85 : 0.90) : 1.0;
     return Math.floor(baseCost * discount);
@@ -210,27 +216,7 @@ export class Agent {
   }
 
   getUpgradeCostForLevel(lvl) {
-    const costsMap = {
-      scout: [50, 550, 1350, 1400, 2500],
-      soldier: [150, 450, 1200, 2200, 4500],
-      sniper: [100, 350, 950, 2500, 5500],
-      demoman: [150, 400, 1100, 2400, 5000],
-      farm: [250, 650, 1500, 3500, 7500],
-      medic: [200, 600, 1400, 3000, 6500],
-      pyromancer: [150, 500, 1200, 2600, 5500],
-      rocketeer: [250, 700, 1800, 3800, 8000],
-      freezer: [100, 400, 1000, 2200, 4800],
-      shotgunner: [150, 500, 1300, 2700, 5800],
-      crook_boss: [250, 800, 2000, 4200, 9000],
-      military_base: [300, 900, 2400, 4800, 10000],
-      minigunner: [500, 1000, 2500, 5000, 9500],
-      commander: [200, 650, 1600, 3200, 7000],
-      dj: [300, 900, 2200, 4500, 9500],
-      ranger: [600, 1500, 3500, 7000, 14000],
-      turret: [500, 1200, 3000, 6500, 13000],
-      gladiator: [200, 500, 1200, 2800, 6000]
-    };
-    const costs = costsMap[this.type] || [100, 300, 800, 1800, 4000];
+    const costs = UPGRADE_COSTS_MAP[this.type] || [100, 300, 800, 1800];
     const baseCost = costs[lvl - 1] || 500;
     const discount = this.djRangeBuffed ? 0.90 : 1.0;
     return Math.floor(baseCost * discount);

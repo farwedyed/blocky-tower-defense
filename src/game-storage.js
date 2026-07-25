@@ -1,5 +1,6 @@
 // src/game-storage.js
 // Handles reading and writing player stats, daily quests, and speedrun records.
+// Integrated with CrazyGames Data module for seamless cross-device cloud saving.
 
 import { uploadRecord, fetchTopRecords } from './firebase.js';
 import { CrazyGamesManager } from './crazygames.js';
@@ -13,22 +14,58 @@ import {
 } from './game-config.js';
 
 /**
- * Loads saved progression stats from localStorage into the active game state.
+ * Defensive getter utilizing the CrazyGames SDK Data Module if available,
+ * falling back gracefully to traditional window.localStorage.
+ */
+function getStorageItem(key) {
+  if (CrazyGamesManager.isInitialized && typeof window !== 'undefined' && window.CrazyGames && window.CrazyGames.SDK && window.CrazyGames.SDK.data) {
+    try {
+      return window.CrazyGames.SDK.data.getItem(key);
+    } catch (e) {
+      console.warn("[CrazyGames Data] getItem failed, falling back to localStorage", e);
+    }
+  }
+  return localStorage.getItem(key);
+}
+
+/**
+ * Defensive setter utilizing the CrazyGames SDK Data Module if available,
+ * falling back gracefully to traditional window.localStorage.
+ */
+function setStorageItem(key, value) {
+  if (CrazyGamesManager.isInitialized && typeof window !== 'undefined' && window.CrazyGames && window.CrazyGames.SDK && window.CrazyGames.SDK.data) {
+    try {
+      window.CrazyGames.SDK.data.setItem(key, value);
+      return;
+    } catch (e) {
+      console.warn("[CrazyGames Data] setItem failed, falling back to localStorage", e);
+    }
+  }
+  localStorage.setItem(key, value);
+}
+
+/**
+ * Loads saved progression stats from cloud or local storage into the active game state.
  * @param {object} game - The main game instance
  */
-export function loadStatsFromStorage(game) {
+export async function loadStatsFromStorage(game) {
+  // Wait for SDK initialization if CrazyGames is present to avoid calling getItem too early
+  if (typeof window !== 'undefined' && window.CrazyGames && window.CrazyGames.SDK) {
+    await CrazyGamesManager.initPromise;
+  }
+
   try {
-    const level = localStorage.getItem('tds_level');
-    const xp = localStorage.getItem('tds_xp');
-    const coins = localStorage.getItem('tds_coins');
-    const unlocked = localStorage.getItem('tds_unlocked');
-    const equipped = localStorage.getItem('tds_equipped');
-    const skins = localStorage.getItem('tds_skins');
-    const eqSkins = localStorage.getItem('tds_equipped_skins');
-    const quests = localStorage.getItem('tds_quests');
-    const questRewarded = localStorage.getItem('tds_quest_rewarded');
-    const tutorial = localStorage.getItem('tds_tutorial_completed');
-    const leaderboard = localStorage.getItem('tds_leaderboard');
+    const level = getStorageItem('tds_level');
+    const xp = getStorageItem('tds_xp');
+    const coins = getStorageItem('tds_coins');
+    const unlocked = getStorageItem('tds_unlocked');
+    const equipped = getStorageItem('tds_equipped');
+    const skins = getStorageItem('tds_skins');
+    const eqSkins = getStorageItem('tds_equipped_skins');
+    const quests = getStorageItem('tds_quests');
+    const questRewarded = getStorageItem('tds_quest_rewarded');
+    const tutorial = getStorageItem('tds_tutorial_completed');
+    const leaderboard = getStorageItem('tds_leaderboard');
 
     if (level) game.playerLevel = parseInt(level);
     if (xp) game.playerXp = parseInt(xp);
@@ -39,16 +76,43 @@ export function loadStatsFromStorage(game) {
     if (skins) game.ownedSkins = JSON.parse(skins);
     if (eqSkins) game.equippedSkins = JSON.parse(eqSkins);
     
-    if (quests) {
-      const parsedQuests = JSON.parse(quests);
-      if (parsedQuests && typeof parsedQuests === 'object') {
-        game.questProgress = { ...game.questProgress, ...parsedQuests };
+    // ─── DAILY QUESTS RESET GATE ───
+    // This strictly checks the calendar date on launch. If the date differs from the last active date,
+    // quest tallies and rewards are securely wiped back to zero to guarantee clean new daily quest goals.
+    const todayStr = new Date().toLocaleDateString();
+    const lastQuestDate = getStorageItem('tds_last_quest_date');
+
+    if (lastQuestDate !== todayStr) {
+      game.questProgress = {
+        kills: 0,
+        cashSpent: 0,
+        wavesSurvived: 0,
+        scoutsPlaced: 0,
+        snipersPlaced: 0,
+        farmsPlaced: 0
+      };
+      game.questRewarded = {
+        kills: false,
+        cashSpent: false,
+        wavesSurvived: false,
+        scoutsPlaced: false,
+        snipersPlaced: false,
+        farmsPlaced: false
+      };
+      setStorageItem('tds_last_quest_date', todayStr);
+      saveStatsToStorage(game);
+    } else {
+      if (quests) {
+        const parsedQuests = JSON.parse(quests);
+        if (parsedQuests && typeof parsedQuests === 'object') {
+          game.questProgress = { ...game.questProgress, ...parsedQuests };
+        }
       }
-    }
-    if (questRewarded) {
-      const parsed = JSON.parse(questRewarded);
-      if (parsed && typeof parsed === 'object') {
-        game.questRewarded = { ...game.questRewarded, ...parsed };
+      if (questRewarded) {
+        const parsed = JSON.parse(questRewarded);
+        if (parsed && typeof parsed === 'object') {
+          game.questRewarded = { ...game.questRewarded, ...parsed };
+        }
       }
     }
     
@@ -106,22 +170,22 @@ export function loadStatsFromStorage(game) {
 }
 
 /**
- * Persists current progression stats to localStorage.
+ * Persists current progression stats securely to cloud or local storage.
  * @param {object} game - The main game instance
  */
 export function saveStatsToStorage(game) {
   try {
-    localStorage.setItem('tds_level', game.playerLevel.toString());
-    localStorage.setItem('tds_xp', game.playerXp.toString());
-    localStorage.setItem('tds_coins', game.playerCoins.toString());
-    localStorage.setItem('tds_unlocked', JSON.stringify(game.unlockedAgents));
-    localStorage.setItem('tds_equipped', JSON.stringify(game.equippedAgents));
-    localStorage.setItem('tds_skins', JSON.stringify(game.ownedSkins));
-    localStorage.setItem('tds_equipped_skins', JSON.stringify(game.equippedSkins));
-    localStorage.setItem('tds_quests', JSON.stringify(game.questProgress));
-    localStorage.setItem('tds_quest_rewarded', JSON.stringify(game.questRewarded));
-    localStorage.setItem('tds_tutorial_completed', game.tutorialCompleted ? 'true' : 'false');
-    localStorage.setItem('tds_leaderboard', JSON.stringify(game.leaderboard));
+    setStorageItem('tds_level', game.playerLevel.toString());
+    setStorageItem('tds_xp', game.playerXp.toString());
+    setStorageItem('tds_coins', game.playerCoins.toString());
+    setStorageItem('tds_unlocked', JSON.stringify(game.unlockedAgents));
+    setStorageItem('tds_equipped', JSON.stringify(game.equippedAgents));
+    setStorageItem('tds_skins', JSON.stringify(game.ownedSkins));
+    setStorageItem('tds_equipped_skins', JSON.stringify(game.equippedSkins));
+    setStorageItem('tds_quests', JSON.stringify(game.questProgress));
+    setStorageItem('tds_quest_rewarded', JSON.stringify(game.questRewarded));
+    setStorageItem('tds_tutorial_completed', game.tutorialCompleted ? 'true' : 'false');
+    setStorageItem('tds_leaderboard', JSON.stringify(game.leaderboard));
   } catch (e) {
     console.warn("Storage save failed.", e);
   }
@@ -133,24 +197,45 @@ export function saveStatsToStorage(game) {
  */
 export function checkQuestCompletion(game) {
   let anyCompleted = false;
+  const goals = game.questGoals;
 
-  if (!game.questRewarded.kills && game.questProgress.kills >= QUEST_GOALS.kills) {
+  if (!game.questRewarded.kills && (game.questProgress.kills || 0) >= goals.kills) {
     game.questRewarded.kills = true;
     game.playerCoins += 75;
     anyCompleted = true;
-    game.effectManager.spawnText(400, 260, 'QUEST COMPLETE! +🪙 75 Coins', '#f1c40f');
+    game.effectManager.spawnText(400, 260, 'QUEST COMPLETE! +75 Coins', '#f1c40f');
   }
-  if (!game.questRewarded.cashSpent && game.questProgress.cashSpent >= QUEST_GOALS.cashSpent) {
+  if (!game.questRewarded.cashSpent && (game.questProgress.cashSpent || 0) >= goals.cashSpent) {
     game.questRewarded.cashSpent = true;
     game.playerCoins += 100;
     anyCompleted = true;
-    game.effectManager.spawnText(400, 260, 'QUEST COMPLETE! +🪙 100 Coins', '#f1c40f');
+    game.effectManager.spawnText(400, 260, 'QUEST COMPLETE! +100 Coins', '#f1c40f');
   }
-  if (!game.questRewarded.farmsPlaced && game.questProgress.farmsPlaced >= QUEST_GOALS.farmsPlaced) {
-    game.questRewarded.farmsPlaced = true;
+  if (!game.questRewarded.wavesSurvived && (game.questProgress.wavesSurvived || 0) >= goals.wavesSurvived) {
+    game.questRewarded.wavesSurvived = true;
+    game.playerCoins += 75;
+    anyCompleted = true;
+    game.effectManager.spawnText(400, 240, 'QUEST COMPLETE! +75 Coins', '#f1c40f');
+  }
+  if (!game.questRewarded.scoutsPlaced && (game.questProgress.scoutsPlaced || 0) >= goals.scoutsPlaced) {
+    game.questRewarded.scoutsPlaced = true;
     game.playerCoins += 50;
     anyCompleted = true;
-    game.effectManager.spawnText(400, 220, 'QUEST COMPLETE! +🪙 50 Coins', '#f1c40f');
+    game.effectManager.spawnText(400, 220, 'QUEST COMPLETE! +50 Coins', '#f1c40f');
+  }
+  if (!game.questRewarded.snipersPlaced && (game.questProgress.snipersPlaced || 0) >= goals.snipersPlaced) {
+    game.questRewarded.snipersPlaced = true;
+    game.playerCoins += 50;
+    anyCompleted = true;
+    game.effectManager.spawnText(400, 200, 'QUEST COMPLETE! +50 Coins', '#f1c40f');
+  }
+  
+  // Gated check: only allow completing Farms Placed if Farm is unlocked
+  if (game.unlockedAgents.includes('farm') && !game.questRewarded.farmsPlaced && (game.questProgress.farmsPlaced || 0) >= goals.farmsPlaced) {
+    game.questRewarded.farmsPlaced = true;
+    game.playerCoins += 60;
+    anyCompleted = true;
+    game.effectManager.spawnText(400, 180, 'QUEST COMPLETE! +60 Coins', '#f1c40f');
   }
 
   if (anyCompleted) {

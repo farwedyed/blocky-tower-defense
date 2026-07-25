@@ -1,4 +1,5 @@
-// Enemy Module for Blocky Tactical Defense (BTD 2D)
+// src/enemy.js
+// Enemy and Boss Modules with dynamic difficulty & wave-based HP scaling for BTD 2D
 
 export class Enemy {
   static hardcoreMode = false;
@@ -11,7 +12,7 @@ export class Enemy {
     // Assign unique network ID
     this.id = Enemy.nextId++;
 
-    const activeDiff = (window.game && window.game.selectedDifficulty) ? window.game.selectedDifficulty : 'molten';
+    const activeDiff = (window.game && window.game.selectedDifficulty) ? window.game.selectedDifficulty : 'casual';
     const diffConfig = window.game ? window.game.difficultySettings[activeDiff] : { hpMultiplier: 1.0 };
     const diffPhMult = diffConfig.hpMultiplier;
 
@@ -19,7 +20,13 @@ export class Enemy {
     const hpMult = (Enemy.hardcoreMode ? 1.5 : 1.0) * diffPhMult;
     const spdMult = Enemy.hardcoreMode ? 1.2 : 1.0;
 
-    this.maxHealth = Math.round(stats.maxHealth * hpMult);
+    // ─── DYNAMIC WAVE HP SCALING ───
+    // Multiplies spawned enemy health by an additional 4% for every wave after Wave 1.
+    // This provides a progressive, balanced difficulty curve as the rounds advance.
+    const waveNum = (window.game && window.game.wave) ? window.game.wave : 1;
+    const waveHpMult = 1.0 + (waveNum - 1) * 0.04;
+
+    this.maxHealth = Math.round(stats.maxHealth * hpMult * waveHpMult);
     this.health = this.maxHealth;
     this.baseSpeed = stats.speed * spdMult;
     this.speed = this.baseSpeed;
@@ -39,7 +46,7 @@ export class Enemy {
     this.isFireImmune = stats.isFireImmune || false;
 
     // Energy Shield Pool
-    this.maxShield = Math.round((stats.maxShield || 0) * hpMult);
+    this.maxShield = Math.round((stats.maxShield || 0) * hpMult * waveHpMult);
     this.shield = this.maxShield;
 
     // Path movement tracking
@@ -142,13 +149,15 @@ export class Enemy {
   }
 
   takeDamage(amount, damageType, effectManager) {
-    // 1. Lead / Heavy Armor Resistance (Immune to physical, takes exactly 1 dmg)
+    // Lead Armor Immunity Check:
+    // Takes exactly 1 damage from standard physical weapons.
+    // Fire, Explosions, and Armor-penetrating weapons (like upgraded Snipers) deal full damage.
     if (this.isLead && damageType === 'physical') {
       amount = 1;
-      effectManager.spawnText(this.x, this.y - 18, "RESIST", '#95a5a6');
+      effectManager.spawnText(this.x, this.y - 18, "RESISTED!", '#95a5a6');
     }
 
-    // 2. Energy Shield damage absorption
+    // Energy Shield absorption checks
     if (this.shield > 0) {
       if (this.shield >= amount) {
         this.shield -= amount;
@@ -166,9 +175,9 @@ export class Enemy {
 
     if (this.health <= 0) {
       this.health = 0;
-      return true; // Dead
+      return true; // Target is dead
     }
-    return false; // Alive
+    return false; // Target is alive
   }
 
   draw(ctx) {
@@ -178,24 +187,24 @@ export class Enemy {
     ctx.strokeStyle = '#222222';
     ctx.lineWidth = 3.5;
 
-    // Apply 50% opacity to Camo enemies
+    // Apply transparency to Camo/Hidden enemies
     if (this.isCamo) {
       ctx.globalAlpha = 0.55;
     }
 
     let renderY = this.y;
     if (this.isFlying) {
-      // Draw ground shadow first
+      // Ground shadow
       ctx.fillStyle = 'rgba(0,0,0,0.18)';
       ctx.beginPath();
       ctx.ellipse(this.x, this.y + 12, this.radius * 0.9, this.radius * 0.35, 0, 0, Math.PI * 2);
       ctx.fill();
       
-      // Elevate actual model
+      // Elevate actual flying model
       renderY = this.y - 18;
     }
 
-    // Draw Boss Rage Fire Aura
+    // Boss Rage Fire Aura
     if (this.enraged) {
       ctx.fillStyle = 'rgba(231, 76, 60, 0.25)';
       ctx.strokeStyle = '#e74c3c';
@@ -206,7 +215,7 @@ export class Enemy {
       ctx.stroke();
     }
 
-    // Render sprites
+    // Render body model
     if (this.hitFlashTimer > 0) {
       ctx.fillStyle = '#ff3131';
       ctx.strokeStyle = '#222';
@@ -215,7 +224,7 @@ export class Enemy {
       this.drawBlockyZombieBody(ctx, renderY);
     }
 
-    // Draw balloon details if flying
+    // Flying balloons
     if (this.isFlying) {
       ctx.fillStyle = '#e67e22'; 
       ctx.strokeStyle = '#222';
@@ -276,37 +285,37 @@ export class Enemy {
   drawBlockyZombieBody(ctx, renderY) {
     const r = this.radius;
 
-    // Left Arm (raised forward)
+    // Left Arm
     ctx.fillStyle = '#2ecc71';
     ctx.fillRect(this.x - r - 6, renderY - 4, 8, 5);
     ctx.strokeRect(this.x - r - 6, renderY - 4, 8, 5);
 
-    // Right Arm (raised forward)
+    // Right Arm
     ctx.fillRect(this.x + r - 2, renderY - 4, 8, 5);
     ctx.strokeRect(this.x + r - 2, renderY - 4, 8, 5);
 
-    // Blocky Torso (Shirt)
+    // Torso
     ctx.fillStyle = '#8e44ad';
     ctx.fillRect(this.x - r, renderY - 6, r * 2, r * 1.5);
     ctx.strokeRect(this.x - r, renderY - 6, r * 2, r * 1.5);
 
-    // Square Head
+    // Head
     ctx.fillStyle = '#2ecc71';
     ctx.fillRect(this.x - r * 0.6, renderY - r * 1.5, r * 1.2, r * 1.0);
     ctx.strokeRect(this.x - r * 0.6, renderY - r * 1.5, r * 1.2, r * 1.0);
 
-    // Facial details
+    // Eyes
     ctx.fillStyle = '#111';
     ctx.fillRect(this.x - r * 0.4, renderY - r * 1.2, 2, 2);
     ctx.fillRect(this.x + r * 0.2, renderY - r * 1.2, 2, 2);
   }
 }
 
-// ─── BASE MATCH ENEMIES (REBALANCED TO OFFICIAL ROBLOX TDS STATS) ───
+// ─── BASE MATCH ENEMIES (TUNED METRICS) ───
 export class Runner extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 10, // Rebalanced down from 15 to match TDS
+      maxHealth: 10, 
       speed: 65,
       goldReward: 12,
       radius: 10,
@@ -320,7 +329,7 @@ export class Runner extends Enemy {
 export class Quick extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 6, // Rebalanced down from 12 to match TDS Speedy
+      maxHealth: 6, 
       speed: 120,
       goldReward: 10,
       radius: 9,
@@ -334,7 +343,7 @@ export class Quick extends Enemy {
 export class Slow extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 25, // Rebalanced down from 40 to match TDS Slow
+      maxHealth: 25, 
       speed: 40,
       goldReward: 20,
       radius: 13,
@@ -348,7 +357,7 @@ export class Slow extends Enemy {
 export class Hidden extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 10, // Rebalanced down from 15 to match TDS
+      maxHealth: 10, 
       speed: 80,
       goldReward: 20,
       radius: 10,
@@ -363,7 +372,7 @@ export class Hidden extends Enemy {
 export class Lead extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 30, // Rebalanced down from 50 to match TDS
+      maxHealth: 30, 
       speed: 35,
       goldReward: 25,
       radius: 11,
@@ -378,7 +387,7 @@ export class Lead extends Enemy {
 export class Shadow extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 50, // Rebalanced down from 80 to match TDS
+      maxHealth: 50, 
       speed: 115,
       goldReward: 35,
       radius: 11,
@@ -393,7 +402,7 @@ export class Shadow extends Enemy {
 export class Goliath extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 200, // Rebalanced down from 400 to match TDS Normal Boss scale
+      maxHealth: 200, 
       speed: 35,
       goldReward: 60,
       radius: 18,
@@ -427,7 +436,7 @@ export class Goliath extends Enemy {
 export class Templar extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 1500, // Rebalanced down from 3000 to scale with 2D singleplayer
+      maxHealth: 1500, 
       maxShield: 500, 
       speed: 30,
       goldReward: 100,
@@ -441,7 +450,7 @@ export class Templar extends Enemy {
 
   drawBlockyZombieBody(ctx, renderY) {
     const r = this.radius;
-    ctx.fillStyle = '#ecf0f1'; // Polished plate chest
+    ctx.fillStyle = '#ecf0f1'; // Plate armor
     ctx.fillRect(this.x - r, renderY - 8, r * 2, r * 1.6);
     ctx.strokeRect(this.x - r, renderY - 8, r * 2, r * 1.6);
 
@@ -449,19 +458,19 @@ export class Templar extends Enemy {
     ctx.fillRect(this.x - 3, renderY - 8, 6, r * 1.6);
     ctx.fillRect(this.x - r, renderY - 2, r * 2, 4);
 
-    ctx.fillStyle = '#bdc3c7'; // Shield block
+    ctx.fillStyle = '#bdc3c7'; // Shield
     ctx.fillRect(this.x - r - 6, renderY - 2, 8, 12);
     ctx.strokeRect(this.x - r - 6, renderY - 2, 8, 12);
   }
 }
 
-// ─── THE SIX UNIQUE DIFFICULTIES BOSSES (SCALED FOR 2D BALANCING) ───
+// ─── UNIQUE DIFFICULTIES BOSSES (BALANCED SCALES) ───
 
 // 1. EASY MODE BOSS: BRUTE
 export class Brute extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 1000, // Rebalanced down from 22000 to make Easy Mode fair for solo play
+      maxHealth: 1000, 
       speed: 32,
       goldReward: 150,
       radius: 24,
@@ -474,21 +483,21 @@ export class Brute extends Enemy {
 
   drawBlockyZombieBody(ctx, renderY) {
     const r = this.radius;
-    ctx.fillStyle = '#1e8449'; // Dark forest green chest
+    ctx.fillStyle = '#1e8449'; 
     ctx.fillRect(this.x - r, renderY - 8, r * 2, r * 1.7);
     ctx.strokeRect(this.x - r, renderY - 8, r * 2, r * 1.7);
 
-    ctx.fillStyle = '#27ae60'; // Heavy bulk shoulders
+    ctx.fillStyle = '#27ae60'; 
     ctx.fillRect(this.x - r - 7, renderY - 10, 8, 12);
     ctx.strokeRect(this.x - r - 7, renderY - 10, 8, 12);
     ctx.fillRect(this.x + r - 1, renderY - 10, 8, 12);
     ctx.strokeRect(this.x + r - 1, renderY - 10, 8, 12);
 
-    ctx.fillStyle = '#27ae60'; // Muscular green head
+    ctx.fillStyle = '#27ae60'; 
     ctx.fillRect(this.x - r * 0.6, renderY - r * 1.4, r * 1.2, r * 1.0);
     ctx.strokeRect(this.x - r * 0.6, renderY - r * 1.4, r * 1.2, r * 1.0);
 
-    ctx.fillStyle = '#ff3131'; // Red raging eye slits
+    ctx.fillStyle = '#ff3131'; 
     ctx.fillRect(this.x - r * 0.3, renderY - r * 1.1, 4, 3);
     ctx.fillRect(this.x + r * 0.1, renderY - r * 1.1, 4, 3);
   }
@@ -498,7 +507,7 @@ export class Brute extends Enemy {
 export class GraveDigger extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 2000, // Rebalanced down from 40000 
+      maxHealth: 2000, 
       speed: 30,
       goldReward: 250,
       radius: 26,
@@ -513,7 +522,7 @@ export class GraveDigger extends Enemy {
   update(pixelPath, effectManager, dt, allEnemies, towers) {
     super.update(pixelPath, effectManager, dt, allEnemies, towers);
     
-    // Periodically summons reinforcements
+    // Grave Digger Summon Reinforcements Ability:
     this.summonTimer += dt;
     if (this.summonTimer >= 8.0 && this.health > 0) {
       this.summonTimer = 0;
@@ -525,22 +534,22 @@ export class GraveDigger extends Enemy {
 
   drawBlockyZombieBody(ctx, renderY) {
     const r = this.radius;
-    ctx.fillStyle = '#2f3542'; // Dark Robe
+    ctx.fillStyle = '#2f3542'; 
     ctx.fillRect(this.x - r, renderY - 8, r * 2, r * 1.6);
     ctx.strokeRect(this.x - r, renderY - 8, r * 2, r * 1.6);
 
-    ctx.fillStyle = '#7f8c8d'; // Spade shovel weapon
+    ctx.fillStyle = '#7f8c8d'; 
     ctx.fillRect(this.x + r * 0.5, renderY - 24, 12, 10);
     ctx.strokeRect(this.x + r * 0.5, renderY - 24, 12, 10);
     ctx.fillStyle = '#784212';
     ctx.fillRect(this.x + r * 0.6, renderY - 14, 4, 25);
     ctx.strokeRect(this.x + r * 0.6, renderY - 14, 4, 25);
 
-    ctx.fillStyle = '#1e272e'; // Dark Hood
+    ctx.fillStyle = '#1e272e'; 
     ctx.fillRect(this.x - r * 0.6, renderY - r * 1.5, r * 1.2, r * 1.1);
     ctx.strokeRect(this.x - r * 0.6, renderY - r * 1.5, r * 1.2, r * 1.1);
 
-    ctx.fillStyle = '#9b59b6'; // Glowing purple slits
+    ctx.fillStyle = '#9b59b6'; 
     ctx.fillRect(this.x - r * 0.25, renderY - r * 1.1, 3, 3);
     ctx.fillRect(this.x + r * 0.1, renderY - r * 1.1, 3, 3);
   }
@@ -550,7 +559,7 @@ export class GraveDigger extends Enemy {
 export class HazardGiant extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 3500, // Rebalanced down from 55000
+      maxHealth: 3500, 
       maxShield: 1000,
       speed: 28,
       goldReward: 350,
@@ -564,21 +573,21 @@ export class HazardGiant extends Enemy {
 
   drawBlockyZombieBody(ctx, renderY) {
     const r = this.radius;
-    ctx.fillStyle = '#f1c40f'; // Neon Hazmat Yellow suit
+    ctx.fillStyle = '#f1c40f'; 
     ctx.fillRect(this.x - r, renderY - 8, r * 2, r * 1.7);
     ctx.strokeRect(this.x - r, renderY - 8, r * 2, r * 1.7);
 
-    ctx.fillStyle = '#2ecc71'; // Radioactive barrels strapped on shoulders
+    ctx.fillStyle = '#2ecc71'; 
     ctx.fillRect(this.x - r - 6, renderY - 12, 6, 14);
     ctx.strokeRect(this.x - r - 6, renderY - 12, 6, 14);
     ctx.fillRect(this.x + r, renderY - 12, 6, 14);
     ctx.strokeRect(this.x + r, renderY - 12, 6, 14);
 
-    ctx.fillStyle = '#f1c40f'; // Dome visor head
+    ctx.fillStyle = '#f1c40f'; 
     ctx.fillRect(this.x - r * 0.6, renderY - r * 1.4, r * 1.2, r * 1.0);
     ctx.strokeRect(this.x - r * 0.6, renderY - r * 1.4, r * 1.2, r * 1.0);
 
-    ctx.fillStyle = '#2ecc71'; // Toxic glowing green glass window
+    ctx.fillStyle = '#2ecc71'; 
     ctx.fillRect(this.x - r * 0.35, renderY - r * 1.15, r * 0.7, 4);
   }
 }
@@ -587,7 +596,7 @@ export class HazardGiant extends Enemy {
 export class MoltenTitan extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 5000, // Rebalanced down from 80000 
+      maxHealth: 5000, 
       speed: 30,
       goldReward: 450,
       radius: 30,
@@ -601,19 +610,18 @@ export class MoltenTitan extends Enemy {
 
   drawBlockyZombieBody(ctx, renderY) {
     const r = this.radius;
-    ctx.fillStyle = '#1e272e'; // Obsidian/Magma crust body
+    ctx.fillStyle = '#1e272e'; 
     ctx.fillRect(this.x - r, renderY - 8, r * 2, r * 1.6);
     ctx.strokeRect(this.x - r, renderY - 8, r * 2, r * 1.6);
 
-    ctx.fillStyle = '#ff6b6b'; // Active molten lava veins
+    ctx.fillStyle = '#ff6b6b'; 
     ctx.fillRect(this.x - r * 0.5, renderY - 4, 3, 10);
     ctx.fillRect(this.x + r * 0.2, renderY - 6, 4, 8);
 
-    ctx.fillStyle = '#1e272e'; // Molten volcanic head
+    ctx.fillStyle = '#1e272e'; 
     ctx.fillRect(this.x - r * 0.6, renderY - r * 1.3, r * 1.2, r * 1.0);
     ctx.strokeRect(this.x - r * 0.6, renderY - r * 1.3, r * 1.2, r * 1.0);
 
-    // Volcano spark crest crown
     ctx.fillStyle = '#e67e22';
     ctx.beginPath();
     ctx.moveTo(this.x - r * 0.6, renderY - r * 1.3);
@@ -631,7 +639,7 @@ export class MoltenTitan extends Enemy {
 export class FallenGuardian extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 4000, // Rebalanced down from 85000 
+      maxHealth: 4000, 
       speed: 28,
       goldReward: 500,
       radius: 30,
@@ -662,7 +670,7 @@ export class FallenGuardian extends Enemy {
 export class FallenKing extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 8000, // Rebalanced down from 150000 
+      maxHealth: 8000, 
       speed: 24,
       goldReward: 800,
       radius: 33,
@@ -677,7 +685,7 @@ export class FallenKing extends Enemy {
   update(pixelPath, effectManager, dt, allEnemies, towers) {
     super.update(pixelPath, effectManager, dt, allEnemies, towers);
     
-    // Slams greatsword to freeze/stun all units within 120px range
+    // Fallen King Greatsword Slam (Stuns nearby towers within 125px range)
     this.slamTimer += dt;
     if (this.slamTimer >= 7.0 && this.health > 0) {
       this.slamTimer = 0;
@@ -689,7 +697,7 @@ export class FallenKing extends Enemy {
           const dist = Math.hypot(tower.x - this.x, tower.y - this.y);
           if (dist <= 125) {
             tower.fireCooldown = Math.max(tower.fireCooldown, 3.0); 
-            effectManager.spawnText(tower.x, tower.y - 15, "STUNNED", '#9b59b6');
+            effectManager.spawnText(tower.x, tower.y - 15, "STUNNED!", '#9b59b6');
           }
         }
       }
@@ -698,15 +706,15 @@ export class FallenKing extends Enemy {
 
   drawBlockyZombieBody(ctx, renderY) {
     const r = this.radius;
-    ctx.fillStyle = '#f1c40f'; // Golden Royal plate armor
+    ctx.fillStyle = '#f1c40f'; 
     ctx.fillRect(this.x - r, renderY - 8, r * 2, r * 1.7);
     ctx.strokeRect(this.x - r, renderY - 8, r * 2, r * 1.7);
 
-    ctx.fillStyle = '#8e44ad'; // Purple Greatsword
+    ctx.fillStyle = '#8e44ad'; 
     ctx.fillRect(this.x + r * 0.6, renderY - 30, 8, 26);
     ctx.strokeRect(this.x + r * 0.6, renderY - 30, 8, 26);
 
-    ctx.fillStyle = '#f1c40f'; // Crown
+    ctx.fillStyle = '#f1c40f'; 
     ctx.beginPath();
     ctx.moveTo(this.x - r * 0.4, renderY - r * 1.4);
     ctx.lineTo(this.x - r * 0.4, renderY - r * 1.7);
@@ -721,11 +729,11 @@ export class FallenKing extends Enemy {
   }
 }
 
-// 7. FROST BOSS: FROST SPIRIT (REQ. LEVEL 60 ACCESS)
+// 7. FROST BOSS: FROST SPIRIT
 export class FrostSpirit extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 12000, // Rebalanced down from 280000 
+      maxHealth: 12000, 
       maxShield: 3000,
       speed: 20,
       goldReward: 1200,
@@ -741,7 +749,7 @@ export class FrostSpirit extends Enemy {
   update(pixelPath, effectManager, dt, allEnemies, towers) {
     super.update(pixelPath, effectManager, dt, allEnemies, towers);
 
-    // Periodically summons deep freeze blizzard across all defensive grids (stuns 1 random tower map-wide)
+    // Frost Spirit Glacial Blizzard Aura (Randomly freezes a map-wide tower for 4.0 seconds)
     this.blizzardTimer += dt;
     if (this.blizzardTimer >= 6.0 && this.health > 0) {
       this.blizzardTimer = 0;
@@ -750,8 +758,8 @@ export class FrostSpirit extends Enemy {
       if (towers && towers.size > 0) {
         const activeTowers = Array.from(towers.values());
         const target = activeTowers[Math.floor(Math.random() * activeTowers.length)];
-        target.fireCooldown = Math.max(target.fireCooldown, 4.0); // Global global ice freeze slow stuns target for 4 seconds
-        effectManager.spawnText(target.x, target.y - 15, "FROZEN", '#0984e3');
+        target.fireCooldown = Math.max(target.fireCooldown, 4.0); 
+        effectManager.spawnText(target.x, target.y - 15, "FROZEN!", '#0984e3');
         effectManager.spawnImpact(target.x, target.y, '#74b9ff', 6, 0.7);
       }
     }
@@ -759,34 +767,34 @@ export class FrostSpirit extends Enemy {
 
   drawBlockyZombieBody(ctx, renderY) {
     const r = this.radius;
-    ctx.fillStyle = '#ebf5fb'; // Pale ice body
+    ctx.fillStyle = '#ebf5fb'; 
     ctx.fillRect(this.x - r, renderY - 8, r * 2, r * 1.8);
     ctx.strokeRect(this.x - r, renderY - 8, r * 2, r * 1.8);
 
-    ctx.fillStyle = '#00ffe0'; // Cyan core lines
+    ctx.fillStyle = '#00ffe0'; 
     ctx.fillRect(this.x - 4, renderY, 8, 8);
 
-    ctx.fillStyle = '#74b9ff'; // Glacier shoulder shield crystals
+    ctx.fillStyle = '#74b9ff'; 
     ctx.fillRect(this.x - r - 6, renderY - 12, 6, 12);
     ctx.strokeRect(this.x - r - 6, renderY - 12, 6, 12);
     ctx.fillRect(this.x + r, renderY - 12, 6, 12);
     ctx.strokeRect(this.x + r, renderY - 12, 6, 12);
 
-    ctx.fillStyle = '#ebf5fb'; // Glacier head
+    ctx.fillStyle = '#ebf5fb'; 
     ctx.fillRect(this.x - r * 0.6, renderY - r * 1.5, r * 1.2, r * 1.0);
     ctx.strokeRect(this.x - r * 0.6, renderY - r * 1.5, r * 1.2, r * 1.0);
 
-    ctx.fillStyle = '#5dade2'; // Frozen horns
+    ctx.fillStyle = '#5dade2'; 
     ctx.fillRect(this.x - r * 0.6 - 3, renderY - r * 1.7, 3, 6);
     ctx.fillRect(this.x + r * 0.6, renderY - r * 1.7, 3, 6);
   }
 }
 
-// 8. FINAL VOID REAVER EXTRA
+// 8. VOID REAVER EXTRA
 export class VoidReaver extends Enemy {
   constructor(x, y) {
     super(x, y, {
-      maxHealth: 15000, // Rebalanced down from 350000 
+      maxHealth: 15000, 
       maxShield: 5000, 
       speed: 22,
       goldReward: 1500,
@@ -821,7 +829,7 @@ export class VoidReaver extends Enemy {
         const list = Array.from(towers.values());
         const target = list[Math.floor(Math.random() * list.length)];
         target.fireCooldown = Math.max(target.fireCooldown, 3.0);
-        effectManager.spawnText(target.x, target.y - 15, "VOID STUNNED", '#8e44ad');
+        effectManager.spawnText(target.x, target.y - 15, "VOID STUNNED!", '#8e44ad');
         effectManager.spawnImpact(target.x, target.y, '#8e44ad', 6, 0.7);
       }
     }
@@ -845,5 +853,4 @@ export class VoidReaver extends Enemy {
   }
 }
 
-// Visual asset maps fallback aliases
 export { MoltenTitan as MoltenBoss, GraveDigger as BossZombie };

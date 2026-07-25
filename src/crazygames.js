@@ -7,6 +7,8 @@ import { updateSessionTelemetry } from './firebase.js';
 export const CrazyGamesManager = {
   sdk: null,
   isInitialized: false,
+  initPromise: null,
+  _resolveInit: null,
   currentUser: null,
   authCallbacks: [],
   roomJoinCallbacks: [],
@@ -15,7 +17,13 @@ export const CrazyGamesManager = {
    * Initializes the CrazyGames SDK and hooks up real-time authentication listeners.
    */
   init: async function() {
-    if (this.isInitialized) return;
+    if (this.isInitialized) return this.initPromise;
+
+    if (!this.initPromise) {
+      this.initPromise = new Promise((resolve) => {
+        this._resolveInit = resolve;
+      });
+    }
 
     try {
       if (typeof window.CrazyGames !== 'undefined' && window.CrazyGames.SDK) {
@@ -99,7 +107,11 @@ export const CrazyGamesManager = {
       }
     } catch (e) {
       console.error('[CrazyGames] Initialization error caught gracefully:', e);
+    } finally {
+      this._resolveInit();
     }
+
+    return this.initPromise;
   },
 
   /**
@@ -129,9 +141,11 @@ export const CrazyGamesManager = {
     if (user && user.username) {
       const cleanName = user.username.substring(0, 12);
       localStorage.setItem('tds_player_username', cleanName);
+      
       const nameInput = document.getElementById('input-player-name');
       if (nameInput) {
         nameInput.value = cleanName;
+        nameInput.disabled = true; // Do not allow manual modifications
       }
 
       // Sync user metadata to the active Firestore telemetry session
@@ -146,6 +160,45 @@ export const CrazyGamesManager = {
     this.authCallbacks.push(callback);
     if (this.currentUser) {
       callback(this.currentUser);
+    }
+  },
+
+  /**
+   * Check if game has been launched in instant multiplayer mode
+   */
+  isInstantMultiplayer: function() {
+    if (this.sdk && this.sdk.game) {
+      return !!this.sdk.game.isInstantMultiplayer;
+    }
+    const params = new URLSearchParams(window.location.search);
+    return params.get('isInstantMultiplayer') === 'true' || params.get('instantJoin') === 'true';
+  },
+
+  /**
+   * Notifies the platform that the game loading process has started.
+   */
+  gameLoadingStart: function() {
+    if (this.sdk && this.isInitialized) {
+      try {
+        this.sdk.game.loadingStart();
+        console.log('[CrazyGames] loadingStart triggered.');
+      } catch (e) {
+        console.warn('[CrazyGames] loadingStart failed:', e);
+      }
+    }
+  },
+
+  /**
+   * Notifies the platform that the game loading process has finished.
+   */
+  gameLoadingStop: function() {
+    if (this.sdk && this.isInitialized) {
+      try {
+        this.sdk.game.loadingStop();
+        console.log('[CrazyGames] loadingStop triggered.');
+      } catch (e) {
+        console.warn('[CrazyGames] loadingStop failed:', e);
+      }
     }
   },
 
@@ -225,18 +278,26 @@ export const CrazyGamesManager = {
       try {
         this.sdk.ad.requestAd("midgame", {
           adStarted: () => {
-            // Ad actually started playing, so clear the initial start safety timeout
             clearTimeout(safetyTimeout);
             soundManager.setEnabled(false); // Mute sound during ads
+            if (typeof soundManager.muteMusic === 'function') {
+              soundManager.muteMusic();
+            }
             console.log('[CrazyGames] Midgame Ad started.');
           },
           adFinished: () => {
             soundManager.setEnabled(originalSoundState); // Restore sound
+            if (typeof soundManager.unmuteMusic === 'function') {
+              soundManager.unmuteMusic();
+            }
             console.log('[CrazyGames] Midgame Ad finished.');
             safeFinish();
           },
           adError: (error) => {
             soundManager.setEnabled(originalSoundState); // Restore sound
+            if (typeof soundManager.unmuteMusic === 'function') {
+              soundManager.unmuteMusic();
+            }
             console.warn('[CrazyGames] Midgame Ad error:', error);
             safeFinish(); // Proceed smoothly if ads fail to load
           }
@@ -256,8 +317,9 @@ export const CrazyGamesManager = {
    * Triggers a rewarded video ad.
    * Automatically handles muting states.
    * @param {function} onRewardEarned - Callback executed ONLY if user fully watches the video
+   * @param {function} onAdError - Callback executed if ad fails or is closed early
    */
-  requestRewardedAd: function(onRewardEarned) {
+  requestRewardedAd: function(onRewardEarned, onAdError) {
     let finishedCalled = false;
     const safeFinish = () => {
       if (finishedCalled) return;
@@ -265,10 +327,10 @@ export const CrazyGamesManager = {
       if (onRewardEarned) onRewardEarned();
     };
 
-    // Safety timeout: If the ad fails to trigger within 2 seconds, treat as offline fallback
+    // Safety timeout
     let safetyTimeout = setTimeout(() => {
-      console.warn('[CrazyGames] Rewarded Ad failed to start. Awarding fallback reward.');
-      safeFinish();
+      console.warn('[CrazyGames] Rewarded Ad failed to start.');
+      if (onAdError) onAdError();
     }, 2000);
 
     if (this.sdk && this.isInitialized && this.sdk.ad) {
@@ -279,27 +341,37 @@ export const CrazyGamesManager = {
           adStarted: () => {
             clearTimeout(safetyTimeout);
             soundManager.setEnabled(false); // Mute sound during ads
+            if (typeof soundManager.muteMusic === 'function') {
+              soundManager.muteMusic();
+            }
             console.log('[CrazyGames] Rewarded Ad started.');
           },
           adFinished: () => {
             soundManager.setEnabled(originalSoundState); // Restore sound
+            if (typeof soundManager.unmuteMusic === 'function') {
+              soundManager.unmuteMusic();
+            }
             console.log('[CrazyGames] Rewarded Ad successfully finished.');
             safeFinish();
           },
           adError: (error) => {
             soundManager.setEnabled(originalSoundState); // Restore sound
+            if (typeof soundManager.unmuteMusic === 'function') {
+              soundManager.unmuteMusic();
+            }
             console.warn('[CrazyGames] Rewarded Ad failed or skipped:', error);
             clearTimeout(safetyTimeout);
+            if (onAdError) onAdError(); // Do not trigger reward
           }
         });
       } catch (e) {
         clearTimeout(safetyTimeout);
         console.warn('[CrazyGames] Failed to request rewarded ad:', e);
-        safeFinish();
+        if (onAdError) onAdError();
       }
     } else {
       clearTimeout(safetyTimeout);
-      safeFinish();
+      if (onAdError) onAdError();
     }
   },
 
@@ -316,6 +388,7 @@ export const CrazyGamesManager = {
     if (this.sdk && this.isInitialized) {
       try {
         this.sdk.game.gameplayStart();
+        console.log('[CrazyGames] gameplayStart called.');
       } catch (e) {
         console.warn('[CrazyGames] gameplayStart failed caught gracefully:', e);
       }
@@ -326,6 +399,7 @@ export const CrazyGamesManager = {
     if (this.sdk && this.isInitialized) {
       try {
         this.sdk.game.gameplayStop();
+        console.log('[CrazyGames] gameplayStop called.');
       } catch (e) {
         console.warn('[CrazyGames] gameplayStop failed caught gracefully:', e);
       }

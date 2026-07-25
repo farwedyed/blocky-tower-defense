@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=1.1">
   
   <!-- CrazyGames SDK v3 Import -->
   <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
@@ -89,7 +89,10 @@
             
             <!-- STEP 1: CHOOSE BATTLEGROUND -->
             <div id="wizard-step-maps" class="wizard-step-content active">
-              <h2>SELECT BATTLEGROUND</h2>
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed #ddd; padding-bottom: 8px; margin-bottom: 10px;">
+                <h2 style="border: none; padding: 0; margin: 0;">SELECT BATTLEGROUND</h2>
+                <button id="btn-back-to-modes-solo" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 10px; margin: 0;">⇠ CHANGE MODE</button>
+              </div>
               <div class="map-grid">
                 <button class="map-card active" data-map-id="grassland">
                   <canvas class="map-preview-canvas" width="120" height="90"></canvas>
@@ -328,6 +331,10 @@
                   <div class="agent-info">
                     <span class="name">Scout</span>
                     <span class="cost-text">STARTER</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 1 | Rng: 90px | Rate: 1.0/s<br/>
+                      <span style="color: var(--primary-blue)">Pistol: Fast physical single-target shots.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" disabled>UNLOCKED</button>
                 </div>
@@ -337,6 +344,10 @@
                   <div class="agent-info">
                     <span class="name">Soldier</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 450</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 2 | Rng: 90px | Rate: 2.0/s<br/>
+                      <span style="color: var(--primary-green-dark)">Assault Rifle: Rapid burst-fire configurations.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="450">BUY</button>
                 </div>
@@ -346,6 +357,10 @@
                   <div class="agent-info">
                     <span class="name">Sniper</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 250</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 4 | Rng: 180px | Rate: 0.25/s<br/>
+                      <span style="color: var(--primary-orange)">Sniper Scope: Heavy slow long-range armor-piercing bullets.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="250">BUY</button>
                 </div>
@@ -355,6 +370,10 @@
                   <div class="agent-info">
                     <span class="name">Demoman</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 350</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 6 | Rng: 110px | Rate: 0.45/s<br/>
+                      <span style="color: #c0392b">Grenades: Heavy area splash explosions.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="350">BUY</button>
                 </div>
@@ -370,6 +389,10 @@
                   <div class="agent-info">
                     <span class="name">Farm</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 2,500</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 0 | Rng: 0px | Rate: 0/s<br/>
+                      <span style="color: var(--primary-green-dark)">Economy: Yields valuable cash dividends every wave.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="2500">BUY</button>
                 </div>
@@ -379,6 +402,10 @@
                   <div class="agent-info">
                     <span class="name">Medic</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 2,500</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 1 | Rng: 100px | Rate: 0.8/s<br/>
+                      <span style="color: var(--primary-red)">Medkit: Restores base health and removes active stun locks.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="2500">BUY</button>
                 </div>
@@ -388,6 +415,10 @@
                   <div class="agent-info">
                     <span class="name">Pyromancer</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 2,000</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 1 | Rng: 90px | Rate: 2.0/s<br/>
+                      <span style="color: var(--primary-orange)">Flamethrower: Melts lead armors and applies fire DoT.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="2000">BUY</button>
                 </div>
@@ -397,6 +428,10 @@
                   <div class="agent-info">
                     <span class="name">Rocketeer</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 2,500</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 8 | Rng: 110px | Rate: 0.35/s<br/>
+                      <span style="color: #1a1a2e">Bazooka: High single-target rocket explosion damage.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="2500">BUY</button>
                 </div>
@@ -406,6 +441,10 @@
                   <div class="agent-info">
                     <span class="name">Freezer</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 2,500</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 1 | Rng: 100px | Rate: 0.65/s<br/>
+                      <span style="color: #3498db">Cryo beam: Slows down and freezes targets.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="2500">BUY</button>
                 </div>
@@ -415,6 +454,10 @@
                   <div class="agent-info">
                     <span class="name">Shotgunner</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 2,500</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 2 | Rng: 90px | Rate: 0.55/s<br/>
+                      <span style="color: #2c3e50">Shotgun: Radial multi-pellet close range blasts.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="2500">BUY</button>
                 </div>
@@ -424,6 +467,10 @@
                   <div class="agent-info">
                     <span class="name">Crook Boss</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 3,500</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 2 | Rng: 120px | Rate: 1.8/s<br/>
+                      <span style="color: #d4ac0d">Reinforcements: Calls in AI guard units to block path.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="3500">BUY</button>
                 </div>
@@ -433,6 +480,10 @@
                   <div class="agent-info">
                     <span class="name">Military Base</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 3,000</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 0 | Rng: 0px | Rate: 0/s<br/>
+                      <span style="color: var(--primary-green-dark)">Motorpool: Periodically deploys humvees and tanks.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="3000">BUY</button>
                 </div>
@@ -448,6 +499,10 @@
                   <div class="agent-info">
                     <span class="name">Minigunner</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 5,000</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 1 | Rng: 130px | Rate: 4.5/s<br/>
+                      <span style="color: var(--primary-orange)">Gatling Gun: Extremely high rapid fire-rate.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="5000">BUY</button>
                 </div>
@@ -457,6 +512,10 @@
                   <div class="agent-info">
                     <span class="name">Commander</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 3,500</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 0 | Rng: 110px | Rate: 0/s<br/>
+                      <span style="color: #c0392b">Rally call: Broad speed boost buffs for nearby units.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="3500">BUY</button>
                 </div>
@@ -466,6 +525,10 @@
                   <div class="agent-info">
                     <span class="name">DJ Booth</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 4,000</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 0 | Rng: 120px | Rate: 0/s<br/>
+                      <span style="color: var(--primary-blue-dark)">Music: Expands ranges and lowers upgrade costs map-wide.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="4000">BUY</button>
                 </div>
@@ -475,6 +538,10 @@
                   <div class="agent-info">
                     <span class="name">Ranger</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 6,000</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 20 | Rng: 220px | Rate: 0.16/s<br/>
+                      <span style="color: #ff0055">Railgun: Massive sniper damage, but cannot detect Camo.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="6000">BUY</button>
                 </div>
@@ -484,6 +551,10 @@
                   <div class="agent-info">
                     <span class="name">Turret</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 5,000</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 2 | Rng: 150px | Rate: 6.0/s<br/>
+                      <span style="color: #00ffe0">Laser gatling: Extreme fire-rate and heavy long range defense.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="5000">BUY</button>
                 </div>
@@ -499,6 +570,10 @@
                   <div class="agent-info">
                     <span class="name">Gladiator</span>
                     <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 5,000</span>
+                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
+                      Dmg: 2 | Rng: 55px | Rate: 1.1/s<br/>
+                      <span style="color: #7f8c8d">Broadsword: Fast-cleaving melee sweeps and war cries.</span>
+                    </div>
                   </div>
                   <button class="btn btn-shop-action" data-cost="5000">BUY</button>
                 </div>
@@ -603,7 +678,10 @@
         </section>
 
         <section id="placement-shop">
-          <h3>PLACE AGENTS</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <h3 style="margin: 0;">PLACE AGENTS</h3>
+            <span id="placement-limit-badge" style="font-size: 0.72rem; font-weight: 900; background: var(--primary-orange); color: #fff; padding: 2px 6px; border-radius: 4px; border: 1.5px solid var(--border-color); line-height: 1;">0 / 40 PLACED</span>
+          </div>
           <div id="equipped-agents-list"></div>
         </section>
       </aside>
@@ -617,13 +695,16 @@
           </div>
           
           <div class="targeting-container">
-            <label for="select-targeting">TARGETING:</label>
-            <select id="select-targeting" class="styled-select">
-              <option value="first">FIRST</option>
-              <option value="last">LAST</option>
-              <option value="strongest">STRONGEST</option>
-              <option value="weakest">WEAKEST</option>
-            </select>
+            <label>TARGETING:</label>
+            <div id="custom-targeting-dropdown" class="custom-dropdown">
+              <div id="custom-targeting-selected" class="dropdown-selected">FIRST ▾</div>
+              <div id="custom-targeting-options" class="dropdown-options hidden">
+                <div class="dropdown-option" data-value="first">FIRST</div>
+                <div class="dropdown-option" data-value="last">LAST</div>
+                <div class="dropdown-option" data-value="strongest">STRONGEST</div>
+                <div class="dropdown-option" data-value="weakest">WEAKEST</div>
+              </div>
+            </div>
           </div>
 
           <div class="selection-actions">

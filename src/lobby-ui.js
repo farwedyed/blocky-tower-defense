@@ -8,6 +8,7 @@ import { LobbyLoadout } from './lobby-loadout.js';
 import { drawAgentPreviewOnCanvas, drawBossPreviewOnCanvas } from './game-renderer.js';
 import { soundManager } from './sound.js';
 import { CrazyGamesManager } from './crazygames.js';
+import { Network } from './network.js';
 
 export class LobbyUI {
   constructor(game, parentUI) {
@@ -76,12 +77,12 @@ export class LobbyUI {
         50% { transform: translateY(-10px); }
       }
       @keyframes tutArrowBounceLeft {
-        0%, 100% { transform: translateX(0) rotate(-90deg); }
-        50% { transform: translateX(-10px) rotate(-90deg); }
+        0%, 100% { transform: translateX(0) rotate(90deg); }
+        50% { transform: translateX(-10px) rotate(90deg); }
       }
       @keyframes tutArrowBounceRight {
-        0%, 100% { transform: translateX(0) rotate(90deg); }
-        50% { transform: translateX(10px) rotate(90deg); }
+        0%, 100% { transform: translateX(0) rotate(-90deg); }
+        50% { transform: translateX(10px) rotate(-90deg); }
       }
       .tut-highlight {
         animation: pulseTutorialHighlight 1.6s infinite !important;
@@ -106,6 +107,7 @@ export class LobbyUI {
       const nameInput = document.getElementById('input-player-name');
       if (nameInput) {
         nameInput.value = user.username;
+        nameInput.disabled = true; // Disable editing on auth sync
       }
     } else {
       if (this.cgUsername) this.cgUsername.textContent = "Guest Player";
@@ -205,7 +207,7 @@ export class LobbyUI {
         const cost = parseInt(btn.getAttribute('data-cost')) || 0;
 
         if (type && cost > 0) {
-          this.game.buyAgentFromShopDirect(type, cost);
+          this.buyAgentFromShopDirect(type, cost);
         }
       });
     }
@@ -235,6 +237,43 @@ export class LobbyUI {
         const revealCard = document.getElementById('crate-reveal-card');
         if (revealCard) revealCard.classList.add('hidden');
       });
+    }
+
+    // Centralized Event Delegation to handle Navigation Back buttons perfectly
+    document.addEventListener('click', (e) => {
+      const backBtn = e.target.closest('#btn-back-to-modes-solo, #btn-back-to-modes-coop');
+      if (backBtn) {
+        e.preventDefault();
+        soundManager.playTick();
+        
+        // Clean up connections if they are in co-op mode and changing modes
+        if (backBtn.id === 'btn-back-to-modes-coop') {
+          try {
+            CrazyGamesManager.leaveRoomPresence();
+            if (Network && Network.peer) {
+              Network.peer.disconnect();
+            }
+          } catch(err) {
+            console.warn("Disconnection error handled gracefully:", err);
+          }
+        }
+
+        // Restore splash layout
+        this.showSplashState();
+      }
+    });
+  }
+
+  buyAgentFromShopDirect(type, cost) {
+    if (this.game.playerCoins >= cost) {
+      this.game.playerCoins -= cost;
+      this.game.unlockedAgents.push(type);
+      this.game.saveStatsToStorage();
+      this.updateLobbyMeta(this.game.playerLevel, this.game.playerXp, this.game.playerCoins);
+      this.game.effectManager.spawnText(400, 260, "AGENT RECRUITED!", '#2ecc71');
+      soundManager.playPlace();
+    } else {
+      this.parentUI.gameUI.showInGameAlert("Not enough coins to recruit this agent!", "INSUFFICIENT FUNDS ⚠️");
     }
   }
 
@@ -282,7 +321,7 @@ export class LobbyUI {
         if (info) info.textContent = "LOCKED (REQ. LVL 10)";
       } else {
         fallenCard.style.opacity = '1.0';
-        fallenCard.style.pointerEvents = 'auto';
+        cyberCard.style.pointerEvents = 'auto';
       }
     }
 

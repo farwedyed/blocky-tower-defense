@@ -270,34 +270,74 @@ export class LobbyWizard {
 
     const { questProgress, questGoals, questRewarded } = this.game;
 
-    const quests = [
-      {
-        key: 'kills',
-        label: '<img src="https://img.icons8.com/color/48/skull.png" class="quest-icon" /> Slay Zombies',
-        current: questProgress.kills,
-        goal: questGoals.kills,
-        reward: 75,
-        rewarded: questRewarded.kills
-      },
-      {
-        key: 'cashSpent',
-        label: '<img src="https://img.icons8.com/color/48/stack-of-money.png" class="quest-icon" /> Spend $2,000 Cash',
-        current: questProgress.cashSpent,
-        goal: questGoals.cashSpent,
-        reward: 100,
-        rewarded: questRewarded.cashSpent
-      },
-      {
+    const availableQuests = [];
+
+    // 1. Basic Slay Zombies (Starter-friendly)
+    availableQuests.push({
+      key: 'kills',
+      label: '<img src="https://img.icons8.com/color/48/skull.png" class="quest-icon" /> Slay Zombies',
+      current: questProgress.kills || 0,
+      goal: questGoals.kills,
+      reward: 75,
+      rewarded: questRewarded.kills
+    });
+
+    // 2. Spend cash in-game (Starter-friendly)
+    availableQuests.push({
+      key: 'cashSpent',
+      label: '<img src="https://img.icons8.com/color/48/stack-of-money.png" class="quest-icon" /> Spend $2,000 Cash',
+      current: questProgress.cashSpent || 0,
+      goal: questGoals.cashSpent,
+      reward: 100,
+      rewarded: questRewarded.cashSpent
+    });
+
+    // 3. Survive waves (Starter-friendly)
+    availableQuests.push({
+      key: 'wavesSurvived',
+      label: '<img src="https://img.icons8.com/color/48/tsunami.png" class="quest-icon" /> Survive 25 Waves',
+      current: questProgress.wavesSurvived || 0,
+      goal: questGoals.wavesSurvived,
+      reward: 75,
+      rewarded: questRewarded.wavesSurvived
+    });
+
+    // 4. Place Scouts (Starter-friendly - Scout is unlocked by default)
+    availableQuests.push({
+      key: 'scoutsPlaced',
+      label: '<img src="https://img.icons8.com/color/48/detective.png" class="quest-icon" /> Deploy 15 Scouts',
+      current: questProgress.scoutsPlaced || 0,
+      goal: questGoals.scoutsPlaced,
+      reward: 50,
+      rewarded: questRewarded.scoutsPlaced
+    });
+
+    // 5. Place Snipers (Starter-friendly - Sniper is unlocked by default)
+    availableQuests.push({
+      key: 'snipersPlaced',
+      label: '<img src="https://img.icons8.com/color/48/target--v1.png" class="quest-icon" /> Deploy 10 Snipers',
+      current: questProgress.snipersPlaced || 0,
+      goal: questGoals.snipersPlaced,
+      reward: 50,
+      rewarded: questRewarded.snipersPlaced
+    });
+
+    // 6. Farms Placed (PROGRESS GATED: Only show if Farm is unlocked!)
+    if (this.game.unlockedAgents.includes('farm')) {
+      availableQuests.push({
         key: 'farmsPlaced',
         label: '<img src="https://img.icons8.com/color/48/wheat.png" class="quest-icon" /> Place 5 Farms',
-        current: questProgress.farmsPlaced,
+        current: questProgress.farmsPlaced || 0,
         goal: questGoals.farmsPlaced,
-        reward: 50,
+        reward: 60,
         rewarded: questRewarded.farmsPlaced
-      }
-    ];
+      });
+    }
 
-    listEl.innerHTML = quests.map(q => {
+    // Limit visible quests to the top 4 active tasks to maintain a clean layout
+    const displayQuests = availableQuests.slice(0, 4);
+
+    listEl.innerHTML = displayQuests.map(q => {
       const pct = Math.min(100, Math.round((q.current / q.goal) * 100));
       const done = q.rewarded || q.current >= q.goal;
       const barColor = done ? '#27ae60' : '#3498db';
@@ -311,7 +351,7 @@ export class LobbyWizard {
           overflow: hidden;
         ">
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-weight:900;font-size:0.82rem;">${q.label}</span>
+            <span style="font-weight:900;font-size:0.82rem;display:flex;align-items:center;gap:6px;">${q.label}</span>
             <span style="font-weight:800;font-size:0.78rem;color:${done ? '#27ae60' : '#f39c12'};">
               ${done ? '✅ DONE' : `${Math.min(q.current, q.goal)} / ${q.goal}`}
             </span>

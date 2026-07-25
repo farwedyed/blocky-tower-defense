@@ -70,12 +70,15 @@ export class LobbyCoop {
     `;
 
     coopPanel.innerHTML = `
-      <h3 style="font-family: var(--font-title); font-size: 1.15rem; margin-bottom: 10px; color: var(--text-dark); display: flex; align-items: center; gap: 8px;">
-        <img src="https://img.icons8.com/color/48/groups.png" style="width:24px; height:24px;" /> CO-OP MULTIPLAYER LOBBY
-      </h3>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px dashed #ddd; padding-bottom: 10px;">
+        <h3 style="font-family: var(--font-title); font-size: 1.15rem; color: var(--text-dark); display: flex; align-items: center; gap: 8px; margin: 0;">
+          <img src="https://img.icons8.com/color/48/groups.png" style="width:24px; height:24px;" /> CO-OP MULTIPLAYER LOBBY
+        </h3>
+        <button id="btn-back-to-modes-coop" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 10px; margin: 0;">⇠ CHANGE MODE</button>
+      </div>
       
       <div id="username-container" style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;">
-        <label for="input-player-name" style="font-size: 0.8rem; font-weight: 900; color: var(--text-muted); text-align: left;">PLAYER ACCOUNT NAME (REQUIRED TO PLAY CO-OP):</label>
+        <label for="input-player-name" style="font-size: 0.8rem; font-weight: 900; color: var(--text-muted); text-align: left;">PLAYER ACCOUNT NAME (CO-OP USERNAME):</label>
         <input type="text" id="input-player-name" placeholder="ENTER YOUR ACCOUNT NAME FIRST" style="
           border: 3px solid var(--border-color);
           border-radius: 10px;
@@ -185,6 +188,14 @@ export class LobbyCoop {
       });
     }
 
+    const btnBackCoop = document.getElementById('btn-back-to-modes-coop');
+    if (btnBackCoop) {
+      btnBackCoop.addEventListener('click', () => {
+        soundManager.playTick();
+        this.showSplashState();
+      });
+    }
+
     const btnHostCoop = document.getElementById('btn-host-coop');
     const btnJoinCoop = document.getElementById('btn-join-coop');
 
@@ -193,7 +204,7 @@ export class LobbyCoop {
         const nameInput = document.getElementById('input-player-name');
         const name = nameInput ? nameInput.value.trim() : "";
         if (!name) {
-          alert("Please specify an active profile name first.");
+          this.game.ui.gameUI.showInGameAlert("Please specify an active profile name first.", "NAME REQUIRED ⚠️");
           return;
         }
         localStorage.setItem('tds_player_username', name);
@@ -257,7 +268,7 @@ export class LobbyCoop {
         const nameInput = document.getElementById('input-player-name');
         const name = nameInput ? nameInput.value.trim() : "";
         if (!name) {
-          alert("Please specify an active profile name first.");
+          this.game.ui.gameUI.showInGameAlert("Please specify an active profile name first.", "NAME REQUIRED ⚠️");
           return;
         }
         localStorage.setItem('tds_player_username', name);
@@ -265,7 +276,7 @@ export class LobbyCoop {
         const inputJoinCode = document.getElementById('input-join-code');
         const code = inputJoinCode ? inputJoinCode.value.trim().toLowerCase() : "";
         if (!code) {
-          alert("Please enter a valid room code.");
+          this.game.ui.gameUI.showInGameAlert("Please enter a valid room code.", "CODE REQUIRED ⚠️");
           return;
         }
 
@@ -308,7 +319,7 @@ export class LobbyCoop {
         if (rawCode) {
           CrazyGamesManager.getInviteLink(rawCode.toLowerCase()).then((inviteUrl) => {
             navigator.clipboard.writeText(inviteUrl).then(() => {
-              this.game.effectManager.spawnText(400, 260, "SQUAD INVITE LINK COPIED!", '#2ecc71');
+              this.game.ui.gameUI.showInGameAlert("SQUAD INVITE LINK COPIED!\nShare it with your friends to play together.", "LINK COPIED ✓");
             }).catch(err => {
               console.error("Clipboard copy failed:", err);
             });

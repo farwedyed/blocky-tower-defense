@@ -17,6 +17,73 @@ if (!window.playerCursors) {
     window.playerCursors = {}; // key: playerId, value: { mouseX, mouseY, selectedShopTower, equippedSkin }
 }
 
+// --- TURN/STUN CREDENTIALS & ICE CONFIGURATION ---
+const METERED_USER = "ec41d9c5a5a8f7a1a1b19e9e";
+const METERED_PASS = "rzCBD4AfbDn7JjG8";
+const EXPRESSTURN_USER = "000000002095335910";
+const EXPRESSTURN_PASS = "GK3y4yS5fDUutl+1ITp1BTxZgR4=";
+
+const ICE_CONFIG = {
+    iceServers: [
+        // --- STUN SERVERS ---
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:global.stun.twilio.com:3478' },
+        { urls: 'stun:stun.relay.metered.ca:80' },
+        { urls: 'stun:free.expressturn.com:3478' },
+        
+        // --- METERED.CA TURN SERVERS ---
+        { 
+            urls: 'turn:standard.relay.metered.ca:80', 
+            username: METERED_USER, 
+            credential: METERED_PASS 
+        },
+        { 
+            urls: 'turn:standard.relay.metered.ca:80?transport=tcp', 
+            username: METERED_USER, 
+            credential: METERED_PASS 
+        },
+        { 
+            urls: 'turn:standard.relay.metered.ca:443', 
+            username: METERED_USER, 
+            credential: METERED_PASS 
+        },
+        { 
+            urls: 'turns:standard.relay.metered.ca:443?transport=tcp', 
+            username: METERED_USER, 
+            credential: METERED_PASS 
+        },
+
+        // --- METERED.CA OPEN RELAY PROJECT ---
+        { 
+            urls: 'turn:openrelay.metered.ca:80', 
+            username: 'openrelayproject', 
+            credential: 'openrelayproject' 
+        },
+        { 
+            urls: 'turn:openrelay.metered.ca:443', 
+            username: 'openrelayproject', 
+            credential: 'openrelayproject' 
+        },
+        { 
+            urls: 'turns:openrelay.metered.ca:443?transport=tcp', 
+            username: 'openrelayproject', 
+            credential: 'openrelayproject' 
+        },
+
+        // --- EXPRESSTURN FREE TIER ---
+        { 
+            urls: 'turn:free.expressturn.com:3478', 
+            username: EXPRESSTURN_USER, 
+            credential: EXPRESSTURN_PASS 
+        },
+        { 
+            urls: 'turn:free.expressturn.com:3478?transport=tcp', 
+            username: EXPRESSTURN_USER, 
+            credential: EXPRESSTURN_PASS 
+        }
+    ]
+};
+
 export const Network = {
     peer: null,
     conns: [], // Host: Stores up to 7 guest connections (P2 through P8)
@@ -56,150 +123,115 @@ export const Network = {
         this.isMigrating = false;
         this.hostPlayerId = 'p1';
 
-        // Generate a clean, native 6-character ID so connections can be made using simple room codes
         const cleanShortId = Math.random().toString(36).substring(2, 8).toLowerCase();
 
-        // Dynamic origin detection to use PeerJS Cloud primarily in CrazyGames sandbox iframes
-        const useCloud = window.location.hostname.includes('crazygames') || window.location.hostname.includes('game-files');
-        const peerHost = useCloud ? '0.peerjs.com' : 'farwedd-zombie-dombie-server.hf.space';
-        const peerPort = 443;
-        const peerPath = useCloud ? '/' : '/peerjs/myapp';
-        const peerSecure = true;
+        // Attempt HuggingFace first with fallback capability
+        this.initPeerWithHuggingFace(cleanShortId, onOpen);
+    },
 
-        console.log(`[Network Status] Instantiating PeerJS. Host: ${peerHost}, Path: ${peerPath}`);
+    initPeerWithHuggingFace: function(cleanShortId, onOpen) {
+        console.log("[Network Status] Instantiating PeerJS on HuggingFace: farwedd-zombie-dombie-server.hf.space");
+        
+        let hasFailed = false;
+        const fallbackTimeout = setTimeout(() => {
+            if (!this.peer || !this.peer.id || this.peer.disconnected) {
+                console.warn("[Network Status] HuggingFace server took too long. Falling back to PeerJS Cloud.");
+                hasFailed = true;
+                this.fallbackToCloudServer(cleanShortId, onOpen);
+            }
+        }, 3000); // 3 seconds timeout boundary
 
         try {
             this.peer = new Peer(cleanShortId, { 
-                host: peerHost,
-                port: peerPort,
-                path: peerPath,
-                secure: peerSecure,
+                host: 'farwedd-zombie-dombie-server.hf.space',
+                port: 443,
+                path: '/peerjs/myapp',
+                secure: true,
                 debug: 1,
-                config: {
-                    iceServers: [
-                        // --- HIGH-REPUTATION FREE STUN SERVERS ---
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:global.stun.twilio.com:3478' },
-                        { urls: 'stun:stun.relay.metered.ca:80' },
-
-                        // --- METERED.CA OPEN RELAY PROJECT (GUARANTEED HIGH-UPTIME TURN fallback) ---
-                        { 
-                            urls: 'turn:openrelay.metered.ca:80', 
-                            username: 'openrelayproject', 
-                            credential: 'openrelayproject' 
-                        },
-                        { 
-                            urls: 'turn:openrelay.metered.ca:443', 
-                            username: 'openrelayproject', 
-                            credential: 'openrelayproject' 
-                        },
-                        { 
-                            urls: 'turns:openrelay.metered.ca:443?transport=tcp', 
-                            username: 'openrelayproject', 
-                            credential: 'openrelayproject' 
-                        }
-                    ]
-                }
+                config: ICE_CONFIG
             });
-        } catch (err) {
-            console.error("[Network Status] Failed to initialize Peer connection:", err);
-            this.mode = 'OFFLINE';
-            return;
-        }
 
-        // Global Signaling Error Boundary
-        if (this.peer) {
+            this.peer.on('open', (id) => {
+                if (hasFailed) return;
+                clearTimeout(fallbackTimeout);
+                this.peerIds[window.myPlayerId] = id;
+                console.log(`[Network Status] PeerJS open with signaling ID: ${id}`);
+                if (onOpen) onOpen(id);
+            });
+
             this.peer.on('error', (err) => {
-                console.warn(`[Network Error] PeerJS global error. Type: ${err.type}, Message: ${err.message}`);
+                if (hasFailed) return;
+                console.warn(`[Network Error][HuggingFace] ${err.type}: ${err.message}`);
                 
-                // If a client connection attempt fails (e.g. host is offline / unavailable)
                 if (err.type === 'peer-unavailable') {
-                    console.warn("[Network Status] Target host room is unavailable or offline.");
                     this.handleJoinFailure();
                     return;
                 }
 
-                // Fallback automatically to high-reputation PeerJS Cloud if custom signaling server drops or is blocked by an iframe
-                if (err.type === 'server-error' || err.type === 'network' || err.type === 'unavailable-id') {
-                    if (this.peer && !this.peer.destroyed) {
-                        try { this.peer.destroy(); } catch(e) {}
-                    }
-                    this.fallbackToCloudServer(gameInstance, onOpen);
-                }
-            });
-
-            this.peer.on('open', (id) => { 
-                this.peerIds[window.myPlayerId] = id;
-                console.log(`[Network Status] PeerJS open with signaling ID: ${id}`);
-                if (onOpen) onOpen(id); 
-
-                // Sync host room state to CrazyGames safely using our dedicated manager
-                CrazyGamesManager.updateRoomPresence(id.toLowerCase(), true);
+                // Instantly fall back to Cloud Server if HuggingFace triggers connection errors
+                clearTimeout(fallbackTimeout);
+                hasFailed = true;
+                this.fallbackToCloudServer(cleanShortId, onOpen);
             });
 
             this.peer.on('disconnected', () => {
-                console.warn("[Network Status] PeerJS disconnected from signaling server. Reconnecting...");
+                if (hasFailed) return;
+                console.warn("[Network Status] Disconnected. Reconnecting...");
                 this.peer.reconnect();
             });
 
             this.peer.on('connection', (c) => {
+                if (hasFailed) return;
                 if (this.conns.length >= 7) {
-                    console.warn("[Network Status] Connection refused: lobby is full (max 8 players).");
-                    setTimeout(() => {
-                        try { c.close(); } catch(e) {}
-                    }, 500);
+                    try { c.close(); } catch(e) {}
                     return;
                 }
                 this.conns.push(c);
                 this.setupHostConnection(c);
             });
+
+        } catch (err) {
+            if (!hasFailed) {
+                clearTimeout(fallbackTimeout);
+                hasFailed = true;
+                this.fallbackToCloudServer(cleanShortId, onOpen);
+            }
         }
     },
 
-    fallbackToCloudServer: function(gameInstance, onOpen) {
-        console.log("[Network Status] Fallback triggered: establishing PeerJS Cloud socket connection...");
-        const cleanShortId = Math.random().toString(36).substring(2, 8).toLowerCase();
+    fallbackToCloudServer: function(cleanShortId, onOpen) {
+        console.log("[Network Status] Instantiating PeerJS fallback on PeerJS Cloud.");
+        
+        // Clean up HuggingFace peer before recreating
+        if (this.peer) {
+            try {
+                this.peer.destroy();
+            } catch(e) {}
+            this.peer = null;
+        }
+
         try {
             this.peer = new Peer(cleanShortId, {
-                host: '0.peerjs.com',
-                port: 443,
-                secure: true,
-                path: '/',
                 debug: 1,
-                config: {
-                    iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:global.stun.twilio.com:3478' },
-                        { 
-                            urls: 'turn:openrelay.metered.ca:80', 
-                            username: 'openrelayproject', 
-                            credential: 'openrelayproject' 
-                        },
-                        { 
-                            urls: 'turn:openrelay.metered.ca:443', 
-                            username: 'openrelayproject', 
-                            credential: 'openrelayproject' 
-                        }
-                    ]
-                }
-            });
-
-            this.peer.on('error', (err) => {
-                console.warn(`[Network Error][Cloud] PeerJS Cloud error: ${err.message}`);
-                if (err.type === 'peer-unavailable') {
-                    this.handleJoinFailure();
-                }
+                config: ICE_CONFIG
             });
 
             this.peer.on('open', (id) => {
                 this.peerIds[window.myPlayerId] = id;
-                console.log(`[Network Status][Cloud] Connected to PeerJS Cloud with ID: ${id}`);
+                console.log(`[Network Status][Cloud] PeerJS Cloud open with ID: ${id}`);
                 if (onOpen) onOpen(id);
-                CrazyGamesManager.updateRoomPresence(id.toLowerCase(), true);
+            });
+
+            this.peer.on('error', (err) => {
+                console.warn(`[Network Error][Cloud] ${err.type}: ${err.message}`);
+                if (err.type === 'peer-unavailable') {
+                    this.handleJoinFailure();
+                    return;
+                }
             });
 
             this.peer.on('disconnected', () => {
-                console.warn("[Network Status][Cloud] PeerJS Cloud disconnected from signaling server. Reconnecting...");
+                console.warn("[Network Status][Cloud] Disconnected. Reconnecting...");
                 this.peer.reconnect();
             });
 
@@ -213,7 +245,7 @@ export const Network = {
             });
 
         } catch (e) {
-            console.error("[Network Status] Cloud fallback setup failed:", e);
+            console.error("[Network Status][Cloud] Fallback setup failed:", e);
             this.mode = 'OFFLINE';
         }
     },
@@ -238,7 +270,7 @@ export const Network = {
         if (coopControls) coopControls.classList.remove('hidden');
 
         const coopLobbyStatus = document.getElementById('coop-lobby-status-container');
-        if (coopLobbyStatus) coopLobbyStatus.classList.add('hidden');
+        if (coopLobbyStatus) coopLobbyStatus.classList.remove('hidden');
 
         const usernameContainer = document.getElementById('username-container');
         if (usernameContainer) usernameContainer.style.display = 'flex';
@@ -256,7 +288,11 @@ export const Network = {
             this.conn = null;
         }
 
-        alert("⚠️ The co-op room is no longer active or the host has disconnected.");
+        if (this.game && this.game.ui && this.game.ui.gameUI) {
+            this.game.ui.gameUI.showInGameAlert("The co-op room is no longer active or the host has disconnected.", "CONNECTION FAILED ⚠️");
+        } else {
+            alert("The co-op room is no longer active or the host has disconnected.");
+        }
     },
 
     interceptEffects: function() {
@@ -315,7 +351,7 @@ export const Network = {
     join: function(hostId, playerName, onConnected) {
         if (typeof Peer === 'undefined' || !this.peer) {
             console.warn("[Network Status] Join canceled: PeerJS is undefined.");
-            this.handleDisconnectFallback("⚠️ Multiplayer is unavailable because the network SDK was blocked by an adblocker.");
+            this.handleDisconnectFallback("Multiplayer is unavailable because the network SDK was blocked by an adblocker.");
             return;
         }
 
@@ -339,7 +375,7 @@ export const Network = {
                 console.warn("[Network Status] Connection request timed out. Discarding handshake.");
                 try { self.conn.close(); } catch(e) {}
                 self.conn = null;
-                self.handleDisconnectFallback("⚠️ Failed to establish communication: Host is unreachable.");
+                self.handleDisconnectFallback("Failed to establish communication: Host is unreachable.");
             }
         }, 6000);
 
@@ -351,7 +387,7 @@ export const Network = {
         } catch (err) {
             console.error("[Network Status] Connection request failed:", err);
             clearTimeout(this.connectionWatchdog);
-            this.handleDisconnectFallback("⚠️ Failed to initiate connection.");
+            this.handleDisconnectFallback("Failed to initiate connection.");
             return;
         }
 
@@ -384,12 +420,12 @@ export const Network = {
         if (!window.lobbyPlayers.p2 || window.lobbyPlayers.p2 === "Reserved") { assignedId = "p2"; }
         else if (!window.lobbyPlayers.p3 || window.lobbyPlayers.p3 === "Reserved") { assignedId = "p3"; }
         else if (!window.lobbyPlayers.p4 || window.lobbyPlayers.p4 === "Reserved") { assignedId = "p4"; }
-        else if (!window.lobbyPlayers.p5 === "Reserved") { assignedId = "p5"; }
+        else if (!window.lobbyPlayers.p5 || window.lobbyPlayers.p5 === "Reserved") { assignedId = "p5"; }
         else if (!window.lobbyPlayers.p6 || window.lobbyPlayers.p6 === "Reserved") { assignedId = "p6"; }
         else if (!window.lobbyPlayers.p7 || window.lobbyPlayers.p7 === "Reserved") { assignedId = "p7"; }
         else if (!window.lobbyPlayers.p8 || window.lobbyPlayers.p8 === "Reserved") { assignedId = "p8"; }
         else {
-            console.warn("[Network Status] Incoming connection rejected: All lobby player slots from P1 to P8 are full.");
+            console.warn("[Network Status] Connection rejected: All lobby player slots from P1 to P8 are full.");
             try { c.close(); } catch(e) {}
             return;
         }
@@ -480,7 +516,7 @@ export const Network = {
                     const cost = this.game.getTowerCost(type);
                     const wallet = this.game.playerWallets ? this.game.playerWallets[c.playerId] : this.game.gold;
                     
-                    if (wallet >= cost && this.game.grid.isCellValidForPlacement(data.col, row)) {
+                    if (wallet >= cost && this.game.grid.isCellValidForPlacement(data.col, data.row)) {
                         this.game.selectedShopTower = type;
                         this.game.placeShopAgent(data.col, data.row, c.playerId);
                     }
@@ -574,7 +610,6 @@ export const Network = {
 
         if (!this.game || this.game.state === 'lobby') return;
 
-        // Defensive guard to ensure game components are available before packaging state
         const equippedSkin = (this.game.equippedSkins && this.game.selectedShopTower) 
             ? (this.game.equippedSkins[this.game.selectedShopTower] || 'default') 
             : 'default';
@@ -586,7 +621,6 @@ export const Network = {
             equippedSkin: equippedSkin
         };
 
-        // Authoritative Co-op State Payload
         const statePayload = {
             type: 'GAME_STATE',
             lives: this.game.lives,
@@ -823,7 +857,7 @@ export const Network = {
                 data.enemies.forEach(eData => {
                     let enemy = this.game.enemies.find(e => e.id === eData.id);
                     if (!enemy) {
-                        const EnemyClass = getEnemyClass(name);
+                        const EnemyClass = getEnemyClass(eData.name);
                         enemy = new EnemyClass(eData.x, eData.y);
                         enemy.id = eData.id;
                         enemy.x = eData.x;
@@ -945,7 +979,7 @@ export const Network = {
 
         if (activePlayerIds.length === 0) {
             console.log("[Network Status] No surviving clients remaining to migrate hosting to.");
-            this.handleDisconnectFallback("⚠️ Connection Lost: Host dropped and lobby is empty.");
+            this.handleDisconnectFallbackReal("Connection Lost: Host dropped and lobby is empty.");
             return;
         }
 
@@ -960,7 +994,7 @@ export const Network = {
                 this.connectToNewHost(newHostPeerId, nextHostId);
             } else {
                 this.isMigrating = false;
-                this.handleDisconnectFallback("⚠️ Host Migration Failed: Selected leader is unreachable.");
+                this.handleDisconnectFallbackReal("Host Migration Failed: Selected leader is unreachable.");
             }
         }
     },
@@ -974,7 +1008,6 @@ export const Network = {
 
         if (this.conn) {
             try {
-                // Clear the close listener to prevent triggering infinite migration loops on close
                 this.conn.off('close'); 
                 this.conn.close(); 
             } catch(e) {}
@@ -987,7 +1020,6 @@ export const Network = {
 
         if (this.game) {
             this.game.effectManager.spawnText(400, 200, "⚠️ YOU ARE THE SQUAD LEADER!", '#ffd700');
-            // Refresh UI HUD and unlock the "START WAVE" button immediately for the new host
             if (this.game.ui) {
                 this.game.ui.updateHUD(this.game.lives, this.game.gold, this.game.wave, this.game.maxWaves);
             }
@@ -1018,7 +1050,7 @@ export const Network = {
         this.conn.on('error', (err) => {
             console.warn("[Network Error] Connection to migrated host failed:", err);
             this.isMigrating = false;
-            this.handleDisconnectFallback("⚠️ Host Migration Failed: Selected leader is unreachable.");
+            this.handleDisconnectFallbackReal("Host Migration Failed: Selected leader is unreachable.");
         });
 
         this.conn.on('open', () => {
@@ -1040,11 +1072,19 @@ export const Network = {
         this.setupClient();
     },
 
-    handleDisconnectFallback: function(customMsg) {
+    handleDisconnectFallbackReal: function(customMsg) {
         this.isMigrating = false;
         this.mode = 'OFFLINE';
-        alert(customMsg || "Connection Lost.");
+        if (this.game && this.game.ui && this.game.ui.gameUI) {
+            this.game.ui.gameUI.showInGameAlert(customMsg || "Connection Lost.", "SIGNAL INTERRUPTED ⚠️");
+        } else {
+            alert(customMsg || "Connection Lost.");
+        }
         location.reload();
+    },
+
+    handleDisconnectFallback: function(customMsg) {
+        this.attemptHostMigration();
     },
 
     sendClientData: function() {

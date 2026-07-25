@@ -1,4 +1,4 @@
-/* Roblox Toy / Blocky TDS 2D Stylings */
+/* BTD 2D - Master Stylesheet with Optimized Mobile Landscape Paneling */
 :root {
   --font-title: 'Fredoka', sans-serif;
   --font-body: 'Nunito', sans-serif;
@@ -90,7 +90,7 @@ body {
     linear-gradient(rgba(255, 255, 255, 0.03) 2px, transparent 2px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.03) 2px, transparent 2px);
   background-size: 30px 30px;
-  z-index: 999999; /* Lowered slightly to sit under system overlays if needed */
+  z-index: 9999999; /* Higher than orientation warning */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -237,6 +237,48 @@ body {
   position: relative;
 }
 
+/* --- PROGRAMMATIC FULLSCREEN OVERRIDES (SEPARATED SELECTORS) --- */
+
+#app-container.fullscreen-active {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+:fullscreen #app-container {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+:-webkit-full-screen #app-container {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+:-moz-full-screen #app-container {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
 /* LOBBY VIEW LAYOUT */
 #lobby-view {
   display: flex;
@@ -254,8 +296,10 @@ body {
   background: var(--panel-light);
   border: 3px solid var(--border-color);
   border-radius: 14px;
-  padding: 15px 24px;
+  padding: 10px 16px;
   box-shadow: 0 4px 0 var(--border-color);
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .blocky-title {
@@ -278,8 +322,9 @@ body {
 
 .player-meta-box {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .meta-item {
@@ -313,7 +358,8 @@ body {
 
 /* XP Bar */
 .xp-item {
-  width: 120px;
+  width: 130px;
+  min-width: 110px;
 }
 
 .xp-bar-container {
@@ -347,6 +393,7 @@ body {
 #lobby-content {
   display: flex;
   flex: 1;
+  min-height: 0; /* FIXED: Prevents the lobby content from expanding beyond the window height */
   gap: 20px;
   overflow: hidden;
 }
@@ -387,13 +434,14 @@ body {
   box-shadow: 0 2px 0 var(--border-color);
 }
 
-/* Tab Panels Container */
+/* Tab Panels Container with precise padded scrolling boundaries */
 #lobby-panels {
   flex: 1;
+  min-height: 0; /* FIXED: Prevents the panel container from expanding beyond the lobby height */
   background: var(--panel-light);
   border: 3px solid var(--border-color);
   border-radius: 14px;
-  padding: 20px;
+  padding: 20px 24px 20px 20px; /* Slight right pad spacer protects scrollbars */
   box-shadow: 0 4px 0 var(--border-color);
   overflow-y: auto;
   position: relative;
@@ -402,8 +450,15 @@ body {
 .lobby-panel {
   display: none;
   flex-direction: column;
-  height: 100%;
+  height: auto !important; /* FIXED: Changed from 100% to auto to let panels scroll naturally */
   gap: 15px;
+  padding-right: 8px; /* Extra protection preventing flush edge clipping */
+}
+
+#panel-shop,
+#panel-loadout,
+#panel-crates {
+  overflow-y: visible !important; /* Let outer lobby-panels handle scrolling */
 }
 
 .lobby-panel.active {
@@ -517,10 +572,22 @@ body {
 
 /* ─── STUNNING DIFFICULTIES CARDS (ROBLOX TDS INSPIRED) ─── */
 .difficulty-wizard-deck {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  display: flex;
+  flex-direction: row;
+  overflow-x: auto;
+  overflow-y: hidden;
   gap: 12px;
   margin: 10px 0;
+  padding: 4px 4px 10px 4px; /* Extra bottom padding gives room for the horizontal scrollbar */
+  scrollbar-width: thin;
+}
+
+.difficulty-wizard-deck::-webkit-scrollbar {
+  height: 8px; /* Horizontal scrollbar height */
+}
+.difficulty-wizard-deck::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
 }
 
 .diff-wizard-card {
@@ -536,6 +603,10 @@ body {
   transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   position: relative;
   text-align: left;
+  
+  /* Ensure cards stretch nicely on wide layouts but scroll smoothly on narrower ones */
+  flex: 1 0 150px;
+  max-width: 220px;
 }
 
 .diff-wizard-card:hover {
@@ -670,11 +741,11 @@ body {
   box-shadow: 0 2px 0 var(--primary-blue-dark), 0 2px 0 var(--border-color);
 }
 
-/* Agent Shop Cards */
+/* Agent Shop Cards & expanded proportions to prevent overlaps */
 .shop-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important; /* Increased to prevent overlaps */
+  gap: 16px !important;
 }
 
 .shop-card {
@@ -719,9 +790,9 @@ body {
 
 /* Loadout Config Grid */
 .loadout-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 10px;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(115px, 1fr)) !important; /* Increased to prevent overlaps */
+  gap: 12px !important;
 }
 
 .loadout-card {
@@ -736,11 +807,6 @@ body {
   box-shadow: 0 3px 0 var(--border-color);
   transition: all 0.15s ease;
   position: relative;
-}
-
-.loadout-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 0 var(--border-color);
 }
 
 .loadout-card.equipped {
@@ -781,11 +847,18 @@ body {
 }
 
 #game-canvas {
-  background-color: #fff;
+  background-color: #1e2230; /* Dark background matching the theme prevents bright side borders */
   border: 4px solid var(--border-color);
   border-radius: 12px;
   box-shadow: 0 10px 20px rgba(0,0,0,0.3);
   display: block;
+  
+  /* Native Aspect-Ratio fluid scaling is driven by height to prevent vertical cutoff */
+  height: 100%;
+  width: auto;
+  max-width: calc(100% - 40px);
+  max-height: calc(100% - 40px);
+  aspect-ratio: 4 / 3;
 }
 
 #game-sidebar {
@@ -1207,16 +1280,34 @@ body {
   z-index: 9999 !important;
 }
 
-/* Force custom thin, visible scrollbars on mobile so they are recognizable */
-#game-sidebar::-webkit-scrollbar {
-  width: 6px;
-}
-#game-sidebar::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
+/* Force highly visible, solid custom scrollbars across both PC & mobile engines */
+#game-sidebar::-webkit-scrollbar,
+#lobby-panels::-webkit-scrollbar,
+.lobby-panel::-webkit-scrollbar,
+#panel-shop::-webkit-scrollbar {
+  width: 12px !important;
+  height: 12px !important;
+  display: block !important;
 }
 
-/* ─── "THE COMMANDER" TUTORIAL DIALOG WRAPPERS ─── */
+#game-sidebar::-webkit-scrollbar-thumb,
+#lobby-panels::-webkit-scrollbar-thumb,
+.lobby-panel::-webkit-scrollbar-thumb,
+#panel-shop::-webkit-scrollbar-thumb {
+  background: #475569 !important; /* Solid dark slate thumb - extremely visible! */
+  border-radius: 8px !important;
+  border: 3.5px solid #ffffff !important; /* Adds a clean contrasting border */
+}
+
+#game-sidebar::-webkit-scrollbar-track,
+#lobby-panels::-webkit-scrollbar-track,
+.lobby-panel::-webkit-scrollbar-track,
+#panel-shop::-webkit-scrollbar-track {
+  background: #f1f5f9 !important; /* Soft grey track background */
+  border-radius: 8px !important;
+}
+
+/* ─── "THE COMMANDER" TUTORIAL DIALOGUE WRAPPERS ─── */
 #commander-dialog-wrapper {
   position: absolute;
   bottom: 16px;
@@ -1329,12 +1420,81 @@ body {
   50% { transform: translateY(-10px); }
 }
 @keyframes tutArrowBounceLeft {
-  0%, 100% { transform: translateX(0) rotate(-90deg); }
-  50% { transform: translateX(-10px) rotate(-90deg); }
+  0%, 100% { transform: translateX(0) rotate(90deg); }
+  50% { transform: translateX(-10px) rotate(90deg); }
 }
 @keyframes tutArrowBounceRight {
-  0%, 100% { transform: translateX(0) rotate(90deg); }
-  50% { transform: translateX(10px) rotate(90deg); }
+  0%, 100% { transform: translateX(0) rotate(-90deg); }
+  50% { transform: translateX(10px) rotate(-90deg); }
+}
+
+/* --- CUSTOM DROPDOWN STYLING --- */
+.custom-dropdown,
+.custom-skin-dropdown {
+  position: relative;
+  display: inline-block;
+  min-width: 105px;
+  font-size: 0.8rem;
+  font-weight: 900;
+  color: var(--primary-blue-dark);
+  cursor: pointer;
+  user-select: none;
+}
+
+.dropdown-selected,
+.skin-dropdown-selected {
+  background: #fff;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  padding: 4px 8px;
+  text-align: center;
+  transition: border-color 0.1s;
+}
+
+.dropdown-selected:hover,
+.skin-dropdown-selected:hover {
+  border-color: var(--primary-blue);
+}
+
+.dropdown-options,
+.skin-dropdown-options {
+  position: absolute;
+  bottom: 100%; /* Render upwards above selection panels */
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 -4px 10px rgba(0,0,0,0.15);
+  z-index: 1000;
+  margin-bottom: 4px;
+  overflow: hidden;
+}
+
+.dropdown-option,
+.skin-option {
+  padding: 6px 12px;
+  border-bottom: 1.5px dashed #eee;
+  color: var(--text-dark);
+  text-align: center;
+  transition: background 0.1s, color 0.1s;
+}
+
+.dropdown-option:last-child,
+.skin-option:last-child {
+  border-bottom: none;
+}
+
+.dropdown-option:hover,
+.skin-option:hover {
+  background: #e3f2fd;
+}
+
+/* Active Dropdown Highlights (To clearly show which targeting strategy/skin is selected) */
+.dropdown-option.active,
+.skin-option.active {
+  background: var(--primary-blue) !important;
+  color: #fff !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1447,14 +1607,15 @@ body {
   }
 
   #lobby-content {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: calc(100% - 48px);
-    position: absolute;
-    top: 48px;
-    bottom: 0;
-  }
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  top: 48px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(100% - 48px);
+}
 
   #lobby-tabs {
     flex-direction: row;
@@ -1488,6 +1649,7 @@ body {
     border-radius: 0;
     border: none;
     padding: 10px;
+    overflow-y: auto !important; /* FIXED: Force vertical scrolling on compact/minimized screens */
   }
 
   .map-grid {
@@ -1523,13 +1685,13 @@ body {
     padding: 4px !important;
     white-space: nowrap !important;
     scroll-snap-type: x mandatory;
-    height: 160px !important; /* Zero scrolling: card heights tightly constrained */
+    height: 195px !important; /* Zero scrolling: card heights tightly constrained */
     margin: 5px 0 !important;
   }
 
   .diff-wizard-card {
     flex: 0 0 130px !important; /* Extremely compact cards to ensure 100% visibility on mobile landscapes */
-    height: 150px !important;
+    height: 180px !important; /* Height increased from 150px to fit all 4 metrics */
     scroll-snap-align: start;
     padding: 0 !important;
     margin: 0 !important;
@@ -1634,24 +1796,23 @@ body {
     font-size: 0.65rem !important;
   }
 
-  /* Auto-Flowing Sized Grids for Shop & Loadout */
+  /* Auto-Flowing Sized Grids for Shop & Loadout in mobile query */
   .shop-grid {
     display: grid !important;
-    grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)) !important;
-    gap: 8px !important;
+    grid-template-columns: repeat(auto-fill, minmax(125px, 1fr)) !important;
+    gap: 10px !important;
   }
 
   .shop-card {
     padding: 8px !important;
     max-width: 130px !important;
     margin: 0 auto !important;
-    padding: 6px !important;
   }
 
   .loadout-grid {
     display: grid !important;
-    grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)) !important;
-    gap: 6px !important;
+    grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)) !important;
+    gap: 8px !important;
   }
 
   .loadout-card {
@@ -1938,25 +2099,25 @@ body {
   }
 }
 
-/* ── Height Constraint Specific rules (Small phone landscape) ── */
-@media (max-height: 480px) and (orientation: landscape) {
+/* ── Desktop-like Row Panel Layout for all Landscapes (Aspect Ratio > 1.2) ── */
+@media (orientation: landscape), (min-aspect-ratio: 1.2) {
   #game-view {
-    flex-direction: row;
+    flex-direction: row !important;
   }
 
   #game-wrapper {
-    flex: 1.5;
-    height: 100%;
+    flex: 1.5 !important;
+    height: 100% !important;
   }
 
   #game-sidebar {
-    width: 270px;
-    height: 100%;
-    border-top: none;
-    border-left: 4px solid var(--border-color);
-    transform: none !important; /* Forces solid landscape side-panel */
-    position: relative;
-    box-shadow: none;
+    width: 270px !important;
+    height: 100% !important;
+    border-top: none !important;
+    border-left: 4px solid var(--border-color) !important;
+    transform: none !important; /* Forces solid landscape side-panel, overrides absolute translateY */
+    position: relative !important;
+    box-shadow: none !important;
     overflow-y: auto !important;
     touch-action: pan-y !important;
     -webkit-overflow-scrolling: touch !important;
@@ -1975,21 +2136,12 @@ body {
     flex-direction: column !important;
     flex-wrap: nowrap !important;
     flex-shrink: 0 !important;
+    padding-bottom: 80px !important;
   }
 
   .placement-btn {
-    width: 100%;
-    flex-direction: row;
+    width: 100% !important;
+    flex-direction: row !important;
     flex-shrink: 0 !important;
-  }
-
-  #selection-panel {
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    transform: none !important;
-    width: 250px !important;
-    max-width: 40vw !important;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
   }
 }

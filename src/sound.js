@@ -1,5 +1,5 @@
-// Procedural Web Audio Sound Manager for Blocky Tactical Defense (BTD 2D)
-// All sounds synthesized natively — zero network requests, zero CORS issues.
+// Procedural Web Audio Sound Manager with Tactical Environmental Ambience for BTD 2D
+// All sounds and ambient environmental soundscapes synthesized natively.
 
 class SoundManager {
   constructor() {
@@ -8,8 +8,16 @@ class SoundManager {
     this._ctx = null;
     this._lastPlayed = {};
 
+    // Ambient state trackers
+    this._ambienceStarted = false;
+    this._windSource = null;
+    this._windModulator = null;
+    this._windGain = null;
+    this._radarInterval = null;
+    this._musicMuted = false;
+
     const resume = (e) => {
-      // ONLY allow genuine, trusted user gestures to initialize AudioContext
+      // ONLY allow genuine user gestures to initialize AudioContext
       if (e && !e.isTrusted) return; 
 
       try {
@@ -18,11 +26,11 @@ class SoundManager {
         }
         if (this._ctx && this._ctx.state === 'suspended') {
           this._ctx.resume().catch(err => {
-            console.warn("[SoundManager] Active AudioContext resume attempt was blocked or interrupted:", err);
+            console.warn("[SoundManager] Context resume attempt failed:", err);
           });
         }
       } catch (err) {
-        console.warn("[SoundManager] Unhandled exception during audio interaction check:", err);
+        console.warn("[SoundManager] Unhandled exception during interaction:", err);
       }
     };
     
@@ -38,7 +46,7 @@ class SoundManager {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (AudioContext) {
         this._ctx = new AudioContext();
-        console.log("[SoundManager] AudioContext successfully initialized after user interaction.");
+        console.log("[SoundManager] AudioContext successfully initialized.");
       }
     } catch (e) {
       console.info('[SoundManager] AudioContext unavailable on this environment:', e.message);
@@ -53,6 +61,146 @@ class SoundManager {
       });
     }
     return this._ctx;
+  }
+
+  /**
+   * Starts the tactical background ambience (called when a match begins)
+   */
+  startAmbience() {
+    if (this._ambienceStarted || !this.enabled || this._musicMuted) return;
+    this._ambienceStarted = true;
+
+    const ctx = this._getCtx();
+    if (!ctx) return;
+
+    try {
+      // 1. Generate Procedural Wind Gust Noise
+      const bufferSize = ctx.sampleRate * 2; // 2 seconds of random noise
+      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+
+      const whiteNoise = ctx.createBufferSource();
+      whiteNoise.buffer = noiseBuffer;
+      whiteNoise.loop = true;
+
+      // Filter to low frequencies to sound like wind blowing
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 180; 
+      filter.Q.value = 1.0;
+
+      const gain = ctx.createGain();
+      gain.gain.value = 0.04 * this.masterVolume; // Very soft background noise
+
+      whiteNoise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      whiteNoise.start();
+
+      // Oscillate filter frequency slowly to simulate rising and falling wind gusts
+      const modulator = ctx.createOscillator();
+      modulator.type = 'sine';
+      modulator.frequency.value = 0.12; // Modulates once every ~8.3 seconds
+      
+      const modGain = ctx.createGain();
+      modGain.gain.value = 60; // Modulate frequency by +/- 60Hz
+
+      modulator.connect(modGain);
+      modGain.connect(filter.frequency);
+      modulator.start();
+
+      this._windSource = whiteNoise;
+      this._windModulator = modulator;
+      this._windGain = gain;
+
+      // 2. Start Subtle Radar Sonar Beeps (Triggers a gentle blip every 6.5 seconds)
+      this._startRadarSweeper();
+
+      console.log("[SoundManager] Tactical environmental soundscape successfully deployed.");
+    } catch(e) {
+      console.warn("[SoundManager] Could not initialize procedural wind: ", e);
+    }
+  }
+
+  /**
+   * Stops the tactical background ambience (called when returning to lobby)
+   */
+  stopAmbience() {
+    this._ambienceStarted = false;
+    
+    if (this._windSource) {
+      try { this._windSource.stop(); } catch(e) {}
+      this._windSource = null;
+    }
+    if (this._windModulator) {
+      try { this._windModulator.stop(); } catch(e) {}
+      this._windModulator = null;
+    }
+    if (this._windGain) {
+      try { this._windGain.disconnect(); } catch(e) {}
+      this._windGain = null;
+    }
+    if (this._radarInterval) {
+      clearInterval(this._radarInterval);
+      this._radarInterval = null;
+    }
+    console.log("[SoundManager] Tactical environmental soundscape stopped.");
+  }
+
+  _startRadarSweeper() {
+    const ctx = this._getCtx();
+    if (!ctx) return;
+
+    const playPing = () => {
+      if (!this.enabled || this._musicMuted) return;
+      try {
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.exponentialRampToValueAtTime(250, now + 1.5);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.007 * this.masterVolume, now); // Extremely low-volume element
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.5);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(now + 1.55);
+      } catch(e) {}
+    };
+
+    if (this._radarInterval) clearInterval(this._radarInterval);
+    this._radarInterval = setInterval(playPing, 6500);
+  }
+
+  /**
+   * Mute the ambient soundscape during Ads
+   */
+  muteMusic() {
+    this._musicMuted = true;
+    if (this._windGain) {
+      try {
+        this._windGain.gain.setValueAtTime(0, this._ctx.currentTime);
+      } catch(e) {}
+    }
+  }
+
+  /**
+   * Unmute the ambient soundscape after Ads
+   */
+  unmuteMusic() {
+    this._musicMuted = false;
+    if (this._windGain && this.enabled) {
+      try {
+        this._windGain.gain.setValueAtTime(0.04 * this.masterVolume, this._ctx.currentTime);
+      } catch(e) {}
+    }
   }
 
   _canPlay(key, minGapMs = 80) {
@@ -81,7 +229,7 @@ class SoundManager {
       osc.start(now);
       osc.stop(now + duration + 0.01);
     } catch (e) {
-      console.warn("[SoundManager] Failed to synthesize procedural audio clip:", e);
+      console.warn("[SoundManager] Failed to synthesize sound effect:", e);
     }
   }
 
@@ -124,7 +272,7 @@ class SoundManager {
     this._makeOsc('sine', 800, 50, 0.08, 0.22);
   }
 
-  // ── playCrateDrop: deep bass-heavy triangle sweep 90→0.01Hz, 0.3s ───────
+  // ── playCrateDrop: deep triangle sweep ──────────────────────────────────
   playCrateDrop() {
     if (!this._canPlay('crateDropAudio', 400)) return;
     this._makeOsc('triangle', 90, 0.01, 0.30, 1.0);
@@ -156,7 +304,7 @@ class SoundManager {
     }
   }
 
-  // ── playTick: rapid high-pitched coin/score tick (1800→1000Hz, 0.02s) ───
+  // ── playTick: rapid high-pitched score tick (1800→1000Hz, 0.02s) ───────
   playTick() {
     if (!this._canPlay('tick', 30)) return;
     this._makeOsc('sine', 1800, 1000, 0.02, 0.18);
@@ -191,14 +339,21 @@ class SoundManager {
     }
   }
 
-  // ── playDefeat: dissonant descending sawtooth rumble (180→45Hz, 0.8s) ────
+  // ── playDefeat: descending sawtooth rumble (180→45Hz, 0.8s) ──────────────
   playDefeat() {
     if (!this._canPlay('defeat', 1000)) return;
     this._makeOsc('sawtooth', 180, 45, 0.8, 0.45);
   }
 
-  // ── Public toggles ─────────────────────────────────────────────────────
-  setEnabled(val) { this.enabled = !!val; }
+  setEnabled(val) { 
+    this.enabled = !!val; 
+    if (!this.enabled) {
+      this.muteMusic();
+    } else {
+      this.unmuteMusic();
+    }
+  }
+  
   setVolume(v)    { this.masterVolume = Math.min(1.0, Math.max(0, v)); }
 }
 

@@ -26,7 +26,11 @@ export class GameUI {
     // Redesigned zero-scroll selection controls
     this.selectionPanel = document.getElementById('selection-panel');
     this.selectionInfo = document.getElementById('selection-info');
-    this.selectTargeting = document.getElementById('select-targeting');
+    
+    // Custom drop-down bindings
+    this.targetingSelected = document.getElementById('custom-targeting-selected');
+    this.targetingOptions = document.getElementById('custom-targeting-options');
+
     this.btnUpgrade = document.getElementById('btn-upgrade');
     this.btnSell = document.getElementById('btn-sell');
 
@@ -90,9 +94,43 @@ export class GameUI {
       });
     }
 
-    this.selectTargeting.addEventListener('change', (e) => {
-      if (this.game.selectedPlacedTower) {
-        this.game.selectedPlacedTower.targetingStrategy = e.target.value;
+    // Toggle dropdown options visibility on click
+    if (this.targetingSelected && this.targetingOptions) {
+      this.targetingSelected.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.targetingOptions.classList.toggle('hidden');
+      });
+    }
+
+    // Handle selecting a dropdown option
+    const dropdownOptions = document.querySelectorAll('.dropdown-option');
+    dropdownOptions.forEach(opt => {
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const value = opt.getAttribute('data-value');
+        const text = opt.textContent;
+
+        if (this.targetingSelected) {
+          this.targetingSelected.textContent = `${text} ▾`;
+        }
+        if (this.targetingOptions) {
+          this.targetingOptions.classList.add('hidden');
+        }
+
+        if (this.game.selectedPlacedTower) {
+          this.game.selectedPlacedTower.targetingStrategy = value;
+          
+          // Re-trigger visual dropdown state refresh
+          this.updateSelectionPanel(this.game.selectedPlacedTower);
+          soundManager.playTick();
+        }
+      });
+    });
+
+    // Close dropdown when clicking anywhere else on document
+    document.addEventListener('click', () => {
+      if (this.targetingOptions) {
+        this.targetingOptions.classList.add('hidden');
       }
     });
 
@@ -107,9 +145,11 @@ export class GameUI {
     if (this.btnCommanderSkip) {
       this.btnCommanderSkip.addEventListener('click', () => {
         this.game.tutorialCompleted = true;
-        this.game.tutorialActive = false; // Deactivate active session
+        this.game.tutorialActive = false; 
+        this.game.showMapDirections = false; // Instantly dismiss the overlay instruction message
         this.game.saveStatsToStorage();
         this.dismissTutorial();
+        CrazyGamesManager.gameplayStart();
       });
     }
 
@@ -121,7 +161,6 @@ export class GameUI {
       const selectionPanel = document.getElementById('selection-panel');
       const sidebarToggle = document.getElementById('btn-toggle-sidebar');
 
-      // Check if the click target is outside the canvas, outside the selection panel, and not the sidebar toggle
       if (canvas && !canvas.contains(e.target) &&
           selectionPanel && !selectionPanel.contains(e.target) &&
           (!sidebarToggle || !sidebarToggle.contains(e.target))) {
@@ -130,18 +169,72 @@ export class GameUI {
     });
 
     this.overlay.addEventListener('click', (e) => {
-      const targetTag = e.target.tagName;
-      if (targetTag === 'INPUT' || targetTag === 'BUTTON' || targetTag === 'TEXTAREA') {
-        return;
-      }
-      if (this.game.state === 'gameover' || this.game.state === 'victory') {
-        const activeSummaryCard = document.getElementById('match-summary-card');
-        if (activeSummaryCard && activeSummaryCard.contains(e.target)) {
-          return;
-        }
-        this.game.quitToLobby();
-        this.hideOverlay();
-      }
+      // Locked lose screen overlay click behavior: do not return to lobby on empty clicks
+    });
+  }
+
+  showInGameAlert(message, title = "TACTICAL NOTICE") {
+    // If there's an existing styled alert modal, remove it
+    const oldModal = document.getElementById('ingame-custom-alert');
+    if (oldModal) oldModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'ingame-custom-alert';
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 1000000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.15s ease-out;
+    `;
+
+    modal.innerHTML = `
+      <div style="
+        background: #fff;
+        border: 4px solid var(--border-color);
+        border-radius: 16px;
+        width: 320px;
+        padding: 20px;
+        box-shadow: 0 8px 0 var(--border-color);
+        text-align: center;
+        font-family: var(--font-body);
+      ">
+        <h3 style="
+          font-family: var(--font-title);
+          font-size: 1.3rem;
+          color: #e74c3c;
+          margin-bottom: 12px;
+          text-shadow: none;
+          -webkit-text-stroke: 0;
+        ">${title}</h3>
+        <p style="
+          font-size: 0.95rem;
+          font-weight: 800;
+          color: var(--text-dark);
+          line-height: 1.4;
+          margin-bottom: 18px;
+        ">${message}</p>
+        <button id="btn-custom-alert-ok" class="btn btn-primary" style="
+          width: 100%;
+          background: var(--primary-blue);
+          color: #fff;
+          box-shadow: 0 4px 0 var(--primary-blue-dark), 0 4px 0 var(--border-color);
+        ">OK</button>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const okBtn = modal.querySelector('#btn-custom-alert-ok');
+    okBtn.addEventListener('click', () => {
+      soundManager.playTick();
+      modal.remove();
     });
   }
 
@@ -190,6 +283,7 @@ export class GameUI {
 
   showPointerAt(targetElement, direction = 'down') {
     this.hidePointer();
+    if (!this.game.tutorialActive) return; // Prevent pointers outside tutorial
     if (!targetElement) return;
 
     this.activePointerTarget = targetElement;
@@ -216,6 +310,7 @@ export class GameUI {
 
   showPointerAtCanvasCenter() {
     this.hidePointer();
+    if (!this.game.tutorialActive) return;
     const canvas = document.getElementById('game-canvas');
     if (!canvas) return;
 
@@ -250,6 +345,7 @@ export class GameUI {
 
   showPointerAtCanvasTile(col, row) {
     this.hidePointer();
+    if (!this.game.tutorialActive) return;
     const canvas = document.getElementById('game-canvas');
     if (!canvas) return;
 
@@ -301,12 +397,12 @@ export class GameUI {
       arrow.style.left = `${rect.left + rect.width / 2 - 12}px`;
     } else if (direction === 'left') {
       arrow.style.animation = 'tutArrowBounceLeft 0.6s infinite ease-in-out';
-      arrow.style.transform = 'rotate(-90deg)';
+      arrow.style.transform = 'rotate(90deg)';
       arrow.style.top = `${rect.top + rect.height / 2 - 10}px`;
       arrow.style.left = `${rect.right + 12}px`;
     } else if (direction === 'right') {
       arrow.style.animation = 'tutArrowBounceRight 0.6s infinite ease-in-out';
-      arrow.style.transform = 'rotate(90deg)';
+      arrow.style.transform = 'rotate(-90deg)';
       arrow.style.top = `${rect.top + rect.height / 2 - 10}px`;
       arrow.style.left = `${rect.left - 28}px`;
     }
@@ -328,7 +424,6 @@ export class GameUI {
       this.equippedAgentsList.innerHTML = '';
 
       this.game.equippedAgents.forEach(type => {
-        // Defensive type guard to prevent undefined/null elements in the inventory list from throwing errors
         if (!type || typeof type !== 'string') return;
 
         const btn = document.createElement('button');
@@ -443,6 +538,18 @@ export class GameUI {
         }
       }
 
+      // Update unit placement limit badge
+      const limitBadge = document.getElementById('placement-limit-badge');
+      if (limitBadge) {
+        const totalTowers = this.game.grid.towers.size;
+        limitBadge.textContent = `${totalTowers} / 40 PLACED`;
+        if (totalTowers >= 40) {
+          limitBadge.style.background = 'var(--primary-red)';
+        } else {
+          limitBadge.style.background = 'var(--primary-orange)';
+        }
+      }
+
       if (this.game.selectedPlacedTower) {
         this.updateSelectionPanel(this.game.selectedPlacedTower);
       }
@@ -460,7 +567,24 @@ export class GameUI {
     this.selectionPanel.classList.remove('hidden');
     document.querySelectorAll('.placement-btn').forEach(b => b.classList.remove('active'));
 
-    this.selectTargeting.value = agent.targetingStrategy;
+    // Update custom dropdown selected item text
+    if (this.targetingSelected) {
+      this.targetingSelected.textContent = `${agent.targetingStrategy.toUpperCase()} ▾`;
+    }
+
+    // Refresh option item selected/active visual backgrounds
+    const optElements = document.querySelectorAll('.dropdown-option');
+    optElements.forEach(opt => {
+      if (opt.getAttribute('data-value') === agent.targetingStrategy) {
+        opt.classList.add('active');
+        opt.style.background = 'var(--primary-blue)';
+        opt.style.color = '#fff';
+      } else {
+        opt.classList.remove('active');
+        opt.style.background = '';
+        opt.style.color = '';
+      }
+    });
 
     const upgradeCost = agent.getUpgradeCost();
     const sellValue = agent.getSellValue();
@@ -471,7 +595,7 @@ export class GameUI {
     else if (agent.type === 'dj') displayName = 'DJ Booth';
 
     let detailsHtml = `
-      <p class="unit-name" style="text-transform: uppercase;">${displayName} <span style="color: #f39c12">Lvl ${agent.level}</span></p>
+      <p class="unit-name" style="text-transform: uppercase;">${displayName} <span style="color: #f39c12">Lvl ${agent.level} / 5</span></p>
       <p class="unit-stats">Damage: ${Math.round(agent.damage)} | Range: ${Math.round(agent.range * (agent.djRangeBuffed ? 1.15 : 1.0))}px | Rate: ${(agent.fireRate * (agent.commanderSpeedBuffed ? 1.35 : 1.0)).toFixed(1)}/s</p>
     `;
 
@@ -631,30 +755,15 @@ export class GameUI {
 
   showAutoCountdown(seconds) {
     if (!this.btnNextWave) return;
-    let remaining = seconds;
-    
     if (Network.mode === 'CLIENT') {
       this.btnNextWave.textContent = "WAITING FOR HOST";
       this.btnNextWave.disabled = true;
       this.btnNextWave.style.opacity = '0.6';
     } else {
-      this.btnNextWave.textContent = `NEXT WAVE IN ${remaining}s...`;
+      this.btnNextWave.textContent = `NEXT WAVE IN ${seconds}s...`;
       this.btnNextWave.disabled = true;
       this.btnNextWave.style.opacity = '0.7';
     }
-
-    const interval = setInterval(() => {
-      remaining--;
-      if (remaining <= 0) {
-        clearInterval(interval);
-      } else {
-        if (Network.mode === 'CLIENT') {
-          this.btnNextWave.textContent = "WAITING FOR HOST";
-        } else {
-          this.btnNextWave.textContent = `NEXT WAVE IN ${remaining}s...`;
-        }
-      }
-    }, 1000);
   }
 
   showOverlay(title, subtitle) {
@@ -673,8 +782,6 @@ export class GameUI {
     }
     this.parentUI.gameView.classList.remove('hidden');
     this.hudMapName.textContent = mapName.toUpperCase();
-    
-    CrazyGamesManager.gameplayStart();
     this.hidePointer();
 
     if (this.game.tutorialActive) {
@@ -687,6 +794,9 @@ export class GameUI {
     this.parentUI.lobbyView.classList.remove('hidden');
     this.dismissCommanderDialog(); 
     
+    // Stop the background environmental soundscape when returning to the lobby!
+    soundManager.stopAmbience();
+
     if (this.parentUI.lobby) {
       this.parentUI.lobby.drawAllStaticPreviews();
       this.parentUI.lobby.renderDailyQuests();
@@ -699,6 +809,7 @@ export class GameUI {
   }
 
   showTutorialHint(step) {
+    if (!this.game.tutorialActive) return; // Prevent any tutorial calls once deactivated
     this.dismissCommanderDialog(); 
     if (!this.commanderWrapper) return;
 
@@ -712,7 +823,7 @@ export class GameUI {
       2: "Good job! Now, tap directly on your placed Scout to select him.",
       2.5: "Great! Now press UPGRADE in your action panel to power him up before starting the wave.",
       3: "Looking strong! Now, press 'START WAVE' to summon the training zombies!",
-      4: "Superb work, rookie. You've mastered the basics of Blocky tactical defenses. Dismissed!"
+      4: "Superb work, rookie. You've mastered the basics of Blocky Tower Defense 2d. Dismissed!"
     };
 
     this.commanderText.textContent = messages[step] || "Awaiting operational instructions...";
@@ -729,9 +840,10 @@ export class GameUI {
       this.btnCommanderAction.textContent = "FINISH TUTORIAL ✓";
       this.btnCommanderAction.onclick = () => {
         this.game.tutorialCompleted = true;
-        this.game.tutorialActive = false; // Deactivate active session flag
+        this.game.tutorialActive = false; 
         this.game.saveStatsToStorage();
         this.dismissTutorial(); 
+        CrazyGamesManager.gameplayStart(); // Launch gameplayStart on tutorial completion!
       };
     } else {
       this.btnCommanderAction.textContent = "GOT IT ✓";
@@ -746,7 +858,6 @@ export class GameUI {
   showCommanderAnnouncement(msg) {
     if (!this.commanderWrapper) return;
 
-    // Clean up skip button visibility
     if (this.btnCommanderSkip) {
       this.btnCommanderSkip.style.display = 'none';
     }
@@ -762,6 +873,7 @@ export class GameUI {
 
   activateStepPointers(step) {
     this.hidePointer();
+    if (!this.game.tutorialActive) return;
 
     if (step === 0.5) {
       this.showPointerAtCanvasCenter(); 
@@ -776,8 +888,10 @@ export class GameUI {
           scoutBtn.removeEventListener('click', onScoutSelect);
           scoutBtn.classList.remove('tut-highlight');
           this.hidePointer();
-          this.game.tutorialStep = 1.5;
-          this.showTutorialHint(1.5);
+          if (this.game.tutorialActive) {
+            this.game.tutorialStep = 1.5;
+            this.showTutorialHint(1.5);
+          }
         };
         scoutBtn.addEventListener('click', onScoutSelect);
       }
@@ -823,7 +937,6 @@ export class GameUI {
     document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
     this.hidePointer();
 
-    // Explicitly hide the skip button on dismissal
     if (this.btnCommanderSkip) {
       this.btnCommanderSkip.style.display = 'none';
     }
@@ -945,11 +1058,11 @@ export class GameUI {
       <div style="display:flex; gap:10px; justify-content:center; font-weight:900; margin-bottom:20px;">
         <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px; border:2.5px solid var(--border-color); flex:1;">
           <span style="font-size:0.75rem; color:var(--text-muted)">REWARD COINS</span>
-          <p style="font-size:1.3rem; color:var(--primary-yellow)" id="tally-coins">+🪙 0</p>
+          <p style="font-size:1.3rem; color:var(--primary-yellow)" id="tally-coins">+<img src="https://img.icons8.com/color/48/coins.png" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 3px;" /> 0</p>
         </div>
         <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px; border:2.5px solid var(--border-color); flex:1;">
           <span style="font-size:0.75rem; color:var(--text-muted)">REWARD XP</span>
-          <p style="font-size:1.3rem; color:var(--primary-green)" id="tally-xp">+🌟 0</p>
+          <p style="font-size:1.3rem; color:var(--primary-green)" id="tally-xp">+🌟 0 XP</p>
         </div>
       </div>
       ${reviveButtonHtml}
@@ -959,7 +1072,6 @@ export class GameUI {
 
     this.overlay.appendChild(summaryCard);
 
-    // Active Input Glow Effects
     const feedbackInput = document.getElementById('input-feedback-msg');
     const feedbackContainer = document.getElementById('summary-feedback-container');
     if (feedbackInput && feedbackContainer) {
@@ -1008,13 +1120,26 @@ export class GameUI {
     const reviveBtn = document.getElementById('btn-summary-revive');
     if (reviveBtn) {
       reviveBtn.addEventListener('click', () => {
-        CrazyGamesManager.requestRewardedAd(() => {
-          this.game.revivePlayer();
-          summaryCard.remove();
-          this.overlay.className = 'overlay-content hidden';
-          this.overlayTitle.classList.remove('hidden');
-          this.overlaySubtitle.classList.remove('hidden');
-        });
+        // Disable button to prevent spam click while ad is active
+        reviveBtn.disabled = true;
+        reviveBtn.textContent = "LOADING AD...";
+
+        CrazyGamesManager.requestRewardedAd(
+          () => {
+            // Success: Revive player!
+            this.game.revivePlayer();
+            summaryCard.remove();
+            this.overlay.className = 'overlay-content hidden';
+            this.overlayTitle.classList.remove('hidden');
+            this.overlaySubtitle.classList.remove('hidden');
+          },
+          () => {
+            // Error: Do not grant reward. Re-enable button and show styled alert popup
+            reviveBtn.disabled = false;
+            reviveBtn.textContent = "📺 WATCH AD TO REVIVE (+50 LIVES)";
+            this.showInGameAlert("Failed to load rewarded ad. Please try again or check your ad blocker!", "AD LOAD FAILED ⚠️");
+          }
+        );
       });
     }
 
@@ -1055,7 +1180,7 @@ export class GameUI {
             if (currentCoins < baseCoins) {
               currentCoins += Math.ceil(baseCoins / 15);
               if (currentCoins >= baseCoins) currentCoins = baseCoins;
-              coinsEl.textContent = `+🪙 ${currentCoins}`;
+              coinsEl.innerHTML = `+<img src="https://img.icons8.com/color/48/coins.png" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 3px;" /> ${currentCoins}`;
               soundManager.playTick();
             } else {
               clearInterval(coinsTally);

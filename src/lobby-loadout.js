@@ -2,6 +2,7 @@
 // Sub-controller handling the Loadout inventory setup and character visual skins selectors.
 
 import { drawAgentPreviewOnCanvas } from './game-renderer.js';
+import { soundManager } from './sound.js';
 
 export class LobbyLoadout {
   constructor(lobbyUI, game) {
@@ -35,13 +36,24 @@ export class LobbyLoadout {
 
       let selectHtml = '';
       if (skins.length > 0) {
-        selectHtml = `<div class="skin-select-container" style="margin-top: 8px;">
-          <span style="font-size: 0.7rem; color: #7f8c8d;">SKIN: </span>
-          <select class="skin-select styled-select" style="font-size: 0.75rem; font-weight: 900; color: var(--primary-blue-dark);">
-            <option value="default">DEFAULT</option>
-            ${skins.map(s => `<option value="${s}" ${currentEquippedSkin === s ? 'selected' : ''}>${s.split('_')[1].toUpperCase()}</option>`).join('')}
-          </select>
-        </div>`;
+        const activeSkinName = currentEquippedSkin === 'default' ? 'DEFAULT' : currentEquippedSkin.split('_')[1].toUpperCase();
+        selectHtml = `
+          <div class="skin-select-container" style="margin-top: 8px; position: relative;">
+            <span style="font-size: 0.7rem; color: #7f8c8d;">SKIN: </span>
+            <div class="custom-skin-dropdown" style="display: inline-block; min-width: 80px; cursor: pointer; user-select: none;">
+              <div class="skin-dropdown-selected" style="font-size: 0.72rem; font-weight: 900; color: var(--primary-blue-dark); border: 2px solid var(--border-color); border-radius: 4px; padding: 2px 6px; background: #fff; text-align: center;">${activeSkinName} ▾</div>
+              <div class="skin-dropdown-options hidden" style="position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); width: 95px; background: #fff; border: 2px solid var(--border-color); border-radius: 6px; z-index: 1000; margin-bottom: 4px; overflow: hidden; box-shadow: 0 -3px 8px rgba(0,0,0,0.15);">
+                <div class="skin-option ${currentEquippedSkin === 'default' ? 'active' : ''}" data-value="default" style="padding: 4px 6px; font-size: 0.72rem; font-weight: 800; border-bottom: 1.5px dashed #eee; text-align: center; ${currentEquippedSkin === 'default' ? 'background: var(--primary-blue); color: #fff;' : ''}">DEFAULT</div>
+                ${skins.map(s => {
+                  const isActive = currentEquippedSkin === s;
+                  return `
+                    <div class="skin-option ${isActive ? 'active' : ''}" data-value="${s}" style="padding: 4px 6px; font-size: 0.72rem; font-weight: 800; border-bottom: 1.5px dashed #eee; text-align: center; ${isActive ? 'background: var(--primary-blue); color: #fff;' : ''}">${s.split('_')[1].toUpperCase()}</div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+        `;
       }
 
       card.innerHTML = `
@@ -59,21 +71,54 @@ export class LobbyLoadout {
       drawAgentPreviewOnCanvas(cvs, type);
 
       card.addEventListener('click', (e) => {
-        if (e.target.tagName === 'SELECT' || e.target.tagName === 'OPTION') return;
+        // Stop equipment toggle if they are interacting with the custom skin dropdown
+        if (e.target.closest('.custom-skin-dropdown')) return;
+
         this.game.toggleLoadoutAgent(type);
         this.renderLoadoutConfig();
       });
 
-      const selector = card.querySelector('.skin-select');
-      if (selector) {
-        selector.addEventListener('change', (e) => {
-          this.game.equippedSkins[type] = e.target.value;
-          this.game.saveStatsToStorage();
-          drawAgentPreviewOnCanvas(cvs, type);
+      // Bind custom skin dropdown interactivity
+      const dropdown = card.querySelector('.custom-skin-dropdown');
+      if (dropdown) {
+        const selected = dropdown.querySelector('.skin-dropdown-selected');
+        const optionsContainer = dropdown.querySelector('.skin-dropdown-options');
+
+        selected.addEventListener('click', (e) => {
+          e.stopPropagation();
+          // Hide all other open dropdowns to keep UI clean
+          document.querySelectorAll('.skin-dropdown-options').forEach(el => {
+            if (el !== optionsContainer) el.classList.add('hidden');
+          });
+          optionsContainer.classList.toggle('hidden');
+        });
+
+        const options = dropdown.querySelectorAll('.skin-option');
+        options.forEach(opt => {
+          opt.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const val = opt.getAttribute('data-value');
+            this.game.equippedSkins[type] = val;
+            this.game.saveStatsToStorage();
+            optionsContainer.classList.add('hidden');
+            
+            // Re-render to apply the skin immediately
+            this.renderLoadoutConfig();
+            soundManager.playTick();
+          });
         });
       }
 
       this.loadoutGrid.appendChild(card);
     });
+
+    // Close any open skin dropdowns when clicking outside
+    const documentClickClose = () => {
+      document.querySelectorAll('.skin-dropdown-options').forEach(el => {
+        el.classList.add('hidden');
+      });
+    };
+    document.removeEventListener('click', documentClickClose);
+    document.addEventListener('click', documentClickClose);
   }
 }

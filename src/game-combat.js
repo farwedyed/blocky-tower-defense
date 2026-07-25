@@ -70,69 +70,41 @@ export function evaluateSupportBuffs(game) {
  * Places an agent at specified tile coordinate, checking limits and wallets.
  */
 export function placeShopAgent(game, col, row, ownerId = 'p1') {
+  // ─── INVALID PLACEMENT INTERCEPT ───
+  // If the clicked cell is invalid (path, decoration obstacle, or already occupied),
+  // immediately spawn a visible warning above the mouse position.
+  if (!game.grid.isCellValidForPlacement(col, row)) {
+    game.effectManager.spawnText(col * game.grid.cellSize + 20, row * game.grid.cellSize + 20, "CANNOT PLACE HERE", '#e74c3c');
+    return;
+  }
+
   const totalPlacedTowers = game.grid.towers.size;
-  const maxTowersAllowed = 40;
-  if (totalPlacedTowers >= maxTowersAllowed) {
-    console.log(`[Placement Fail] Limit reached. Total placed: ${totalPlacedTowers}`);
-    game.effectManager.spawnText(col * game.grid.cellSize + game.grid.cellSize / 2, row * game.grid.cellSize + game.grid.cellSize / 2, "LIMIT REACHED (MAX 40)", '#e74c3c');
+  if (totalPlacedTowers >= 40) {
+    game.effectManager.spawnText(col * game.grid.cellSize + 20, row * game.grid.cellSize + 20, "PLACEMENT LIMIT REACHED (40)", '#e74c3c');
+    return;
+  }
+
+  const type = game.selectedShopTower;
+  const cost = game.getTowerCost(type);
+  const wallet = (Network.mode === 'HOST') ? (ownerId === 'p1' ? game.gold : (game.playerWallets[ownerId] || 0)) : game.gold;
+
+  if (wallet < cost) {
+    game.effectManager.spawnText(col * game.grid.cellSize + 20, row * game.grid.cellSize + 20, "CASH INSUFFICIENT!", '#e74c3c');
     return;
   }
 
   let currentPlacedOfTypeCount = 0;
   for (const t of game.grid.towers.values()) {
-    if (t.type === game.selectedShopTower) {
+    if (t.type === type) {
       currentPlacedOfTypeCount++;
     }
   }
 
-  if (game.selectedShopTower === 'farm' && currentPlacedOfTypeCount >= 8) {
-    console.log(`[Placement Fail] Limit reached. Current placed farms: ${currentPlacedOfTypeCount}`);
-    game.effectManager.spawnText(col * game.grid.cellSize + game.grid.cellSize / 2, row * game.grid.cellSize + game.grid.cellSize / 2, "LIMIT (MAX 8 FARMS)", '#e74c3c');
-    return;
-  }
-  if (game.selectedShopTower === 'commander' && currentPlacedOfTypeCount >= 3) {
-    console.log(`[Placement Fail] Limit reached. Current placed commanders: ${currentPlacedOfTypeCount}`);
-    game.effectManager.spawnText(col * game.grid.cellSize + game.grid.cellSize / 2, row * game.grid.cellSize + game.grid.cellSize / 2, "LIMIT (MAX 3)", '#e74c3c');
-    return;
-  }
-  if (game.selectedShopTower === 'dj' && currentPlacedOfTypeCount >= 1) {
-    console.log(`[Placement Fail] Limit reached. Current placed DJs: ${currentPlacedOfTypeCount}`);
-    game.effectManager.spawnText(col * game.grid.cellSize + game.grid.cellSize / 2, row * game.grid.cellSize + game.grid.cellSize / 2, "LIMIT (MAX 1 DJ)", '#e74c3c');
-    return;
-  }
-  if (game.selectedShopTower === 'medic' && currentPlacedOfTypeCount >= 3) {
-    console.log(`[Placement Fail] Limit reached. Current placed medics: ${currentPlacedOfTypeCount}`);
-    game.effectManager.spawnText(col * game.grid.cellSize + game.grid.cellSize / 2, row * game.grid.cellSize + game.grid.cellSize / 2, "LIMIT (MAX 3)", '#e74c3c');
-    return;
-  }
-  if (game.selectedShopTower === 'crook_boss' && currentPlacedOfTypeCount >= 4) {
-    console.log(`[Placement Fail] Limit reached. Current placed crook bosses: ${currentPlacedOfTypeCount}`);
-    game.effectManager.spawnText(col * game.grid.cellSize + game.grid.cellSize / 2, row * game.grid.cellSize + game.grid.cellSize / 2, "LIMIT (MAX 4)", '#e74c3c');
-    return;
-  }
-  if (game.selectedShopTower === 'turret' && currentPlacedOfTypeCount >= 5) {
-    console.log(`[Placement Fail] Limit reached. Current placed turrets: ${currentPlacedOfTypeCount}`);
-    game.effectManager.spawnText(col * game.grid.cellSize + game.grid.cellSize / 2, row * game.grid.cellSize + game.grid.cellSize / 2, "LIMIT (MAX 5)", '#e74c3c');
-    return;
-  }
-  if (game.selectedShopTower === 'military_base' && currentPlacedOfTypeCount >= 5) {
-    console.log(`[Placement Fail] Limit reached. Current placed military bases: ${currentPlacedOfTypeCount}`);
-    game.effectManager.spawnText(col * game.grid.cellSize + game.grid.cellSize / 2, row * game.grid.cellSize + game.grid.cellSize / 2, "LIMIT (MAX 5)", '#e74c3c');
-    return;
-  }
-
-  const cost = getTowerCost(game.selectedShopTower, game.isHardcore);
-  
-  let wallet = 0;
-  if (Network.mode === 'HOST') {
-    wallet = (ownerId === 'p1') ? game.gold : (game.playerWallets[ownerId] || 0);
-  } else {
-    wallet = game.gold;
-  }
-
-  if (wallet < cost) {
-    console.log(`[Placement Fail] Insufficient gold. Cost: ${cost}, Wallet: ${wallet}`);
-    game.effectManager.spawnText(col * game.grid.cellSize + game.grid.cellSize / 2, row * game.grid.cellSize + game.grid.cellSize / 2, "CASH INSUFFICIENT", '#e74c3c');
+  // TDS Specific Placement Limits
+  const limits = { farm: 8, commander: 3, dj: 1, medic: 3, crook_boss: 4, turret: 5, military_base: 5 };
+  if (limits[type] !== undefined && currentPlacedOfTypeCount >= limits[type]) {
+    const errorMsg = `LIMIT REACHED! (MAX ${limits[type]} ${type.replace('_', ' ').toUpperCase()}S)`;
+    game.effectManager.spawnText(col * game.grid.cellSize + 20, row * game.grid.cellSize + 20, errorMsg, '#e74c3c');
     return;
   }
 
@@ -140,7 +112,7 @@ export function placeShopAgent(game, col, row, ownerId = 'p1') {
     let newAgent;
     const size = game.grid.cellSize;
 
-    switch (game.selectedShopTower) {
+    switch (type) {
       case 'scout': newAgent = new Scout(col, row, size); break;
       case 'minigunner': newAgent = new Minigunner(col, row, size); break;
       case 'commander': newAgent = new Commander(col, row, size); break;
@@ -162,7 +134,7 @@ export function placeShopAgent(game, col, row, ownerId = 'p1') {
     }
 
     if (newAgent) {
-      newAgent.equippedSkin = game.equippedSkins[game.selectedShopTower] || 'default';
+      newAgent.equippedSkin = game.equippedSkins[type] || 'default';
       newAgent.ownerId = ownerId; 
       game.grid.placeTower(col, row, newAgent);
       
@@ -178,79 +150,83 @@ export function placeShopAgent(game, col, row, ownerId = 'p1') {
       }
       soundManager.playPlace();
 
-      if (game.selectedShopTower === 'farm') {
-        game.questProgress.farmsPlaced++;
+      if (type === 'farm') {
+        game.questProgress.farmsPlaced = (game.questProgress.farmsPlaced || 0) + 1;
+      } else if (type === 'scout') {
+        game.questProgress.scoutsPlaced = (game.questProgress.scoutsPlaced || 0) + 1;
+      } else if (type === 'sniper') {
+        game.questProgress.snipersPlaced = (game.questProgress.snipersPlaced || 0) + 1;
       }
+
       game.questProgress.cashSpent += cost;
       checkQuestCompletion(game);
 
-      // Tutorial Flow Handler
+      // Tutorial Progress Check
       if (game.tutorialActive && game.tutorialStep === 1.5) {
         game.tutorialStep = 2;
         game.ui.showTutorialHint(2);
       }
 
-      console.log(`[Placement Success] ${game.selectedShopTower} at (${col}, ${row})`);
       game.effectManager.spawnPlacementSparks(newAgent.x, newAgent.y, size);
       game.ui.updateHUD(game.lives, game.gold, game.wave, game.maxWaves);
     }
-  } else {
-    const isPath = game.grid.pathTiles ? game.grid.pathTiles.has(`${col},${row}`) : false;
-    const isOccupied = game.grid.towers ? game.grid.towers.has(`${col},${row}`) : false;
-    console.log(`[Placement Fail] Invalid cell at (${col}, ${row}). Path: ${isPath}, Occupied: ${isOccupied}`);
   }
 }
 
 /**
- * Handles agent level upgrading.
+ * Upgrades the selected tower.
  */
 export function upgradeSelectedTower(game) {
   if (!game.selectedPlacedTower) return;
-  const col = game.selectedPlacedTower.gridX;
-  const row = game.selectedPlacedTower.gridY;
+  const tower = game.selectedPlacedTower;
+  if (tower.level >= 5) return;
+
+  const cost = tower.getUpgradeCost();
+  if (game.gold < cost) {
+    game.effectManager.spawnText(tower.x, tower.y - 15, "NEED CASH!", '#e74c3c');
+    return;
+  }
 
   if (Network.mode === 'CLIENT') {
-    Network.conn.send({ type: 'UPGRADE_TOWER', col: col, row: row });
+    Network.conn.send({ type: 'UPGRADE_TOWER', col: tower.gridX, row: tower.gridY });
   } else {
-    const cost = game.selectedPlacedTower.getUpgradeCost();
-    if (game.gold >= cost) {
-      game.gold -= cost;
-      game.playerWallets['p1'] = game.gold;
+    game.gold -= cost;
+    game.playerWallets['p1'] = game.gold;
 
-      game.questProgress.cashSpent += cost;
-      checkQuestCompletion(game);
+    game.questProgress.cashSpent += cost;
+    checkQuestCompletion(game);
 
-      game.selectedPlacedTower.upgrade(game.effectManager);
-      soundManager.playUpgrade();
-      game.ui.updateSelectionPanel(game.selectedPlacedTower);
-      game.ui.updateHUD(game.lives, game.gold, game.wave, game.maxWaves);
+    tower.upgrade(game.effectManager);
+    soundManager.playUpgrade();
+    game.ui.updateSelectionPanel(tower);
+    game.ui.updateHUD(game.lives, game.gold, game.wave, game.maxWaves);
 
-      if (game.tutorialActive && game.tutorialStep === 2.5) {
-        game.tutorialStep = 3;
-        game.ui.showTutorialHint(3);
-      }
+    if (game.tutorialActive && game.tutorialStep === 2.5) {
+      game.tutorialStep = 3;
+      game.ui.showTutorialHint(3);
     }
   }
 }
 
 /**
- * Sells the selected agent on the field.
+ * Sells the selected tower.
  */
 export function sellSelectedTower(game) {
   if (!game.selectedPlacedTower) return;
-  const col = game.selectedPlacedTower.gridX;
-  const row = game.selectedPlacedTower.gridY;
+  const tower = game.selectedPlacedTower;
+  const col = tower.gridX;
+  const row = tower.gridY;
 
   if (Network.mode === 'CLIENT') {
     Network.conn.send({ type: 'SELL_TOWER', col: col, row: row });
     game.setSelectedPlacedTower(null);
   } else {
-    const refund = game.tutorialActive ? game.selectedPlacedTower.cost : game.selectedPlacedTower.getSellValue();
+    const refund = game.tutorialActive ? tower.cost : tower.getSellValue();
     game.gold += refund;
     game.playerWallets['p1'] = game.gold;
 
     game.grid.removeTower(col, row);
-    game.effectManager.spawnPlacementSparks(game.selectedPlacedTower.x, game.selectedPlacedTower.y, 40);
+    game.effectManager.spawnPlacementSparks(tower.x, tower.y, 40);
     game.setSelectedPlacedTower(null);
     game.ui.updateHUD(game.lives, game.gold, game.wave, game.maxWaves);
   }
@@ -365,19 +341,24 @@ export function startNextWave(game, isFromSkip = false) {
 
 /**
  * Triggers interactive context alerts from the base Commander.
+ * Updated to match classic, commanding Roblox TDS style dialogue.
  */
 export function triggerCommanderAlerts(game) {
   let alertMsg = "";
   if (game.wave === 1) {
-    alertMsg = "There's reports of zombie activity nearby.";
+    alertMsg = "Get ready! They're coming! Get some defenses up, let's get to work!";
   } else if (game.wave === 2) {
-    alertMsg = "Secure the area and keep an eye out. We have teams that are pushing them in our direction.";
+    alertMsg = "They're marching in, stay focused! Strength in numbers, place down more towers!";
   } else if (game.wave === 5) {
-    alertMsg = "Heavy threat inbound! Watch out for those slow, tanky targets!";
-  } else if (game.wave === 7) {
-    alertMsg = "The Toxic Giant is approaching! Get those defenses up, let's get to work!";
+    alertMsg = "We need more firepower! Make sure to upgrade your troops to handle these faster target scales!";
   } else if (game.wave === 10) {
-    alertMsg = "Warning: Camo zombies detected! Hiddens are approaching, keep your eyes open!";
+    alertMsg = "Warning: Camo zombies detected! Hiddens have entered the area, watch out!";
+  } else if (game.wave === 15) {
+    alertMsg = "Zombies with high shield capacities have been spotted! Focus fire immediately!";
+  } else if (game.wave === 20) {
+    alertMsg = "Lead armors detected! Sharp bullets won't pierce them. Bring in explosives or Pyromancer fire to melt them down!";
+  } else if (game.wave === game.maxWaves) {
+    alertMsg = "The final Boss is approaching! Prepare your lines and activate your abilities, survival is our only option!";
   }
 
   if (alertMsg) {

@@ -48,6 +48,11 @@ class Game {
     this.canvas = document.getElementById('game-canvas');
     this.ctx = this.canvas.getContext('2d');
 
+    // 1. Initialize all core engine modules FIRST to prevent race conditions
+    this.grid = new Grid(800, 600, 40);
+    this.effectManager = new EffectManager();
+    this.ui = new UI(this);
+
     // Progression Stats
     this.playerLevel = 1;
     this.playerXp = 0;
@@ -72,8 +77,6 @@ class Game {
     this.tutorialCompleted = false;
     this.tutorialActive = false;
     this.tutorialStep = 0;
-
-    this.loadStatsFromStorage();
 
     // In-Match stats
     this.lives = 150;
@@ -109,9 +112,8 @@ class Game {
     this.spawnQueue = [];
     this.activeSpawners = [];
 
-    this.grid = new Grid(800, 600, 40);
-    this.effectManager = new EffectManager();
-    this.ui = new UI(this);
+    this.initWaveBlueprints();
+    this.initEventListeners();
 
     // Network initialization
     if (typeof Network !== 'undefined' && typeof Peer !== 'undefined') {
@@ -123,52 +125,86 @@ class Game {
     }
 
     this.lastTime = 0;
-    this.lastTouchTime = 0; // Tracks real touches to suppress fake click events
+    this.lastTouchTime = 0;
 
-    this.initWaveBlueprints();
-    this.initEventListeners();
-    
-    // Sync display elements
-    this.ui.updateLobbyMeta(this.playerLevel, this.playerXp, this.playerCoins);
-    this.ui.renderDailyQuests();
-    this.ui.renderLeaderboard(this.selectedMap);
+    // Initialize CrazyGames SDK
+    CrazyGamesManager.init().then(async () => {
+      // Start the loading session immediately on SDK ready
+      CrazyGamesManager.gameLoadingStart();
 
-    this.loadStatsFromStorage();
-    if (!this.tutorialCompleted) {
-      this.tutorialStep = 0;
-    }
+      // Load stats asynchronously after SDK is fully ready
+      await this.loadStatsFromStorage();
 
-    CrazyGamesManager.init().then(() => {
+      // Set up username constraints
+      let savedUser = localStorage.getItem('tds_player_username');
+      if (!savedUser || savedUser === 'Guest' || savedUser.toLowerCase().startsWith('guest')) {
+        const randomId = String(Math.floor(1000 + Math.random() * 9000));
+        savedUser = `Guest Player_${randomId}`;
+        localStorage.setItem('tds_player_username', savedUser);
+      }
+      const nameInput = document.getElementById('input-player-name');
+      if (nameInput) {
+        nameInput.value = savedUser;
+        nameInput.disabled = true; // DO NOT allow players to manually change their usernames!
+      }
+
+      // Sync display elements
+      this.ui.updateLobbyMeta(this.playerLevel, this.playerXp, this.playerCoins);
+      this.ui.renderDailyQuests();
+      this.ui.renderLeaderboard(this.selectedMap);
+
       CrazyGamesManager.onRoomJoinReceived((params) => {
         if (params && params.roomId) {
           this.handleCrazyGamesInvite(params.roomId);
         }
       });
+
+      // Start preloading and check onboarding status
+      const barFill = document.getElementById('loading-bar-fill');
+      const statusText = document.getElementById('loading-status');
+      preloadAllAssets(
+        (percent, loaded, total) => {
+          if (barFill) barFill.style.width = `${percent}%`;
+          if (statusText) statusText.textContent = `Deploying Assets: ${loaded} / ${total} (${percent}%)`;
+        },
+        () => {
+          if (statusText) statusText.textContent = "Operational Ready!";
+          setTimeout(() => {
+            const loader = document.getElementById('loading-screen');
+            if (loader) loader.classList.add('fade-out');
+
+            // Notify CrazyGames loading is officially finished
+            CrazyGamesManager.gameLoadingStop();
+
+            // Check for Instant Multiplayer trigger
+            if (CrazyGamesManager.isInstantMultiplayer()) {
+              console.log('[CrazyGames] Instant Multiplayer detected! Directing to Co-op lobby.');
+              this.autoHostMultiplayerLobby();
+              return;
+            }
+
+            // Onboarding tutorial flow or lobby splash state
+            if (!this.tutorialCompleted) {
+              console.log('[Onboarding] First-time player detected! Deploying directly to tutorial match.');
+              this.selectedMap = 'grassland';
+              this.selectedDifficulty = 'easy';
+              this.deployToMatch();
+            } else {
+              if (this.ui && this.ui.lobby) {
+                this.ui.lobby.showSplashState();
+              }
+            }
+
+            // Force Redraw Preview Canvases with newly preloaded textures
+            if (this.ui && this.ui.lobby) {
+              this.ui.lobby.drawAllStaticPreviews();
+              this.ui.lobby.renderDailyQuests();
+              this.ui.lobby.renderLeaderboard(this.selectedMap);
+            }
+          }, 400);
+        }
+      );
     });
-
-    // Start Robust Asset Preloading
-    const barFill = document.getElementById('loading-bar-fill');
-    const statusText = document.getElementById('loading-status');
-    preloadAllAssets(
-      (percent, loaded, total) => {
-        if (barFill) barFill.style.width = `${percent}%`;
-        if (statusText) statusText.textContent = `Deploying Assets: ${loaded} / ${total} (${percent}%)`;
-      },
-      () => {
-        if (statusText) statusText.textContent = "Operational Ready!";
-        setTimeout(() => {
-          const loader = document.getElementById('loading-screen');
-          if (loader) loader.classList.add('fade-out');
-
-          // Force Redraw Preview Canvases with newly preloaded textures
-          if (this.ui && this.ui.lobby) {
-            this.ui.lobby.drawAllStaticPreviews();
-            this.ui.lobby.renderDailyQuests();
-            this.ui.lobby.renderLeaderboard(this.selectedMap);
-          }
-        }, 400);
-      }
-    );
 
     requestAnimationFrame((t) => this.loop(t));
   }
@@ -177,8 +213,8 @@ class Game {
      MODULE DELEGATION HOOKS
      ─────────────────────────────────────────────────────────── */
 
-  loadStatsFromStorage() {
-    loadStatsFromStorage(this);
+  async loadStatsFromStorage() {
+    await loadStatsFromStorage(this);
   }
 
   saveStatsToStorage() {
@@ -359,6 +395,24 @@ class Game {
     });
   }
 
+  autoHostMultiplayerLobby() {
+    const splash = document.getElementById('lobby-splash-container');
+    if (splash) splash.style.display = 'none';
+    
+    const matchmaking = document.getElementById('coop-matchmaking-panel');
+    if (matchmaking) matchmaking.classList.remove('hidden');
+
+    const nameInput = document.getElementById('input-player-name');
+    if (nameInput) {
+      nameInput.disabled = true;
+    }
+
+    const btnHost = document.getElementById('btn-host-coop');
+    if (btnHost) {
+      btnHost.click();
+    }
+  }
+
   initWaveBlueprints() {
     const data = initWaveData();
     this.waveBlueprintsEasy = data.waveBlueprintsEasy;
@@ -383,6 +437,13 @@ class Game {
 
     if (this.showMapDirections) {
       this.showMapDirections = false;
+      
+      // Requirement: Call gameplayStart when map directions are dismissed, NOT immediately on entering.
+      // Exception: Do not call gameplayStart during guide tour (tutorial active).
+      if (!this.tutorialActive) {
+        CrazyGamesManager.gameplayStart();
+      }
+
       if (this.tutorialActive && this.tutorialStep === 0.5) {
         this.tutorialStep = 1;
         this.ui.showTutorialHint(1);
@@ -423,6 +484,45 @@ class Game {
           this.setSelectedPlacedTower(null);
         }
       }
+    }
+  }
+
+  /**
+   * Scans viewport dimensions to programmatically apply fullscreen scaling 
+   * fallback styles when embedded iframes expand to fill the hardware resolution bounds.
+   */
+  updateFullscreenClass() {
+    const container = document.getElementById('app-container');
+    if (!container) return;
+
+    // Detect if running inside CrazyGames iframe to automatically scale fully
+    const isCrazyGames = window.location.hostname.includes('crazygames') || window.location.hostname.includes('game-files');
+    if (isCrazyGames) {
+      container.classList.add('fullscreen-active');
+      return;
+    }
+
+    // Standardize physical screen metrics into CSS logical pixels by dividing by DPR
+    const dpr = window.devicePixelRatio || 1;
+    const screenWidthLogical = window.screen.width / dpr;
+    const screenHeightLogical = window.screen.height / dpr;
+
+    // Detect if browser standard full-screen is active
+    const isNativeFull = !!(document.fullscreenElement || 
+                            document.webkitFullscreenElement || 
+                            document.mozFullScreenElement || 
+                            document.msFullscreenElement ||
+                            window.matchMedia('(display-mode: fullscreen)').matches);
+
+    // Checks if the active viewport dimensions match the full display width/height 
+    // (with safe tolerances for macOS slid-down bookmarks, tabs and top toolbars)
+    const matchesScreenSize = (window.innerWidth >= screenWidthLogical - 150) && 
+                              (window.innerHeight >= screenHeightLogical - 250);
+
+    if (isNativeFull || matchesScreenSize) {
+      container.classList.add('fullscreen-active');
+    } else {
+      container.classList.remove('fullscreen-active');
     }
   }
 
@@ -508,6 +608,14 @@ class Game {
         this.setSelectedPlacedTower(null);
       }
     });
+
+    // Real-time layout resize listener handles viewport adjustments
+    window.addEventListener('resize', () => {
+      this.updateFullscreenClass();
+    });
+    
+    // Initial scaling check
+    this.updateFullscreenClass();
   }
 
   setSelectedMap(mapId) {
@@ -520,6 +628,11 @@ class Game {
     // Clear directions immediately if they select a unit first
     if (this.showMapDirections) {
       this.showMapDirections = false;
+      
+      if (!this.tutorialActive) {
+        CrazyGamesManager.gameplayStart();
+      }
+
       if (this.tutorialActive && this.tutorialStep === 0.5) {
         this.tutorialStep = 1;
         this.ui.showTutorialHint(1);
@@ -563,6 +676,17 @@ class Game {
   }
 
   deployToMatch() {
+    // If Solo Mode, request midgame ad before launching match!
+    if (Network.mode === 'OFFLINE') {
+      CrazyGamesManager.requestMidgameAd(() => {
+        this.continueDeployment();
+      });
+    } else {
+      this.continueDeployment();
+    }
+  }
+
+  continueDeployment() {
     try {
       this.state = 'playing';
       this.showMapDirections = true;
@@ -621,7 +745,7 @@ class Game {
           selectedMap: this.selectedMap,
           isHardcore: this.isHardcore,
           playerWallets: this.playerWallets,
-          obstacles: this.grid.obstacles,
+          obstacles: this.grid.obstacles, // FIXED: Changed this.game.grid to this.grid
           lives: this.lives,
           gold: this.gold,
           maxWaves: this.maxWaves
@@ -650,7 +774,8 @@ class Game {
 
   quitToLobby() {
     this.tutorialActive = false; 
-    CrazyGamesManager.requestMidgameAd(() => {
+    
+    const returnAction = () => {
       this.state = 'lobby';
       this.ui.showLobbyLayout();
       this.ui.updateLobbyMeta(this.playerLevel, this.playerXp, this.playerCoins);
@@ -660,7 +785,15 @@ class Game {
       if (!this.tutorialCompleted && this.tutorialStep === 0) {
         this.ui.showTutorialHint(0);
       }
-    });
+    };
+
+    if (Network.mode !== 'OFFLINE') {
+      // Multiplayer Mode: Show midgame ad when returning to lobby
+      CrazyGamesManager.requestMidgameAd(returnAction);
+    } else {
+      // Solo Mode: Return instantly without showing a midgame ad!
+      returnAction();
+    }
   }
 
   revivePlayer() {
@@ -685,7 +818,7 @@ class Game {
       }
     } else {
       if (!this.skipVotes) this.skipVotes = new Set();
-      this.skipVotes.add('p1');
+      this.skipVotes.add(window.myPlayerId);
       
       const required = Math.ceil((Network.conns.filter(c => c && c.open).length + 1) / 2);
       if (this.skipVotes.size >= required) {
@@ -699,7 +832,12 @@ class Game {
 
   toggleAutoMode() {
     this.autoMode = !this.autoMode;
-    if (!this.autoMode) this.autoStartTimer = 0;
+    if (!this.autoMode) {
+      this.autoStartTimer = 0;
+      if (this.ui) {
+        this.ui.updateWaveButton(this.waveInProgress);
+      }
+    }
     this.ui.updateAutoWaveButton(this.autoMode);
   }
 
@@ -717,7 +855,6 @@ class Game {
     const dt = Math.min(0.1, (timestamp - this.lastTime) / 1000.0) * this.speedMultiplier;
     this.lastTime = timestamp;
 
-    // Frame rate monitoring diagnostics
     if (this.state === 'playing') {
       if (!this.fpsTicks) {
         this.fpsTicks = 0;
@@ -726,7 +863,7 @@ class Game {
       this.fpsTicks++;
       this.fpsAccumulator += dt;
 
-      if (this.fpsAccumulator >= 5.0) { // Every 5 seconds of active gameplay
+      if (this.fpsAccumulator >= 5.0) { 
         const avgFps = Math.round(this.fpsTicks / this.fpsAccumulator);
         if (avgFps < 20) {
           console.warn(`[Performance Alert] Low FPS detected: ${avgFps} FPS over last 5s.`);
@@ -737,7 +874,9 @@ class Game {
     }
 
     if (this.state === 'playing' || this.state === 'victory' || this.state === 'gameover') {
-      this.matchTime += dt;
+      if (this.state === 'playing') {
+        this.matchTime += dt;
+      }
       this.update(dt);
       this.draw(); 
     }
@@ -746,6 +885,8 @@ class Game {
   }
 
   update(dt) {
+    if (this.state !== 'playing') return; 
+
     if (this.isMouseOnCanvas) {
       this.targetHoverPos.x = this.mousePos.x;
       this.targetHoverPos.y = this.mousePos.y;
@@ -798,6 +939,10 @@ class Game {
         if (this.wave < this.maxWaves) {
           this.startNextWave();
         }
+      } else {
+        if (this.ui) {
+          this.ui.showAutoCountdown(Math.ceil(this.autoStartTimer));
+        }
       }
     }
 
@@ -818,8 +963,18 @@ class Game {
 
     this.evaluateSupportBuffs();
 
+    // ─── SEQUENTIAL COUNTDOWN TIMER RECONSTRUCTION ───
     if (this.skipCooldown > 0) {
       this.skipCooldown -= dt;
+      if (this.ui && this.ui.gameUI && this.ui.gameUI.btnSkipWave) {
+        this.ui.gameUI.btnSkipWave.textContent = `COOLDOWN (${Math.ceil(this.skipCooldown)}s)`;
+      }
+      if (this.skipCooldown <= 0) {
+        this.skipCooldown = 0;
+        if (this.ui) {
+          this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
+        }
+      }
     }
 
     for (let i = this.enemies.length - 1; i >= 0; i--) {
@@ -853,6 +1008,7 @@ class Game {
           soundManager.playDefeat();
           this.ui.showMatchSummaryCard(false);
           this.saveStatsToStorage();
+          CrazyGamesManager.gameplayStop(); 
           if (Network.mode === 'HOST') {
             Network.broadcastGameOver(this.wave);
           }
@@ -916,6 +1072,9 @@ class Game {
         this.gold += cashBonus;
       }
 
+      this.questProgress.wavesSurvived = (this.questProgress.wavesSurvived || 0) + 1;
+      this.checkQuestCompletion();
+
       let coinReward = 0;
       let xpReward = 0;
 
@@ -923,6 +1082,7 @@ class Game {
         this.state = 'victory';
         soundManager.playVictory();
         this.saveSpeedrunRecord();
+        CrazyGamesManager.gameplayStop(); 
         
         const diffConfig = this.difficultySettings[this.selectedDifficulty];
         coinReward = Math.round(300 * diffConfig.coinMultiplier);
