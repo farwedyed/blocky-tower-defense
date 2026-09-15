@@ -226,7 +226,11 @@ export const CrazyGamesManager = {
    * @param {boolean} isJoinable
    */
   updateRoomPresence: function(roomId, isJoinable) {
-    if (this.sdk && this.isInitialized) {
+    // GUARD: Do NOT call updateRoom if player has left or is offline!
+    if (typeof window.Network !== 'undefined' && (window.Network.mode === 'OFFLINE' || !window.Network.roomId)) {
+      return;
+    }
+    if (this.sdk && this.isInitialized && roomId) {
       try {
         this.sdk.game.updateRoom({
           roomId: roomId,

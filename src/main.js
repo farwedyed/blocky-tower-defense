@@ -26,7 +26,8 @@ import {
   loadStatsFromStorage, 
   saveStatsToStorage, 
   checkQuestCompletion, 
-  saveSpeedrunRecord 
+  saveSpeedrunRecord,
+  awardMatchRewards
 } from './game-storage.js';
 
 import { 
@@ -116,9 +117,9 @@ class Game {
     this.initEventListeners();
 
     // Network initialization
-    if (typeof Network !== 'undefined' && typeof Peer !== 'undefined') {
-      Network.init(this, (peerId) => {
-        console.log("[Signal] established Peer ID room link:", peerId);
+    if (typeof Network !== 'undefined') {
+      Network.init(this, () => {
+        console.log("[Network] Connected to Azure Cloud Server!");
       });
     } else {
       console.warn("[Network] Offline mode forced on start: network SDK missing or blocked.");
@@ -129,13 +130,10 @@ class Game {
 
     // Initialize CrazyGames SDK
     CrazyGamesManager.init().then(async () => {
-      // Start the loading session immediately on SDK ready
       CrazyGamesManager.gameLoadingStart();
 
-      // Load stats asynchronously after SDK is fully ready
       await this.loadStatsFromStorage();
 
-      // Set up username constraints
       let savedUser = localStorage.getItem('tds_player_username');
       if (!savedUser || savedUser === 'Guest' || savedUser.toLowerCase().startsWith('guest')) {
         const randomId = String(Math.floor(1000 + Math.random() * 9000));
@@ -145,10 +143,9 @@ class Game {
       const nameInput = document.getElementById('input-player-name');
       if (nameInput) {
         nameInput.value = savedUser;
-        nameInput.disabled = true; // DO NOT allow players to manually change their usernames!
+        nameInput.disabled = true;
       }
 
-      // Sync display elements
       this.ui.updateLobbyMeta(this.playerLevel, this.playerXp, this.playerCoins);
       this.ui.renderDailyQuests();
       this.ui.renderLeaderboard(this.selectedMap);
@@ -159,7 +156,6 @@ class Game {
         }
       });
 
-      // Start preloading and check onboarding status
       const barFill = document.getElementById('loading-bar-fill');
       const statusText = document.getElementById('loading-status');
       preloadAllAssets(
@@ -173,17 +169,25 @@ class Game {
             const loader = document.getElementById('loading-screen');
             if (loader) loader.classList.add('fade-out');
 
-            // Notify CrazyGames loading is officially finished
             CrazyGamesManager.gameLoadingStop();
 
-            // Check for Instant Multiplayer trigger
-            if (CrazyGamesManager.isInstantMultiplayer()) {
-              console.log('[CrazyGames] Instant Multiplayer detected! Directing to Co-op lobby.');
-              this.autoHostMultiplayerLobby();
+            const params = new URLSearchParams(window.location.search);
+            const startupRoomId = params.get('roomId');
+
+            if (CrazyGamesManager.isInstantMultiplayer() || startupRoomId) {
+              console.log('[CrazyGames] Multiplayer join/host triggered on launch. Bypassing onboarding.');
+              this.tutorialCompleted = true;
+              this.tutorialActive = false;
+              this.saveStatsToStorage();
+
+              if (startupRoomId) {
+                this.handleCrazyGamesInvite(startupRoomId);
+              } else {
+                this.autoHostMultiplayerLobby();
+              }
               return;
             }
 
-            // Onboarding tutorial flow or lobby splash state
             if (!this.tutorialCompleted) {
               console.log('[Onboarding] First-time player detected! Deploying directly to tutorial match.');
               this.selectedMap = 'grassland';
@@ -195,7 +199,6 @@ class Game {
               }
             }
 
-            // Force Redraw Preview Canvases with newly preloaded textures
             if (this.ui && this.ui.lobby) {
               this.ui.lobby.drawAllStaticPreviews();
               this.ui.lobby.renderDailyQuests();
@@ -208,10 +211,6 @@ class Game {
 
     requestAnimationFrame((t) => this.loop(t));
   }
-
-  /* ───────────────────────────────────────────────────────────
-     MODULE DELEGATION HOOKS
-     ─────────────────────────────────────────────────────────── */
 
   async loadStatsFromStorage() {
     await loadStatsFromStorage(this);
@@ -272,10 +271,6 @@ class Game {
   getTowerRange(type) {
     return getTowerRange(type);
   }
-
-  /* ───────────────────────────────────────────────────────────
-     CORE LIFECYCLE & INPUT PROCESSING
-     ─────────────────────────────────────────────────────────── */
 
   buyCrate(crateType) {
     let cost = 150;
@@ -347,7 +342,6 @@ class Game {
   handleCrazyGamesInvite(roomId) {
     if (this.state !== 'lobby') return;
     
-    // Switch to client mode and join the room
     Network.mode = 'CLIENT';
     const nameInput = document.getElementById('input-player-name');
     const name = nameInput ? nameInput.value.trim() : "";
@@ -358,19 +352,23 @@ class Game {
     if (joinCodeInput) joinCodeInput.value = roomId.toUpperCase();
     if (nameInput && !nameInput.value) nameInput.value = activeName;
 
-    // Hide splash container so the invite lobby is visible instantly
     const splash = document.getElementById('lobby-splash-container');
     if (splash) splash.style.display = 'none';
 
-    // Unhide the parent co-op matchmaking panel
-    const coopMatchmakingPanel = document.getElementById('coop-matchmaking-panel');
-    if (coopMatchmakingPanel) coopMatchmakingPanel.classList.remove('hidden');
+    const coopHeaderPanel = document.getElementById('coop-header-panel');
+    if (coopHeaderPanel) coopHeaderPanel.classList.remove('hidden');
     
     const coopControls = document.getElementById('coop-setup-controls');
     if (coopControls) coopControls.classList.add('hidden');
     
     const coopLobbyStatus = document.getElementById('coop-lobby-status-container');
     if (coopLobbyStatus) coopLobbyStatus.classList.remove('hidden');
+
+    const coopLobbyFooter = document.getElementById('coop-footer-panel');
+    if (coopLobbyFooter) {
+      coopLobbyFooter.classList.remove('hidden');
+      coopLobbyFooter.style.display = 'block';
+    }
     
     const usernameContainer = document.getElementById('username-container');
     if (usernameContainer) usernameContainer.style.display = 'none';
@@ -383,10 +381,10 @@ class Game {
 
     Network.join(roomId.toLowerCase(), activeName, () => {
       const labelRoomCode = document.getElementById('label-room-code');
-      if (labelRoomCode) labelRoomCode.textContent = `CONNECTED TO HOST`;
+      if (labelRoomCode) labelRoomCode.textContent = `ROOM CODE: ${roomId.toUpperCase()}`;
       
       if (labelStatus) {
-        labelStatus.textContent = "IN SQUAD (WAITING FOR HOST)";
+        labelStatus.textContent = "IN SQUAD (WAITING FOR LEADER)";
         labelStatus.style.color = "var(--primary-blue)";
       }
       this.ui.lobby.updateCoopPlayerList();
@@ -394,13 +392,13 @@ class Game {
       CrazyGamesManager.updateRoomPresence(roomId.toLowerCase(), true);
     });
   }
-
+  
   autoHostMultiplayerLobby() {
     const splash = document.getElementById('lobby-splash-container');
     if (splash) splash.style.display = 'none';
     
-    const matchmaking = document.getElementById('coop-matchmaking-panel');
-    if (matchmaking) matchmaking.classList.remove('hidden');
+    const coopHeaderPanel = document.getElementById('coop-header-panel');
+    if (coopHeaderPanel) coopHeaderPanel.classList.remove('hidden');
 
     const nameInput = document.getElementById('input-player-name');
     if (nameInput) {
@@ -438,8 +436,6 @@ class Game {
     if (this.showMapDirections) {
       this.showMapDirections = false;
       
-      // Requirement: Call gameplayStart when map directions are dismissed, NOT immediately on entering.
-      // Exception: Do not call gameplayStart during guide tour (tutorial active).
       if (!this.tutorialActive) {
         CrazyGamesManager.gameplayStart();
       }
@@ -487,35 +483,26 @@ class Game {
     }
   }
 
-  /**
-   * Scans viewport dimensions to programmatically apply fullscreen scaling 
-   * fallback styles when embedded iframes expand to fill the hardware resolution bounds.
-   */
   updateFullscreenClass() {
     const container = document.getElementById('app-container');
     if (!container) return;
 
-    // Detect if running inside CrazyGames iframe to automatically scale fully
     const isCrazyGames = window.location.hostname.includes('crazygames') || window.location.hostname.includes('game-files');
     if (isCrazyGames) {
       container.classList.add('fullscreen-active');
       return;
     }
 
-    // Standardize physical screen metrics into CSS logical pixels by dividing by DPR
     const dpr = window.devicePixelRatio || 1;
     const screenWidthLogical = window.screen.width / dpr;
     const screenHeightLogical = window.screen.height / dpr;
 
-    // Detect if browser standard full-screen is active
     const isNativeFull = !!(document.fullscreenElement || 
                             document.webkitFullscreenElement || 
                             document.mozFullScreenElement || 
                             document.msFullscreenElement ||
                             window.matchMedia('(display-mode: fullscreen)').matches);
 
-    // Checks if the active viewport dimensions match the full display width/height 
-    // (with safe tolerances for macOS slid-down bookmarks, tabs and top toolbars)
     const matchesScreenSize = (window.innerWidth >= screenWidthLogical - 150) && 
                               (window.innerHeight >= screenHeightLogical - 250);
 
@@ -541,7 +528,6 @@ class Game {
     });
 
     this.canvas.addEventListener('click', () => {
-      // Ignore click event if it was triggered by a touch event within the last 500ms
       if (this.lastTouchTime && (Date.now() - this.lastTouchTime < 500)) {
         return;
       }
@@ -571,7 +557,7 @@ class Game {
 
     this.canvas.addEventListener('touchend', (e) => {
       e.preventDefault();
-      this.lastTouchTime = Date.now(); // Record real touch time
+      this.lastTouchTime = Date.now();
       const touch = e.changedTouches[0];
       if (touch) {
         const { x, y } = this._getCanvasCoords(touch.clientX, touch.clientY);
@@ -587,7 +573,6 @@ class Game {
       }, 250);
     }, { passive: false });
 
-    // Keyboard hotkeys for desktop clients
     window.addEventListener('keydown', (e) => {
       if (this.state !== 'playing') return;
       
@@ -609,12 +594,10 @@ class Game {
       }
     });
 
-    // Real-time layout resize listener handles viewport adjustments
     window.addEventListener('resize', () => {
       this.updateFullscreenClass();
     });
     
-    // Initial scaling check
     this.updateFullscreenClass();
   }
 
@@ -625,7 +608,6 @@ class Game {
   setSelectedShopTower(type) {
     this.selectedShopTower = type;
 
-    // Clear directions immediately if they select a unit first
     if (this.showMapDirections) {
       this.showMapDirections = false;
       
@@ -676,8 +658,8 @@ class Game {
   }
 
   deployToMatch() {
-    // If Solo Mode, request midgame ad before launching match!
-    if (Network.mode === 'OFFLINE') {
+    // Avoid calling midgame ads for first-time players entering the tutorial match
+    if (Network.mode === 'OFFLINE' && this.tutorialCompleted) {
       CrazyGamesManager.requestMidgameAd(() => {
         this.continueDeployment();
       });
@@ -688,6 +670,7 @@ class Game {
 
   continueDeployment() {
     try {
+      this._rewardsClaimed = false; // Reset rewards claim flag for new match
       this.state = 'playing';
       this.showMapDirections = true;
       this.autoStartTimer = 0; 
@@ -709,6 +692,7 @@ class Game {
       this.waveInProgress = false;
       this.hasRevivedThisMatch = false; 
       this.speedMultiplier = 1;
+      this.matchTime = 0;
       this.enemies = [];
       this.bullets = [];
       this.spawnQueue = [];
@@ -717,35 +701,37 @@ class Game {
       this.grid.clear();
       this.effectManager.clear();
 
-      const runTutorialThisMatch = !this.tutorialCompleted;
+      const runTutorialThisMatch = !this.tutorialCompleted && (Network.mode === 'OFFLINE');
 
       if (runTutorialThisMatch) {
         this.tutorialActive = true;
         this.tutorialStep = 0.5; 
         this.selectedShopTower = null;
-
-        this.tutorialCompleted = true;
-        this.saveStatsToStorage();
+        // Do NOT mark tutorialCompleted here! Only mark it complete once they finish Step 4!
       } else {
         this.tutorialActive = false;
         this.selectedShopTower = this.equippedAgents[0];
       }
 
       this.playerWallets = {};
-      this.playerWallets[window.myPlayerId] = this.gold;
-      for (const c of Network.conns) {
-        if (c && c.open) {
-          this.playerWallets[c.playerId] = this.gold;
+      for (const slot of ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8']) {
+        if (window.lobbyPlayers[slot]) {
+          this.playerWallets[slot] = this.gold;
         }
       }
 
       if (Network.mode === 'HOST') {
+        if (Network.peer && Network.peer.id) {
+          CrazyGamesManager.updateRoomPresence(Network.peer.id.toLowerCase(), false);
+        }
+
         Network.broadcastToAll({
           type: 'START',
           selectedMap: this.selectedMap,
+          selectedDifficulty: this.selectedDifficulty,
           isHardcore: this.isHardcore,
           playerWallets: this.playerWallets,
-          obstacles: this.grid.obstacles, // FIXED: Changed this.game.grid to this.grid
+          obstacles: this.grid.obstacles,
           lives: this.lives,
           gold: this.gold,
           maxWaves: this.maxWaves
@@ -772,26 +758,70 @@ class Game {
     }
   }
 
-  quitToLobby() {
+  quitToLobby(forceDisconnect = false) {
     this.tutorialActive = false; 
+
+    // Grant earned coins and XP when quitting mid-match from the game view
+    if (this.state === 'playing') {
+      awardMatchRewards(this);
+    }
     
     const returnAction = () => {
       this.state = 'lobby';
       this.ui.showLobbyLayout();
-      this.ui.updateLobbyMeta(this.playerLevel, this.playerXp, this.playerCoins);
-      this.ui.renderDailyQuests();
-      this.ui.renderLeaderboard(this.selectedMap);
-
       if (!this.tutorialCompleted && this.tutorialStep === 0) {
         this.ui.showTutorialHint(0);
       }
     };
 
+    if (Network.mode !== 'OFFLINE' && !forceDisconnect) {
+      this.state = 'lobby';
+      this.ui.showLobbyLayout();
+
+      if (Network.mode === 'HOST') {
+        if (Network.peer && Network.peer.id) {
+          CrazyGamesManager.updateRoomPresence(Network.peer.id.toLowerCase(), true);
+        }
+        Network.broadcastToAll({
+          type: 'RETURN_TO_LOBBY'
+        });
+      }
+      return;
+    }
+
     if (Network.mode !== 'OFFLINE') {
-      // Multiplayer Mode: Show midgame ad when returning to lobby
+      try {
+        CrazyGamesManager.leaveRoomPresence();
+      } catch (err) {
+        console.warn("[CrazyGames] leftRoom notification exception caught:", err);
+      }
+
+      try {
+        if (Network.mode === 'CLIENT') {
+          if (Network.conn) {
+            Network.conn.close();
+            Network.conn = null;
+          }
+        } else if (Network.mode === 'HOST') {
+          Network.conns.forEach(c => {
+            if (c) c.close();
+          });
+          Network.conns = [];
+        }
+        if (Network.peer && !Network.peer.destroyed) {
+          Network.peer.destroy();
+          Network.peer = null;
+        }
+      } catch (err) {
+        console.warn("[Network] P2P cleanup exception ignored during Quit to Lobby:", err);
+      }
+
+      Network.mode = 'OFFLINE';
+      window.lobbyPlayers = { p1: "Host Survivor", p2: "", p3: "", p4: "", p5: "", p6: "", p7: "", p8: "" };
+      window.myPlayerId = "p1";
+
       CrazyGamesManager.requestMidgameAd(returnAction);
     } else {
-      // Solo Mode: Return instantly without showing a midgame ad!
       returnAction();
     }
   }
@@ -845,10 +875,6 @@ class Game {
     this.speedMultiplier = this.speedMultiplier === 1 ? 2 : 1;
     this.ui.updateSpeedButton(this.speedMultiplier);
   }
-
-  /* ───────────────────────────────────────────────────────────
-     ANIMATION & STATE SYNCHRONIZATION RUNTIME
-     ─────────────────────────────────────────────────────────── */
 
   loop(timestamp) {
     if (!this.lastTime) this.lastTime = timestamp;
@@ -963,7 +989,6 @@ class Game {
 
     this.evaluateSupportBuffs();
 
-    // ─── SEQUENTIAL COUNTDOWN TIMER RECONSTRUCTION ───
     if (this.skipCooldown > 0) {
       this.skipCooldown -= dt;
       if (this.ui && this.ui.gameUI && this.ui.gameUI.btnSkipWave) {
@@ -1005,6 +1030,7 @@ class Game {
         if (this.lives <= 0) {
           this.lives = 0;
           this.state = 'gameover';
+          this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
           soundManager.playDefeat();
           this.ui.showMatchSummaryCard(false);
           this.saveStatsToStorage();
@@ -1075,34 +1101,11 @@ class Game {
       this.questProgress.wavesSurvived = (this.questProgress.wavesSurvived || 0) + 1;
       this.checkQuestCompletion();
 
-      let coinReward = 0;
-      let xpReward = 0;
-
       if (this.wave >= this.maxWaves) {
         this.state = 'victory';
         soundManager.playVictory();
         this.saveSpeedrunRecord();
         CrazyGamesManager.gameplayStop(); 
-        
-        const diffConfig = this.difficultySettings[this.selectedDifficulty];
-        coinReward = Math.round(300 * diffConfig.coinMultiplier);
-        xpReward = Math.round(200 * diffConfig.xpMultiplier);
-
-        if (this.isHardcore) {
-          coinReward *= 3;
-          xpReward *= 3;
-        }
-
-        this.playerCoins += coinReward;
-        this.playerXp += xpReward;
-
-        const nextLevelXp = this.playerLevel * 100;
-        if (this.playerXp >= nextLevelXp) {
-          this.playerXp -= nextLevelXp;
-          this.playerLevel++;
-          soundManager.playUpgrade();
-          this.effectManager.spawnText(400, 200, `LEVEL UP! LEVEL ${this.playerLevel}`, '#f1c40f');
-        }
 
         this.saveStatsToStorage();
 

@@ -70,14 +70,6 @@ export function evaluateSupportBuffs(game) {
  * Places an agent at specified tile coordinate, checking limits and wallets.
  */
 export function placeShopAgent(game, col, row, ownerId = 'p1') {
-  // ─── INVALID PLACEMENT INTERCEPT ───
-  // If the clicked cell is invalid (path, decoration obstacle, or already occupied),
-  // immediately spawn a visible warning above the mouse position.
-  if (!game.grid.isCellValidForPlacement(col, row)) {
-    game.effectManager.spawnText(col * game.grid.cellSize + 20, row * game.grid.cellSize + 20, "CANNOT PLACE HERE", '#e74c3c');
-    return;
-  }
-
   const totalPlacedTowers = game.grid.towers.size;
   if (totalPlacedTowers >= 40) {
     game.effectManager.spawnText(col * game.grid.cellSize + 20, row * game.grid.cellSize + 20, "PLACEMENT LIMIT REACHED (40)", '#e74c3c');
@@ -86,7 +78,12 @@ export function placeShopAgent(game, col, row, ownerId = 'p1') {
 
   const type = game.selectedShopTower;
   const cost = game.getTowerCost(type);
-  const wallet = (Network.mode === 'HOST') ? (ownerId === 'p1' ? game.gold : (game.playerWallets[ownerId] || 0)) : game.gold;
+
+  if (!game.playerWallets) game.playerWallets = {};
+  if (game.playerWallets[ownerId] === undefined) {
+    game.playerWallets[ownerId] = game.gold;
+  }
+  const wallet = (Network.mode === 'HOST') ? game.playerWallets[ownerId] : game.gold;
 
   if (wallet < cost) {
     game.effectManager.spawnText(col * game.grid.cellSize + 20, row * game.grid.cellSize + 20, "CASH INSUFFICIENT!", '#e74c3c');
@@ -392,5 +389,10 @@ export function spawnZombie(game, type) {
 
   if (e) {
     game.enemies.push(e);
+    
+    // Play a friendly blocky zombie growl occasionally
+    if (Math.random() < 0.25) {
+      soundManager.playZombieGrunt();
+    }
   }
 }

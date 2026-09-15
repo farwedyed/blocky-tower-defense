@@ -33,15 +33,19 @@ function getStorageItem(key) {
  * falling back gracefully to traditional window.localStorage.
  */
 function setStorageItem(key, value) {
+  // Always save to localStorage first so Guest players never lose progress
+  try {
+    localStorage.setItem(key, value);
+  } catch(e) {}
+
+  // Also sync to CrazyGames cloud if available
   if (CrazyGamesManager.isInitialized && typeof window !== 'undefined' && window.CrazyGames && window.CrazyGames.SDK && window.CrazyGames.SDK.data) {
     try {
       window.CrazyGames.SDK.data.setItem(key, value);
-      return;
     } catch (e) {
       console.warn("[CrazyGames Data] setItem failed, falling back to localStorage", e);
     }
   }
-  localStorage.setItem(key, value);
 }
 
 /**
@@ -49,7 +53,6 @@ function setStorageItem(key, value) {
  * @param {object} game - The main game instance
  */
 export async function loadStatsFromStorage(game) {
-  // Wait for SDK initialization if CrazyGames is present to avoid calling getItem too early
   if (typeof window !== 'undefined' && window.CrazyGames && window.CrazyGames.SDK) {
     await CrazyGamesManager.initPromise;
   }
@@ -76,9 +79,6 @@ export async function loadStatsFromStorage(game) {
     if (skins) game.ownedSkins = JSON.parse(skins);
     if (eqSkins) game.equippedSkins = JSON.parse(eqSkins);
     
-    // ─── DAILY QUESTS RESET GATE ───
-    // This strictly checks the calendar date on launch. If the date differs from the last active date,
-    // quest tallies and rewards are securely wiped back to zero to guarantee clean new daily quest goals.
     const todayStr = new Date().toLocaleDateString();
     const lastQuestDate = getStorageItem('tds_last_quest_date');
 
@@ -134,7 +134,6 @@ export async function loadStatsFromStorage(game) {
     console.warn("Storage load failed, adopting defaults.", e);
   }
 
-  // Sanitize arrays to filter out corrupted or null items
   if (Array.isArray(game.unlockedAgents)) {
     game.unlockedAgents = game.unlockedAgents.filter(a => a && typeof a === 'string');
   }
@@ -192,6 +191,56 @@ export function saveStatsToStorage(game) {
 }
 
 /**
+ * Calculates, awards, and saves match earnings (coins & XP) based on wave progression and difficulty.
+ * Guaranteed to run on Defeat, Victory, or Quit Lobby.
+ * @param {object} game 
+ * @returns {object} { coinsEarned, xpEarned }
+ */
+export function awardMatchRewards(game) {
+  if (game._rewardsClaimed) {
+    return { coinsEarned: 0, xpEarned: 0 };
+  }
+  game._rewardsClaimed = true;
+
+  const finalWave = game.wave || 0;
+  const mapMult = game.selectedMap === 'tundra' ? 1.5 : game.selectedMap === 'desert' ? 1.25 : 1.0;
+  const diffConfig = game.difficultySettings[game.selectedDifficulty] || { coinMultiplier: 1.0, xpMultiplier: 1.0 };
+  const isHc = game.isHardcore;
+
+  // Base rewards scaled by waves defended and difficulty
+  let coinsEarned = Math.round((10 + finalWave * 5) * mapMult * diffConfig.coinMultiplier);
+  let xpEarned = Math.round((15 + finalWave * 4) * mapMult * diffConfig.xpMultiplier);
+
+  if (game.state === 'victory' && isHc) {
+    coinsEarned *= 3;
+    xpEarned *= 3;
+  }
+
+  game.playerCoins += coinsEarned;
+  game.playerXp += xpEarned;
+
+  // Level up check
+  const nextLevelXp = game.playerLevel * 100;
+  if (game.playerXp >= nextLevelXp) {
+    game.playerXp -= nextLevelXp;
+    game.playerLevel++;
+    soundManager.playUpgrade();
+    if (game.effectManager) {
+      game.effectManager.spawnText(400, 200, `LEVEL UP! LEVEL ${game.playerLevel}`, '#f1c40f');
+    }
+  }
+
+  saveStatsToStorage(game);
+
+  // Immediately update lobby meta UI so coin and XP counts are reflected accurately
+  if (game.ui && game.ui.lobby) {
+    game.ui.lobby.updateLobbyMeta(game.playerLevel, game.playerXp, game.playerCoins);
+  }
+
+  return { coinsEarned, xpEarned };
+}
+
+/**
  * Checks for completed daily quests and awards coins.
  * @param {object} game - The main game instance
  */
@@ -230,7 +279,6 @@ export function checkQuestCompletion(game) {
     game.effectManager.spawnText(400, 200, 'QUEST COMPLETE! +50 Coins', '#f1c40f');
   }
   
-  // Gated check: only allow completing Farms Placed if Farm is unlocked
   if (game.unlockedAgents.includes('farm') && !game.questRewarded.farmsPlaced && (game.questProgress.farmsPlaced || 0) >= goals.farmsPlaced) {
     game.questRewarded.farmsPlaced = true;
     game.playerCoins += 60;

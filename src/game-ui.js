@@ -4,6 +4,7 @@
 import { soundManager } from './sound.js';
 import { Network } from './network.js';
 import { CrazyGamesManager } from './crazygames.js';
+import { awardMatchRewards } from './game-storage.js';
 
 export class GameUI {
   constructor(game, parentUI) {
@@ -70,26 +71,31 @@ export class GameUI {
     }
 
     this.btnReturnLobby.addEventListener('click', () => {
-      this.game.quitToLobby();
+      soundManager.playTick(); // Add click sound
+      this.game.quitToLobby(true); // Force fully leaving/disconnecting from the co-op match
     });
 
     this.btnNextWave.addEventListener('click', () => {
+      soundManager.playTick(); // Add click sound
       this.game.startNextWave();
     });
 
     if (this.btnSkipWave) {
       this.btnSkipWave.addEventListener('click', () => {
+        soundManager.playTick(); // Add click sound
         this.game.voteSkipWave();
       });
     }
 
     this.btnSpeed.addEventListener('click', () => {
+      soundManager.playTick(); // Add click sound
       if (Network.mode === 'CLIENT') return;
       this.game.toggleSpeed();
     });
 
     if (this.btnAutoWave) {
       this.btnAutoWave.addEventListener('click', () => {
+        soundManager.playTick(); // Add click sound
         this.game.toggleAutoMode();
       });
     }
@@ -449,6 +455,7 @@ export class GameUI {
         }
 
         btn.addEventListener('click', () => {
+          soundManager.playTick(); // Add click sound
           document.querySelectorAll('.placement-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
           this.game.setSelectedShopTower(type);
@@ -501,7 +508,8 @@ export class GameUI {
       });
 
       if (this.btnSkipWave) {
-        const showSkip = this.game.waveInProgress && this.game.wave < this.game.maxWaves;
+        // Only allow showing Skip Wave controls on the Host machine
+        const showSkip = this.game.waveInProgress && this.game.wave < this.game.maxWaves && Network.mode !== 'CLIENT';
         if (showSkip) {
           this.btnSkipWave.style.display = 'block';
           this.btnSkipWave.classList.remove('hidden');
@@ -538,6 +546,15 @@ export class GameUI {
         }
       }
 
+      if (this.btnAutoWave) {
+        if (Network.mode === 'CLIENT') {
+          this.btnAutoWave.style.display = 'none';
+          this.btnAutoWave.classList.add('hidden');
+        } else {
+          this.btnAutoWave.style.display = 'block';
+          this.btnAutoWave.classList.remove('hidden');
+        }
+      }
       // Update unit placement limit badge
       const limitBadge = document.getElementById('placement-limit-badge');
       if (limitBadge) {
@@ -740,16 +757,27 @@ export class GameUI {
 
   updateAutoWaveButton(isOn) {
     if (!this.btnAutoWave) return;
+    
+    if (Network.mode === 'CLIENT') {
+      this.btnAutoWave.style.display = 'none';
+      this.btnAutoWave.classList.add('hidden');
+      return;
+    }
+
     if (isOn) {
       this.btnAutoWave.textContent = 'AUTO WAVE: ON';
       this.btnAutoWave.style.background = '#27ae60';
       this.btnAutoWave.style.color = '#fff';
       this.btnAutoWave.style.opacity = '1.0';
+      this.btnAutoWave.style.display = 'block';      // Ensure visible for Host
+      this.btnAutoWave.classList.remove('hidden');
     } else {
       this.btnAutoWave.textContent = 'AUTO WAVE: OFF';
       this.btnAutoWave.style.background = '#7f8c8d';
       this.btnAutoWave.style.color = '#fff';
       this.btnAutoWave.style.opacity = '0.85';
+      this.btnAutoWave.style.display = 'block';      // Ensure visible for Host
+      this.btnAutoWave.classList.remove('hidden');
     }
   }
 
@@ -784,6 +812,12 @@ export class GameUI {
     this.hudMapName.textContent = mapName.toUpperCase();
     this.hidePointer();
 
+    try {
+      soundManager.startAmbience();
+    } catch (e) {
+      console.warn("[Sound] Ambience playback deferred until user interaction:", e);
+    }
+
     if (this.game.tutorialActive) {
       this.showTutorialHint(0.5); 
     }
@@ -794,10 +828,11 @@ export class GameUI {
     this.parentUI.lobbyView.classList.remove('hidden');
     this.dismissCommanderDialog(); 
     
-    // Stop the background environmental soundscape when returning to the lobby!
     soundManager.stopAmbience();
 
     if (this.parentUI.lobby) {
+      // Force immediate update of displayed Coins, Level, and XP in the menu
+      this.parentUI.lobby.updateLobbyMeta(this.game.playerLevel, this.game.playerXp, this.game.playerCoins);
       this.parentUI.lobby.drawAllStaticPreviews();
       this.parentUI.lobby.renderDailyQuests();
       this.parentUI.lobby.renderLeaderboard(this.game.selectedMap);
@@ -809,7 +844,7 @@ export class GameUI {
   }
 
   showTutorialHint(step) {
-    if (!this.game.tutorialActive) return; // Prevent any tutorial calls once deactivated
+    if (!this.game.tutorialActive) return;
     this.dismissCommanderDialog(); 
     if (!this.commanderWrapper) return;
 
@@ -842,8 +877,8 @@ export class GameUI {
         this.game.tutorialCompleted = true;
         this.game.tutorialActive = false; 
         this.game.saveStatsToStorage();
-        this.dismissTutorial(); 
-        CrazyGamesManager.gameplayStart(); // Launch gameplayStart on tutorial completion!
+        this.dismissTutorial();
+        CrazyGamesManager.gameplayStart();
       };
     } else {
       this.btnCommanderAction.textContent = "GOT IT ✓";
@@ -952,6 +987,9 @@ export class GameUI {
     let oldCard = document.getElementById('match-summary-card');
     if (oldCard) oldCard.remove();
 
+    // Awards and persists match rewards immediately on summary appearance
+    const rewards = awardMatchRewards(this.game);
+
     const summaryCard = document.createElement('div');
     summaryCard.id = 'match-summary-card';
     summaryCard.className = 'summary-card-anim';
@@ -959,11 +997,11 @@ export class GameUI {
       background: rgba(20, 30, 50, 0.98);
       border: 4px solid ${isVictory ? '#f1c40f' : '#e74c3c'};
       box-shadow: 0 0 25px ${isVictory ? 'rgba(241,196,15,0.4)' : 'rgba(231,76,60,0.4)'};
-      border-radius: 16px;
-      padding: 16px 20px 20px 20px;
+      border-radius: 14px;
+      padding: 10px 16px 14px 16px;
       width: 360px;
       max-width: 90%;
-      max-height: 95vh;
+      max-height: 88vh;
       overflow-y: auto;
       text-align: center;
       position: absolute;
@@ -981,16 +1019,8 @@ export class GameUI {
     const durationS = Math.floor(this.game.matchTime % 60);
     const durationStr = `${String(durationM).padStart(2, '0')}:${String(durationS).padStart(2, '0')}`;
 
-    const mapMult = this.game.selectedMap === 'tundra' ? 1.5 : this.game.selectedMap === 'desert' ? 1.25 : 1.0;
-    const isHc = this.game.isHardcore;
-
-    let baseCoins = Math.round((10 + finalWave * 5) * mapMult);
-    let baseXP = Math.round((15 + finalWave * 4) * mapMult);
-
-    if (isVictory && isHc) {
-      baseCoins *= 3;
-      baseXP *= 3;
-    }
+    const baseCoins = rewards.coinsEarned;
+    const baseXP = rewards.xpEarned;
 
     let reviveButtonHtml = '';
     if (!isVictory && !this.game.hasRevivedThisMatch) {
@@ -999,10 +1029,15 @@ export class GameUI {
           background: #27ae60;
           color: #fff;
           width: 100%;
-          font-size: 1.1rem;
-          margin-bottom: 8px;
-          box-shadow: 0 4px 0 #219653, 0 4px 0 var(--border-color);
-        ">📺 WATCH AD TO REVIVE (+50 LIVES)</button>
+          font-size: 1.0rem;
+          padding: 10px;
+          margin-bottom: 6px;
+          box-shadow: 0 3px 0 #219653, 0 3px 0 var(--border-color);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+        "><span style="display:inline-block; border: 2px solid #fff; border-radius: 3px; padding: 1px 5px; font-size: 0.8em; line-height: 1;">▶</span> WATCH AD TO REVIVE (+50 LIVES)</button>
       `;
     }
 
@@ -1012,23 +1047,23 @@ export class GameUI {
     if (!feedbackSubmittedBefore) {
       feedbackFormHtml = `
         <div id="summary-feedback-container" style="
-          margin-top: 14px;
+          margin-top: 10px;
           background: rgba(241, 196, 15, 0.04);
           border: 2px dashed rgba(241, 196, 15, 0.3);
-          border-radius: 10px;
-          padding: 10px 12px;
+          border-radius: 8px;
+          padding: 8px 10px;
           text-align: left;
           transition: all 0.2s ease;
         ">
           <label for="input-feedback-msg" style="
             font-family: var(--font-title);
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             font-weight: 900;
             color: #f1c40f;
             display: flex;
             align-items: center;
             gap: 6px;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             text-shadow: 1px 1px 0 #000;
           ">
             📝 HELP IMPROVE THE GAME! (SUGGESTIONS & BUGS)
@@ -1036,38 +1071,48 @@ export class GameUI {
           <div style="display:flex; gap:6px; align-items: center;">
             <input type="text" id="input-feedback-msg" placeholder="Write feedback here..." style="
               flex: 1;
-              font-size: 0.8rem;
-              padding: 6px;
+              font-size: 0.75rem;
+              padding: 5px;
               border: 2px solid var(--border-color);
               border-radius: 6px;
               outline: none;
             "/>
-            <button id="btn-submit-feedback" class="btn btn-primary" style="font-size: 0.72rem; padding: 6px 12px; margin: 0; min-height: 32px;">SEND</button>
+            <button id="btn-submit-feedback" class="btn btn-primary" style="font-size: 0.68rem; padding: 5px 10px; margin: 0; min-height: 28px;">SEND</button>
           </div>
         </div>
       `;
     }
 
+    let returnButtonsHtml = '';
+    if (Network.mode !== 'OFFLINE') {
+      returnButtonsHtml = `
+        <button id="btn-summary-close" class="btn btn-primary" style="width:100%; font-size:1.0rem; padding:10px; margin-top:8px; box-shadow:0 3px 0 var(--primary-blue-dark), 0 3px 0 var(--border-color);">RETURN TO SQUAD LOBBY</button>
+        <button id="btn-summary-disconnect" class="btn btn-secondary" style="width:100%; font-size:0.85rem; padding:8px; margin-top:6px; background:var(--primary-red); color:#fff; box-shadow:0 2px 0 var(--primary-red-dark), 0 2px 0 var(--border-color);">LEAVE PARTY & EXIT</button>
+      `;
+    } else {
+      returnButtonsHtml = `
+        <button id="btn-summary-close" class="btn btn-primary" style="width:100%; font-size:1.0rem; padding:10px; margin-top:8px; box-shadow:0 3px 0 var(--primary-blue-dark), 0 3px 0 var(--border-color);">RETURN TO MAIN MENU</button>
+      `;
+    }
+
     summaryCard.innerHTML = `
-      <h2 style="font-family:var(--font-title); font-size:1.8rem; margin-bottom:15px; color:${isVictory ? 'var(--primary-yellow)' : 'var(--primary-red)'}">${isVictory ? '🏆 VICTORY' : '💀 DEFEAT'}</h2>
-      <div style="font-size:0.9rem; font-weight:800; margin-bottom:15px;">
-        <p>MAP: <span style="color:var(--primary-blue)">${mapName}</span></p>
-        <p>WAVES DEFENDED: <span style="color:var(--primary-yellow-dark)" id="tally-wave">0</span></p>
-        <p>TIME ELAPSED: <span style="color:#00ffe0" id="tally-time">--:--</span></p>
+      <h2 style="font-family:var(--font-title); font-size:1.5rem; margin-bottom:10px; color:${isVictory ? 'var(--primary-yellow)' : 'var(--primary-red)'}">${isVictory ? '🏆 VICTORY' : '💀 DEFEAT'}</h2>
+      <div style="font-size:0.82rem; font-weight:800; margin-bottom:10px;">
+        <p>MAP: <span style="color:var(--primary-blue)">${mapName}</span> | WAVES: <span style="color:var(--primary-yellow-dark)" id="tally-wave">0</span> | TIME: <span style="color:#00ffe0" id="tally-time">--:--</span></p>
       </div>
-      <div style="display:flex; gap:10px; justify-content:center; font-weight:900; margin-bottom:20px;">
-        <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px; border:2.5px solid var(--border-color); flex:1;">
-          <span style="font-size:0.75rem; color:var(--text-muted)">REWARD COINS</span>
-          <p style="font-size:1.3rem; color:var(--primary-yellow)" id="tally-coins">+<img src="https://img.icons8.com/color/48/coins.png" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 3px;" /> 0</p>
+      <div style="display:flex; gap:8px; justify-content:center; font-weight:900; margin-bottom:12px;">
+        <div style="background:rgba(255,255,255,0.06); padding:6px; border-radius:8px; border:2px solid var(--border-color); flex:1;">
+          <span style="font-size:0.68rem; color:var(--text-muted)">REWARD COINS</span>
+          <p style="font-size:1.1rem; color:var(--primary-yellow)" id="tally-coins">+<img src="https://img.icons8.com/color/48/coins.png" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 2px;" /> 0</p>
         </div>
-        <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px; border:2.5px solid var(--border-color); flex:1;">
-          <span style="font-size:0.75rem; color:var(--text-muted)">REWARD XP</span>
-          <p style="font-size:1.3rem; color:var(--primary-green)" id="tally-xp">+🌟 0 XP</p>
+        <div style="background:rgba(255,255,255,0.06); padding:6px; border-radius:8px; border:2px solid var(--border-color); flex:1;">
+          <span style="font-size:0.68rem; color:var(--text-muted)">REWARD XP</span>
+          <p style="font-size:1.1rem; color:var(--primary-green)" id="tally-xp">+🌟 0 XP</p>
         </div>
       </div>
       ${reviveButtonHtml}
       ${feedbackFormHtml}
-      <button id="btn-summary-close" class="btn btn-primary" style="width:100%; font-size:1.1rem; padding:12px; margin-top:10px; box-shadow:0 4px 0 var(--primary-blue-dark), 0 4px 0 var(--border-color);">RETURN TO LOBBY</button>
+      ${returnButtonsHtml}
     `;
 
     this.overlay.appendChild(summaryCard);
@@ -1120,24 +1165,27 @@ export class GameUI {
     const reviveBtn = document.getElementById('btn-summary-revive');
     if (reviveBtn) {
       reviveBtn.addEventListener('click', () => {
-        // Disable button to prevent spam click while ad is active
         reviveBtn.disabled = true;
         reviveBtn.textContent = "LOADING AD...";
 
         CrazyGamesManager.requestRewardedAd(
           () => {
-            // Success: Revive player!
-            this.game.revivePlayer();
+            if (Network.mode === 'CLIENT') {
+              Network.conn.send({ type: 'REQUEST_TEAM_REVIVE' });
+            } else {
+              this.game.revivePlayer();
+              if (Network.mode === 'HOST') {
+                Network.broadcastToAll({ type: 'TEAM_REVIVE' });
+              }
+            }
             summaryCard.remove();
             this.overlay.className = 'overlay-content hidden';
             this.overlayTitle.classList.remove('hidden');
             this.overlaySubtitle.classList.remove('hidden');
           },
           () => {
-            // Error: Do not grant reward. Re-enable button and show styled alert popup
             reviveBtn.disabled = false;
-            reviveBtn.textContent = "📺 WATCH AD TO REVIVE (+50 LIVES)";
-            this.showInGameAlert("Failed to load rewarded ad. Please try again or check your ad blocker!", "AD LOAD FAILED ⚠️");
+            reviveBtn.innerHTML = `<span style="display:inline-block; border: 2px solid #fff; border-radius: 3px; padding: 1px 5px; font-size: 0.8em; line-height: 1;">▶</span> WATCH AD TO REVIVE (+50 LIVES)`;
           }
         );
       });
@@ -1149,8 +1197,21 @@ export class GameUI {
       this.overlay.className = 'overlay-content hidden';
       this.overlayTitle.classList.remove('hidden');
       this.overlaySubtitle.classList.remove('hidden');
-      this.game.quitToLobby();
+      this.game.quitToLobby(false);
     });
+
+    const disconnectBtn = document.getElementById('btn-summary-disconnect');
+    if (disconnectBtn) {
+      disconnectBtn.addEventListener('click', () => {
+        Network.intentionalDisconnect = true;
+        
+        summaryCard.remove();
+        this.overlay.className = 'overlay-content hidden';
+        this.overlayTitle.classList.remove('hidden');
+        this.overlaySubtitle.classList.remove('hidden');
+        this.game.quitToLobby(true);
+      });
+    }
 
     setTimeout(() => {
       let currentWave = 0;
@@ -1180,7 +1241,7 @@ export class GameUI {
             if (currentCoins < baseCoins) {
               currentCoins += Math.ceil(baseCoins / 15);
               if (currentCoins >= baseCoins) currentCoins = baseCoins;
-              coinsEl.innerHTML = `+<img src="https://img.icons8.com/color/48/coins.png" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 3px;" /> ${currentCoins}`;
+              coinsEl.innerHTML = `+<img src="https://img.icons8.com/color/48/coins.png" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 2px;" /> ${currentCoins}`;
               soundManager.playTick();
             } else {
               clearInterval(coinsTally);
@@ -1194,11 +1255,11 @@ export class GameUI {
                 } else {
                   clearInterval(xpTally);
                 }
-              }, 40);
+              }, 30);
             }
-          }, 40);
+          }, 30);
         }
-      }, 70);
-    }, 400);
+      }, 50);
+    }, 300);
   }
 }

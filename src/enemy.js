@@ -25,10 +25,12 @@ export class Enemy {
     // This provides a progressive, balanced difficulty curve as the rounds advance.
     const waveNum = (window.game && window.game.wave) ? window.game.wave : 1;
     const waveHpMult = 1.0 + (waveNum - 1) * 0.04;
+const isTutorial = window.game && window.game.tutorialActive;
 
-    this.maxHealth = Math.round(stats.maxHealth * hpMult * waveHpMult);
+    // Scale health down to 20% and speed to 60% during tutorial to guarantee single Scout success
+    this.maxHealth = Math.round(stats.maxHealth * hpMult * waveHpMult * (isTutorial ? 0.2 : 1.0));
     this.health = this.maxHealth;
-    this.baseSpeed = stats.speed * spdMult;
+    this.baseSpeed = stats.speed * spdMult * (isTutorial ? 0.6 : 1.0);
     this.speed = this.baseSpeed;
     this.goldReward = stats.goldReward;
     this.radius = stats.radius || 12;

@@ -52,6 +52,7 @@ html, body {
 /* Ensure only explicitly scrollable elements are allowed to scroll vertically */
 #lobby-panels, 
 #game-sidebar, 
+#equipped-agents-list,
 #quests-box,
 #leaderboard-box {
   touch-action: pan-y !important; /* Re-enable precise vertical finger scrolling only on panels */
@@ -393,7 +394,7 @@ body {
 #lobby-content {
   display: flex;
   flex: 1;
-  min-height: 0; /* FIXED: Prevents the lobby content from expanding beyond the window height */
+  min-height: 0;
   gap: 20px;
   overflow: hidden;
 }
@@ -437,11 +438,11 @@ body {
 /* Tab Panels Container with precise padded scrolling boundaries */
 #lobby-panels {
   flex: 1;
-  min-height: 0; /* FIXED: Prevents the panel container from expanding beyond the lobby height */
+  min-height: 0;
   background: var(--panel-light);
   border: 3px solid var(--border-color);
   border-radius: 14px;
-  padding: 20px 24px 20px 20px; /* Slight right pad spacer protects scrollbars */
+  padding: 20px 24px 20px 20px;
   box-shadow: 0 4px 0 var(--border-color);
   overflow-y: auto;
   position: relative;
@@ -450,15 +451,15 @@ body {
 .lobby-panel {
   display: none;
   flex-direction: column;
-  height: auto !important; /* FIXED: Changed from 100% to auto to let panels scroll naturally */
+  height: auto !important;
   gap: 15px;
-  padding-right: 8px; /* Extra protection preventing flush edge clipping */
+  padding-right: 8px;
 }
 
 #panel-shop,
 #panel-loadout,
 #panel-crates {
-  overflow-y: visible !important; /* Let outer lobby-panels handle scrolling */
+  overflow-y: visible !important;
 }
 
 .lobby-panel.active {
@@ -525,6 +526,13 @@ body {
   box-shadow: 0 4px 0 var(--border-color);
 }
 
+.map-preview-canvas {
+  width: 100px !important;
+  height: 75px !important;
+  display: block;
+  border-radius: 6px;
+}
+
 .map-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 0 var(--border-color);
@@ -542,12 +550,12 @@ body {
 .map-info .name {
   display: block;
   font-weight: 800;
-  font-size: 1.1rem;
+  font-size: 0.95rem;
 }
 .map-info .difficulty {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 900;
-  padding: 2px 6px;
+  padding: 2px 5px;
   border-radius: 4px;
 }
 .easy { color: var(--primary-green); }
@@ -578,12 +586,12 @@ body {
   overflow-y: hidden;
   gap: 12px;
   margin: 10px 0;
-  padding: 4px 4px 10px 4px; /* Extra bottom padding gives room for the horizontal scrollbar */
+  padding: 4px 4px 10px 4px;
   scrollbar-width: thin;
 }
 
 .difficulty-wizard-deck::-webkit-scrollbar {
-  height: 8px; /* Horizontal scrollbar height */
+  height: 8px;
 }
 .difficulty-wizard-deck::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.25);
@@ -604,7 +612,6 @@ body {
   position: relative;
   text-align: left;
   
-  /* Ensure cards stretch nicely on wide layouts but scroll smoothly on narrower ones */
   flex: 1 0 150px;
   max-width: 220px;
 }
@@ -620,7 +627,6 @@ body {
   transform: scale(1.03);
 }
 
-/* Difficulty Card Headers with TDS Gradients */
 .diff-card-header {
   padding: 10px 8px;
   text-align: center;
@@ -741,10 +747,10 @@ body {
   box-shadow: 0 2px 0 var(--primary-blue-dark), 0 2px 0 var(--border-color);
 }
 
-/* Agent Shop Cards & expanded proportions to prevent overlaps */
+/* Agent Shop Cards */
 .shop-grid {
   display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important; /* Increased to prevent overlaps */
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
   gap: 16px !important;
 }
 
@@ -791,7 +797,7 @@ body {
 /* Loadout Config Grid */
 .loadout-grid {
   display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(115px, 1fr)) !important; /* Increased to prevent overlaps */
+  grid-template-columns: repeat(auto-fill, minmax(115px, 1fr)) !important;
   gap: 12px !important;
 }
 
@@ -847,13 +853,12 @@ body {
 }
 
 #game-canvas {
-  background-color: #1e2230; /* Dark background matching the theme prevents bright side borders */
+  background-color: #1e2230;
   border: 4px solid var(--border-color);
   border-radius: 12px;
   box-shadow: 0 10px 20px rgba(0,0,0,0.3);
   display: block;
   
-  /* Native Aspect-Ratio fluid scaling is driven by height to prevent vertical cutoff */
   height: 100%;
   width: auto;
   max-width: calc(100% - 40px);
@@ -861,6 +866,7 @@ body {
   aspect-ratio: 4 / 3;
 }
 
+/* CHROMEBOOK & DESKTOP SIDEBAR FIX: Prevent entire sidebar from scrolling; make only agent list scrollable */
 #game-sidebar {
   width: 320px;
   background-color: var(--panel-light);
@@ -868,8 +874,8 @@ body {
   display: flex;
   flex-direction: column;
   padding: 20px;
-  gap: 20px;
-  overflow-y: auto;
+  gap: 16px;
+  overflow: hidden !important; /* Disabled sidebar-wide scroll so HUD/stats stay pinned */
   flex-shrink: 0;
 }
 
@@ -879,6 +885,7 @@ body {
   align-items: center;
   border-bottom: 2px dashed #e2e8f0;
   padding-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .btn-exit {
@@ -894,6 +901,7 @@ body {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .hud-box {
@@ -926,6 +934,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .control-row {
@@ -935,6 +944,16 @@ body {
 
 .control-row .btn {
   flex: 1;
+  height: 52px;
+  min-height: 52px;
+  max-height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.1;
+  padding: 4px 8px;
+  box-sizing: border-box;
 }
 
 .btn-primary {
@@ -949,20 +968,41 @@ body {
   box-shadow: 0 4px 0 var(--border-color);
 }
 
-/* In-game Placement Shop List */
+/* Placement Shop Container */
+#placement-shop {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 #placement-shop h3 {
   font-family: var(--font-title);
   font-size: 0.9rem;
   color: var(--text-dark);
   margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+/* SCROLLABLE AGENT ENTRIES ONLY - JITTER & HORIZONTAL SCROLL PROOF */
+#placement-shop {
+  overflow-x: hidden !important;
 }
 
 #equipped-agents-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  /* Add safe padding at the bottom on PC so placement list never scrolls under absolute upgrade panel */
-  padding-bottom: 180px;
+  overflow-y: scroll !important; /* Permanent track prevents scrollbar pop-in jitter */
+  overflow-x: hidden !important; /* Completely disallows horizontal scrolling */
+  scrollbar-gutter: stable;      /* Prevents layout shift when content height changes */
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 20px;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  touch-action: pan-y !important;
 }
 
 .placement-btn {
@@ -975,13 +1015,17 @@ body {
   padding: 6px 12px;
   cursor: pointer;
   text-align: left;
-  transition: all 0.1s ease;
+  transition: background-color 0.1s ease, border-color 0.1s ease;
   box-shadow: 0 3px 0 var(--border-color);
-  flex-shrink: 0 !important; /* Ensure buttons never squish vertically */
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
 }
 
 .placement-btn:hover {
-  transform: translateX(2px);
+  background: #f8fafc;
 }
 
 .placement-btn.active {
@@ -1023,12 +1067,12 @@ body {
   font-weight: 900;
 }
 
-/* ─── DETACHED ZERO-SCROLL UPGRADE MENU (DESKTOP DEFAULT) ─── */
+/* Detached Upgrade Menu */
 #selection-panel {
   position: absolute;
   bottom: 20px;
   right: 20px;
-  width: 280px; /* Aligns inside the 320px wide sidebar with 20px padding on each side */
+  width: 280px;
   z-index: 10;
   background: #fff8e1;
   border: 3px solid var(--primary-yellow-dark);
@@ -1257,7 +1301,6 @@ body {
   display: none;
 }
 
-/* Stunning gold glow animation */
 @keyframes pulseTutorialHighlight {
   0% {
     border-color: #f1c40f !important;
@@ -1294,16 +1337,16 @@ body {
 #lobby-panels::-webkit-scrollbar-thumb,
 .lobby-panel::-webkit-scrollbar-thumb,
 #panel-shop::-webkit-scrollbar-thumb {
-  background: #475569 !important; /* Solid dark slate thumb - extremely visible! */
+  background: #475569 !important;
   border-radius: 8px !important;
-  border: 3.5px solid #ffffff !important; /* Adds a clean contrasting border */
+  border: 3.5px solid #ffffff !important;
 }
 
 #game-sidebar::-webkit-scrollbar-track,
 #lobby-panels::-webkit-scrollbar-track,
 .lobby-panel::-webkit-scrollbar-track,
 #panel-shop::-webkit-scrollbar-track {
-  background: #f1f5f9 !important; /* Soft grey track background */
+  background: #f1f5f9 !important;
   border-radius: 8px !important;
 }
 
@@ -1459,7 +1502,7 @@ body {
 .dropdown-options,
 .skin-dropdown-options {
   position: absolute;
-  bottom: 100%; /* Render upwards above selection panels */
+  bottom: 100%;
   left: 0;
   right: 0;
   background: #fff;
@@ -1490,7 +1533,6 @@ body {
   background: #e3f2fd;
 }
 
-/* Active Dropdown Highlights (To clearly show which targeting strategy/skin is selected) */
 .dropdown-option.active,
 .skin-option.active {
   background: var(--primary-blue) !important;
@@ -1501,7 +1543,6 @@ body {
    COMPREHENSIVE RESPONSIVE AND COLLAPSIBLE MOBILE LAYOUTS
 ═══════════════════════════════════════════════════════════════ */
 
-/* Touch optimization global rule */
 @media (pointer: coarse) {
   .btn,
   .placement-btn,
@@ -1518,7 +1559,6 @@ body {
   }
 }
 
-/* ── Mobile & Compact Screens (Width <= 1024px OR Height <= 600px) ── */
 @media (max-width: 1024px), (max-height: 600px) {
   #app-container {
     position: absolute !important;
@@ -1535,7 +1575,6 @@ body {
     overflow: hidden;
   }
 
-  /* Compact, Transparent Stats Top-Bar */
   #lobby-header {
     position: absolute;
     top: 0;
@@ -1554,20 +1593,16 @@ body {
     z-index: 1000;
   }
 
-  /* Hide logo area to save space */
   .logo-area {
     display: none !important;
   }
 
-  /* Profile on left, stats on right */
   #cg-profile-widget {
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
     font-weight: 800;
     font-size: 0.9rem;
-  }
-  #cg-profile-widget {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -1579,13 +1614,12 @@ body {
     border-radius: 50%;
   }
 
-  /* Compact top bar */
   .player-meta-box {
     gap: 8px;
   }
 
   .meta-item .label {
-    display: none; /* Hide labels for pure compact bar layout */
+    display: none;
   }
 
   .xp-item {
@@ -1607,15 +1641,15 @@ body {
   }
 
   #lobby-content {
-  display: flex;
-  flex-direction: column;
-  position: absolute;
-  top: 48px;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: calc(100% - 48px);
-}
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 48px;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: calc(100% - 48px);
+  }
 
   #lobby-tabs {
     flex-direction: row;
@@ -1649,7 +1683,7 @@ body {
     border-radius: 0;
     border: none;
     padding: 10px;
-    overflow-y: auto !important; /* FIXED: Force vertical scrolling on compact/minimized screens */
+    overflow-y: auto !important;
   }
 
   .map-grid {
@@ -1675,7 +1709,6 @@ body {
     display: none !important;
   }
 
-  /* ─── ZERO-SCROLL HORIZONTAL SWIPEABLE DIFFICULTIES DECK (MOBILE LANDSCAPE) ─── */
   .difficulty-wizard-deck {
     display: flex !important;
     flex-direction: row !important;
@@ -1685,13 +1718,13 @@ body {
     padding: 4px !important;
     white-space: nowrap !important;
     scroll-snap-type: x mandatory;
-    height: 195px !important; /* Zero scrolling: card heights tightly constrained */
+    height: 195px !important;
     margin: 5px 0 !important;
   }
 
   .diff-wizard-card {
-    flex: 0 0 130px !important; /* Extremely compact cards to ensure 100% visibility on mobile landscapes */
-    height: 180px !important; /* Height increased from 150px to fit all 4 metrics */
+    flex: 0 0 130px !important;
+    height: 180px !important;
     scroll-snap-align: start;
     padding: 0 !important;
     margin: 0 !important;
@@ -1735,7 +1768,6 @@ body {
     height: 12px !important;
   }
 
-  /* Map Select Grid inside Wizard Step 1 */
   #panel-maps .map-grid {
     display: flex !important;
     flex-direction: row !important;
@@ -1768,7 +1800,6 @@ body {
     display: none !important;
   }
 
-  /* Double Column Row for bottom boxes */
   #panel-maps div[style*="display: flex; gap: 20px;"] {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
@@ -1796,7 +1827,6 @@ body {
     font-size: 0.65rem !important;
   }
 
-  /* Auto-Flowing Sized Grids for Shop & Loadout in mobile query */
   .shop-grid {
     display: grid !important;
     grid-template-columns: repeat(auto-fill, minmax(125px, 1fr)) !important;
@@ -1821,7 +1851,6 @@ body {
     padding: 6px !important;
   }
 
-  /* Crates panel */
   #panel-crates .shop-grid {
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
   }
@@ -1835,7 +1864,6 @@ body {
     font-size: 0.65rem !important;
   }
 
-  /* Game View Collapsible Drawer Layout */
   #game-view {
     flex-direction: column;
     height: 100%;
@@ -1859,13 +1887,12 @@ body {
     border: none;
   }
 
-  /* Absolute Sliding Sidebar Drawer */
   #game-sidebar {
     position: absolute;
     left: 0;
     bottom: 0;
     width: 100%;
-    height: 52vh; /* Smoothly occupies bottom half of screen space */
+    height: 52vh;
     border-left: none;
     border-top: 4px solid var(--border-color);
     border-radius: 14px 14px 0 0;
@@ -1874,17 +1901,15 @@ body {
     padding: 10px;
     gap: 10px;
     box-shadow: 0 -8px 25px rgba(0,0,0,0.35);
-    transform: translateY(100%); /* Hidden by default */
+    transform: translateY(100%);
     transition: transform 0.3s cubic-bezier(0.1, 0.9, 0.2, 1);
-    touch-action: pan-y !important; /* Explicit vertical panning allowed */
-    overflow-y: auto !important;
+    overflow: hidden !important;
   }
 
   #game-sidebar.sidebar-open {
-    transform: translateY(0); /* Slide-up animation activation */
+    transform: translateY(0);
   }
 
-  /* Toggle Sidebar Button */
   #btn-toggle-sidebar {
     display: block;
     position: absolute;
@@ -1898,7 +1923,6 @@ body {
     box-shadow: 0 3px 0 var(--primary-blue-dark), 0 3px 0 var(--border-color);
   }
 
-  /* Compressed Game Stats HUD */
   #game-hud {
     grid-template-columns: repeat(3, 1fr);
     gap: 6px;
@@ -1926,17 +1950,20 @@ body {
 
   .control-row .btn {
     font-size: 0.75rem;
-    padding: 8px;
+    padding: 4px 6px;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
   }
 
-  /* Compact Horizontal Flow Placements list inside Drawer */
   #equipped-agents-list {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
     gap: 6px;
-    overflow-y: visible;
-    padding-bottom: 0 !important; /* No extra padding on mobile */
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-bottom: 0 !important;
   }
 
   .placement-btn {
@@ -1963,7 +1990,6 @@ body {
     font-size: 0.7rem;
   }
 
-  /* ─── FLOATING ZERO-SCROLL UPGRADE MENU (MOBILE LANDSCAPE) ─── */
   #selection-panel {
     position: absolute;
     bottom: 20px;
@@ -2026,7 +2052,6 @@ body {
     min-height: 28px;
   }
 
-  /* Compact yellow bordered tutorial box centered at the bottom */
   #tutorial-hint-box {
     position: fixed !important;
     bottom: 12px !important;
@@ -2048,11 +2073,6 @@ body {
     font-size: 1.3rem !important;
   }
 
-  #tutorial-hint-box idv[style*="font-size:1rem"] {
-    font-size: 0.8rem !important;
-    color: #d4ac0d !important;
-  }
-
   #tutorial-hint-box div[style*="font-size:0.85rem"] {
     font-size: 0.7rem !important;
     color: #111 !important;
@@ -2067,7 +2087,6 @@ body {
     color: #1a1a2e !important;
   }
 
-  /* ─── MOBILE LANDSCAPE COMPACT COMMANDER DIALOGUE OVERRIDES ─── */
   @media (max-height: 480px) and (orientation: landscape) {
     #commander-dialog-wrapper {
       bottom: 8px !important;
@@ -2099,7 +2118,6 @@ body {
   }
 }
 
-/* ── Desktop-like Row Panel Layout for all Landscapes (Aspect Ratio > 1.2) ── */
 @media (orientation: landscape), (min-aspect-ratio: 1.2) {
   #game-view {
     flex-direction: row !important;
@@ -2115,13 +2133,13 @@ body {
     height: 100% !important;
     border-top: none !important;
     border-left: 4px solid var(--border-color) !important;
-    transform: none !important; /* Forces solid landscape side-panel, overrides absolute translateY */
+    transform: none !important;
     position: relative !important;
     box-shadow: none !important;
-    overflow-y: auto !important;
+    overflow: hidden !important; /* Sidebar non-scrollable container */
     touch-action: pan-y !important;
     -webkit-overflow-scrolling: touch !important;
-    padding: 8px 8px 80px 8px !important;
+    padding: 8px 8px 12px 8px !important;
     gap: 8px !important;
   }
 
@@ -2132,11 +2150,13 @@ body {
   #equipped-agents-list {
     display: flex !important;
     max-height: none !important;
-    overflow-y: visible !important;
+    overflow-y: auto !important; /* Only agent list scrolls */
+    overflow-x: hidden !important;
     flex-direction: column !important;
     flex-wrap: nowrap !important;
-    flex-shrink: 0 !important;
-    padding-bottom: 80px !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+    padding-bottom: 20px !important;
   }
 
   .placement-btn {
@@ -2144,4 +2164,10 @@ body {
     flex-direction: row !important;
     flex-shrink: 0 !important;
   }
+}
+
+#btn-wizard-next-maps {
+  font-size: 1.15rem !important;
+  padding: 10px 16px !important;
+  margin-top: 10px !important;
 }

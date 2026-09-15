@@ -345,6 +345,43 @@ class SoundManager {
     this._makeOsc('sawtooth', 180, 45, 0.8, 0.45);
   }
 
+  // ── playZombieGrunt: low-frequency muffled blocky growl (PEGI 12 compliant) ──
+  playZombieGrunt() {
+    if (!this._canPlay('zombieGrunt', 1500)) return; // Limit to once every 1.5s to keep it atmospheric and not annoying
+    const ctx = this._getCtx();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const dur = 0.35;
+      
+      // Low growly sawtooth oscillator
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(110, now);
+      osc.frequency.linearRampToValueAtTime(70, now + dur);
+
+      // Lowpass filter keeps the sound muffled and cartoonish
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(320, now);
+      filter.frequency.linearRampToValueAtTime(160, now + dur);
+
+      const gain = ctx.createGain();
+      const vol = 0.12 * this.masterVolume; // Muffled, comfortable background volume
+      gain.gain.setValueAtTime(vol, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + dur + 0.01);
+    } catch (e) {
+      console.warn("[SoundManager] Failed to play zombie grunt:", e);
+    }
+  }
+
   setEnabled(val) { 
     this.enabled = !!val; 
     if (!this.enabled) {
