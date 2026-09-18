@@ -360,6 +360,30 @@ export const Network = {
             }
         }
 
+        // Match Game Over (Victory / Defeat Synchronization for Joined Players)
+        else if (data.type === 'GAME_OVER') {
+            if (this.game && this.game.state === 'playing') {
+                this.game.state = data.isVictory ? 'victory' : 'gameover';
+                this.game.wave = data.wave !== undefined ? data.wave : this.game.wave;
+                
+                CrazyGamesManager.gameplayStop();
+
+                if (data.isVictory) {
+                    soundManager.playVictory();
+                    this.game.saveSpeedrunRecord();
+                } else {
+                    soundManager.playDefeat();
+                }
+
+                this.game.saveStatsToStorage();
+
+                if (this.game.ui) {
+                    this.game.ui.updateHUD(this.game.lives, this.game.gold, this.game.wave, this.game.maxWaves);
+                    this.game.ui.showMatchSummaryCard(data.isVictory);
+                }
+            }
+        }
+
         // Replicated Game State (Client side)
         else if (data.type === 'GAME_STATE' && this.mode === 'CLIENT') {
             this.applyGameState(data);
@@ -457,6 +481,18 @@ export const Network = {
         this.game.wave = data.wave;
         this.game.waveInProgress = data.waveInProgress;
         this.game.speedMultiplier = data.speedMultiplier !== undefined ? data.speedMultiplier : 1;
+
+        // Instant fallback: If synced lives reach 0, immediately trigger Defeat screen
+        if (this.game.lives <= 0 && this.game.state === 'playing') {
+            this.game.state = 'gameover';
+            CrazyGamesManager.gameplayStop();
+            soundManager.playDefeat();
+            this.game.saveStatsToStorage();
+            if (this.game.ui) {
+                this.game.ui.showMatchSummaryCard(false);
+            }
+            return;
+        }
         this.game.skipVotesCount = data.skipVotesCount !== undefined ? data.skipVotesCount : 0;
         this.game.skipVotesRequired = data.skipVotesRequired !== undefined ? data.skipVotesRequired : 1;
 
