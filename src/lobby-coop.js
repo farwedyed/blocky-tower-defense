@@ -303,6 +303,10 @@ export class LobbyCoop {
 
     if (btnSelectSolo) {
       btnSelectSolo.addEventListener('click', () => {
+        // If the player was previously hosting or connected to a room, disconnect cleanly
+        if (Network.mode !== 'OFFLINE') {
+          Network.disconnect();
+        }
         Network.mode = 'OFFLINE';
         const splash = document.getElementById('lobby-splash-container');
         if (splash) splash.style.display = 'none';
@@ -317,6 +321,15 @@ export class LobbyCoop {
         
         const matchmakingHeader = document.getElementById('coop-header-panel');
         if (matchmakingHeader) matchmakingHeader.classList.remove('hidden');
+
+        // Ensure connection is active and fetch fresh public squads immediately
+        if (Network.ws && Network.ws.readyState === WebSocket.OPEN) {
+          Network.send({ type: 'GET_ROOMS' });
+        } else {
+          Network.init(this.game, () => {
+            Network.send({ type: 'GET_ROOMS' });
+          });
+        }
       });
     }
 
@@ -328,6 +341,10 @@ export class LobbyCoop {
       btnRefreshServers.addEventListener('click', () => {
         if (Network.ws && Network.ws.readyState === WebSocket.OPEN) {
           Network.send({ type: 'GET_ROOMS' });
+        } else {
+          Network.init(this.game, () => {
+            Network.send({ type: 'GET_ROOMS' });
+          });
         }
       });
     }
@@ -447,6 +464,10 @@ export class LobbyCoop {
 
           const labelRoomCode = document.getElementById('label-room-code');
           if (labelRoomCode) labelRoomCode.textContent = `ROOM CODE: ${code.toUpperCase()}`;
+
+          // Unhide the copy link button for joined players
+          const copyCodeBtn = document.getElementById('btn-copy-code');
+          if (copyCodeBtn) copyCodeBtn.classList.remove('hidden');
           
           if (labelStatus) {
             labelStatus.textContent = "IN SQUAD (WAITING FOR LEADER)";
@@ -462,7 +483,7 @@ export class LobbyCoop {
     const btnCopyCode = document.getElementById('btn-copy-code');
     if (btnCopyCode) {
       btnCopyCode.addEventListener('click', () => {
-        const rawCode = Network.peer ? Network.peer.id.toUpperCase() : "";
+        const rawCode = (Network.roomId || (Network.peer && Network.peer.id ? Network.peer.id : "")).toUpperCase();
         if (rawCode) {
           CrazyGamesManager.getInviteLink(rawCode.toLowerCase()).then((inviteUrl) => {
             navigator.clipboard.writeText(inviteUrl).then(() => {

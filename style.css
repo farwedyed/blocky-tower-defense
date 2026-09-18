@@ -844,25 +844,35 @@ body {
 
 #game-wrapper {
   position: relative;
-  flex-grow: 1;
-  background-color: var(--bg-game);
+  flex: 1 1 auto;
+  background-color: #1a2230;
   display: flex;
   justify-content: center;
   align-items: center;
   height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* 4:3 Aspect Ratio Frame: Anchors Commander dialogue directly over the map */
+#canvas-container {
+  position: relative;
+  height: 100%;
+  max-height: 100%;
+  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #game-canvas {
   background-color: #1e2230;
-  border: 4px solid var(--border-color);
-  border-radius: 12px;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+  border: 3px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.35);
   display: block;
-  
-  height: 100%;
-  width: auto;
-  max-width: calc(100% - 40px);
-  max-height: calc(100% - 40px);
+  width: 100% !important;
+  height: 100% !important;
   aspect-ratio: 4 / 3;
 }
 
@@ -1353,16 +1363,16 @@ body {
 /* ─── "THE COMMANDER" TUTORIAL DIALOGUE WRAPPERS ─── */
 #commander-dialog-wrapper {
   position: absolute;
-  bottom: 16px;
-  left: 16px;
+  bottom: 12px;
+  left: 12px;
   display: flex;
   align-items: flex-end;
-  gap: 12px;
+  gap: 10px;
   z-index: 2000;
   pointer-events: auto;
   font-family: var(--font-body);
-  max-width: 420px;
-  width: 85vw;
+  max-width: 380px;
+  width: calc(100% - 24px);
   animation: commanderSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -2121,11 +2131,33 @@ body {
 @media (orientation: landscape), (min-aspect-ratio: 1.2) {
   #game-view {
     flex-direction: row !important;
+    width: 100% !important;
+    height: 100% !important;
   }
 
   #game-wrapper {
-    flex: 1.5 !important;
+    flex: 1 1 auto !important;
+    width: calc(100% - 270px) !important;
     height: 100% !important;
+    overflow: hidden !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+
+  #canvas-container {
+    height: 100% !important;
+    aspect-ratio: 4 / 3 !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+  }
+
+  #game-canvas {
+    width: 100% !important;
+    height: 100% !important;
+    aspect-ratio: 4 / 3 !important;
+    border: 3px solid var(--border-color) !important;
+    border-radius: 8px !important;
   }
 
   #game-sidebar {

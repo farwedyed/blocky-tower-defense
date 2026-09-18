@@ -226,18 +226,14 @@ export const CrazyGamesManager = {
    * @param {boolean} isJoinable
    */
   updateRoomPresence: function(roomId, isJoinable) {
-    // GUARD: Do NOT call updateRoom if player has left or is offline!
-    if (typeof window.Network !== 'undefined' && (window.Network.mode === 'OFFLINE' || !window.Network.roomId)) {
-      return;
-    }
     if (this.sdk && this.isInitialized && roomId) {
       try {
         this.sdk.game.updateRoom({
-          roomId: roomId,
-          isJoinable: isJoinable,
-          inviteParams: { roomId: roomId }
+          roomId: roomId.toLowerCase(),
+          isJoinable: !!isJoinable,
+          inviteParams: { roomId: roomId.toLowerCase() }
         });
-        console.log('[CrazyGames] Platform room state sync:', roomId, 'Joinable:', isJoinable);
+        console.log('[CrazyGames] Platform room state sync:', roomId.toLowerCase(), 'Joinable:', !!isJoinable);
       } catch (e) {
         console.warn('[CrazyGames] Failed to update presence:', e);
       }
@@ -250,8 +246,10 @@ export const CrazyGamesManager = {
   leaveRoomPresence: function() {
     if (this.sdk && this.isInitialized) {
       try {
+        // Set isJoinable to false first, then notify leftRoom
+        this.sdk.game.updateRoom({ isJoinable: false });
         this.sdk.game.leftRoom();
-        console.log('[CrazyGames] Notified left room.');
+        console.log('[CrazyGames] Notified left room and closed presence.');
       } catch (e) {
         console.warn('[CrazyGames] Left room failure:', e);
       }

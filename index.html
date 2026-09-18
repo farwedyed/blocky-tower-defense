@@ -637,11 +637,30 @@
       <div id="game-wrapper">
         <!-- Mobile Toggle Menu Button -->
         <button id="btn-toggle-sidebar" class="btn">☰ SHOP & MENU</button>
-        <canvas id="game-canvas" width="800" height="600"></canvas>
-        <div id="game-overlay" class="hidden">
-          <div class="overlay-content">
-            <h1 id="overlay-title">MATCH OVER</h1>
-            <p id="overlay-subtitle">Click anywhere to return to Lobby</p>
+        
+        <!-- Responsive 4:3 Canvas Frame: Anchors in-game overlays flush over the map -->
+        <div id="canvas-container">
+          <canvas id="game-canvas" width="800" height="600"></canvas>
+          <div id="game-overlay" class="hidden">
+            <div class="overlay-content">
+              <h1 id="overlay-title">MATCH OVER</h1>
+              <p id="overlay-subtitle">Click anywhere to return to Lobby</p>
+            </div>
+          </div>
+
+          <!-- "THE COMMANDER" TUTORIAL DIALOG HUB: Anchored INSIDE the battlefield -->
+          <div id="commander-dialog-wrapper" class="hidden">
+            <div class="commander-avatar-panel">
+              <canvas id="commander-face-canvas" width="70" height="70"></canvas>
+              <span class="commander-name-tag">COMMANDER</span>
+            </div>
+            <div class="commander-speech-balloon">
+              <p id="commander-dialog-text">Awaiting operational instructions, survivor.</p>
+              <div style="display: flex; gap: 8px; align-self: flex-end;">
+                <button id="btn-commander-skip" class="btn btn-secondary" style="font-size: 0.72rem; padding: 4px 10px; background: #95a5a6; color: white; border-width: 2px; margin: 0; display: none;">SKIP TUTORIAL</button>
+                <button id="btn-commander-action" class="btn">GOT IT ✓</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -714,21 +733,6 @@
           </div>
         </div>
       </section>
-
-      <!-- "THE COMMANDER" TUTORIAL DIALOG HUB -->
-      <div id="commander-dialog-wrapper" class="hidden">
-        <div class="commander-avatar-panel">
-          <canvas id="commander-face-canvas" width="70" height="70"></canvas>
-          <span class="commander-name-tag">COMMANDER</span>
-        </div>
-        <div class="commander-speech-balloon">
-          <p id="commander-dialog-text">Awaiting operational instructions, survivor.</p>
-          <div style="display: flex; gap: 8px; align-self: flex-end;">
-            <button id="btn-commander-skip" class="btn btn-secondary" style="font-size: 0.72rem; padding: 4px 10px; background: #95a5a6; color: white; border-width: 2px; margin: 0; display: none;">SKIP TUTORIAL</button>
-            <button id="btn-commander-action" class="btn">GOT IT ✓</button>
-          </div>
-        </div>
-      </div>
 
     </div>
 

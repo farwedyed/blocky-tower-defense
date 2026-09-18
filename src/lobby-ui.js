@@ -240,36 +240,28 @@ export class LobbyUI {
     }
 
     // Centralized Event Delegation to handle Navigation Back buttons perfectly
-    // Centralized Event Delegation to handle Navigation Back buttons perfectly
     document.addEventListener('click', (e) => {
       const backBtn = e.target.closest('#btn-back-to-modes-solo, #btn-back-to-modes-coop');
       if (backBtn) {
         e.preventDefault();
         soundManager.playTick();
         
-        // Clean up connections if they are in co-op mode and changing modes
-        if (backBtn.id === 'btn-back-to-modes-coop') {
+        // Always disconnect cleanly if leaving co-op mode via ANY change mode button
+        if (Network.mode !== 'OFFLINE') {
           try {
-            // Suppress connection failure popup
             Network.intentionalDisconnect = true;
-
-            // Cancel active connection watchdogs
             if (Network.connectionTimeout) clearTimeout(Network.connectionTimeout);
             if (Network.connectionWatchdog) clearTimeout(Network.connectionWatchdog);
 
-            // 1. Notify CrazyGames that the player has left
             CrazyGamesManager.leaveRoomPresence();
 
-            // 2. Clean URL params
             const url = new URL(window.location.href);
             if (url.searchParams.has('roomId')) {
               url.searchParams.delete('roomId');
               window.history.replaceState({}, document.title, url.pathname + url.search);
             }
 
-            // 3. Disconnect cleanly from cloud server
             Network.disconnect();
-
           } catch(err) {
             console.warn("Disconnection error handled gracefully:", err);
           }

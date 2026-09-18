@@ -123,17 +123,26 @@ export const Network = {
     },
 
     disconnect: function() {
+        const leavingRoomId = this.roomId;
         this.mode = 'OFFLINE';
         this.roomId = null;
         window.lobbyPlayers = { p1: "Host Survivor", p2: "", p3: "", p4: "", p5: "", p6: "", p7: "", p8: "" };
         window.myPlayerId = "p1";
         window.playerCursors = {};
 
-        // Explicitly notify CrazyGames platform of exit
+        // 1. Notify CrazyGames platform of exit
         CrazyGamesManager.leaveRoomPresence();
 
+        // 2. Send LEAVE_ROOM and close socket so the server 100% registers the exit
         if (this.ws) {
-            try { this.ws.close(); } catch(e) {}
+            if (this.ws.readyState === WebSocket.OPEN && leavingRoomId) {
+                try {
+                    this.ws.send(JSON.stringify({ type: 'LEAVE_ROOM', roomId: leavingRoomId }));
+                } catch(e) {}
+            }
+            try {
+                this.ws.close();
+            } catch(e) {}
             this.ws = null;
         }
     },
@@ -193,9 +202,11 @@ export const Network = {
         else if (data.type === 'LOBBY_UPDATE') {
             window.lobbyPlayers = data.lobbyPlayers;
             
-            // Sync isJoinable across BOTH Leader and Members
+            // In the lobby, the room IS ALWAYS JOINABLE AND INVITABLE for all players as long as slots < 8
             const currentPlayers = Object.values(window.lobbyPlayers).filter(p => p && p.trim() !== '').length;
-            const isJoinable = (currentPlayers < 8) && (this.game ? !this.game.waveInProgress && this.game.state !== 'playing' : true);
+            const inLobby = !this.game || this.game.state === 'lobby';
+            const isJoinable = (currentPlayers < 8) && inLobby;
+
             if (this.roomId) {
                 CrazyGamesManager.updateRoomPresence(this.roomId.toLowerCase(), isJoinable);
             }
@@ -213,9 +224,10 @@ export const Network = {
 
         // Announcement for other clients when a new host takes over
         else if (data.type === 'NEW_LEADER_ANNOUNCED') {
-            if (this.game && this.game.ui) {
-                this.game.ui.showCommanderAnnouncement(`Squad leader left. ${data.leaderName} is now the SQUAD LEADER!`);
-                this.game.ui.updateCoopPlayerList();
+            if (data.assignedId) window.myPlayerId = data.assignedId;
+            if (data.lobbyPlayers) window.lobbyPlayers = data.lobbyPlayers;
+            if (this.game && this.game.ui && this.game.ui.lobby) {
+                this.game.ui.lobby.updateCoopPlayerList();
             }
         }
 
@@ -224,25 +236,33 @@ export const Network = {
             this.mode = 'HOST';
             window.myPlayerId = 'p1';
             if (data.roomId) this.roomId = data.roomId;
+            if (data.lobbyPlayers) window.lobbyPlayers = data.lobbyPlayers;
 
-            // Unhide the privacy toggle for the newly promoted host
+            // Sync new host status with CrazyGames
+            if (this.roomId) {
+                CrazyGamesManager.updateRoomPresence(this.roomId.toLowerCase(), true);
+            }
+
+            // Unhide privacy toggle and copy link icon for newly promoted host
             const hostPrivacyBox = document.getElementById('host-privacy-container');
             if (hostPrivacyBox) hostPrivacyBox.classList.remove('hidden');
+            const copyCodeBtn = document.getElementById('btn-copy-code');
+            if (copyCodeBtn) copyCodeBtn.classList.remove('hidden');
+
+            const labelStatus = document.getElementById('label-lobby-status');
+            if (labelStatus) {
+                labelStatus.textContent = "HOSTING SQUAD LOBBY";
+                labelStatus.style.color = "var(--primary-green-dark)";
+            }
 
             if (this.game && this.game.ui) {
-                // 1. Unlock Map Selection & Deploy controls in the Lobby
+                // Unlock Map Selection & Deploy controls in the Lobby for the new host
                 if (this.game.ui.lobby) {
                     this.game.ui.lobby.toggleSoloElements(true);
+                    this.game.ui.lobby.updateCoopPlayerList();
                 }
 
-                // 2. Update Room Status Label
-                const labelStatus = document.getElementById('label-lobby-status');
-                if (labelStatus) {
-                    labelStatus.textContent = "HOSTING SQUAD LOBBY";
-                    labelStatus.style.color = "var(--primary-green-dark)";
-                }
-
-                // 3. Unlock In-Game Match Controls if a game is currently playing
+                // Unlock In-Game Match Controls if a game is currently playing
                 if (this.game.state === 'playing') {
                     this.game.ui.updateWaveButton(this.game.waveInProgress);
                     this.game.ui.updateAutoWaveButton(this.game.autoMode);
@@ -272,9 +292,6 @@ export const Network = {
                         }
                     }
                 }
-
-                this.game.ui.showCommanderAnnouncement("Party leader left! You are now the SQUAD LEADER.");
-                this.game.ui.updateCoopPlayerList();
             }
         }
 
@@ -288,6 +305,14 @@ export const Network = {
             this.game.state = 'playing';
             this.game.tutorialActive = false;
             this.game.showMapDirections = true;
+
+            // Trigger gameplayStart for connected multiplayer clients as well
+            CrazyGamesManager.gameplayStart();
+
+            // Disable joining once active match begins
+            if (this.roomId) {
+                CrazyGamesManager.updateRoomPresence(this.roomId.toLowerCase(), false);
+            }
             this.game.grid.selectMap(data.selectedMap);
 
             if (data.obstacles) this.game.grid.obstacles = data.obstacles;

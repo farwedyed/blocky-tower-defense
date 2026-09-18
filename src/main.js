@@ -382,6 +382,10 @@ class Game {
     Network.join(roomId.toLowerCase(), activeName, () => {
       const labelRoomCode = document.getElementById('label-room-code');
       if (labelRoomCode) labelRoomCode.textContent = `ROOM CODE: ${roomId.toUpperCase()}`;
+
+      // Unhide copy link button when joining through CrazyGames invite link
+      const copyCodeBtn = document.getElementById('btn-copy-code');
+      if (copyCodeBtn) copyCodeBtn.classList.remove('hidden');
       
       if (labelStatus) {
         labelStatus.textContent = "IN SQUAD (WAITING FOR LEADER)";
@@ -598,6 +602,15 @@ class Game {
       this.updateFullscreenClass();
     });
     
+    // Automatically clean up multiplayer rooms when closing or refreshing the tab
+    const handleTabExit = () => {
+      if (typeof Network !== 'undefined' && Network.mode !== 'OFFLINE' && Network.roomId) {
+        Network.disconnect();
+      }
+    };
+    window.addEventListener('beforeunload', handleTabExit);
+    window.addEventListener('pagehide', handleTabExit);
+
     this.updateFullscreenClass();
   }
 
@@ -674,6 +687,9 @@ class Game {
       this.state = 'playing';
       this.showMapDirections = true;
       this.autoStartTimer = 0; 
+
+      // Notify CrazyGames that active gameplay has officially started
+      CrazyGamesManager.gameplayStart();
       
       this.grid.selectMap(this.selectedMap);
 
@@ -707,7 +723,9 @@ class Game {
         this.tutorialActive = true;
         this.tutorialStep = 0.5; 
         this.selectedShopTower = null;
-        // Do NOT mark tutorialCompleted here! Only mark it complete once they finish Step 4!
+        // Mark tutorial completed permanently so subsequent page refreshes do NOT force-deploy to tutorial
+        this.tutorialCompleted = true;
+        this.saveStatsToStorage();
       } else {
         this.tutorialActive = false;
         this.selectedShopTower = this.equippedAgents[0];
@@ -760,6 +778,10 @@ class Game {
 
   quitToLobby(forceDisconnect = false) {
     this.tutorialActive = false; 
+    this.tutorialCompleted = true;
+    this.waveInProgress = false; // CRITICAL: Reset wave state so isJoinable stays true in lobby
+    this.saveStatsToStorage();
+    CrazyGamesManager.gameplayStop();
 
     // Grant earned coins and XP when quitting mid-match from the game view
     if (this.state === 'playing') {
@@ -768,9 +790,10 @@ class Game {
     
     const returnAction = () => {
       this.state = 'lobby';
+      this.waveInProgress = false;
       this.ui.showLobbyLayout();
-      if (!this.tutorialCompleted && this.tutorialStep === 0) {
-        this.ui.showTutorialHint(0);
+      if (Network.mode === 'HOST' && Network.roomId) {
+        CrazyGamesManager.updateRoomPresence(Network.roomId.toLowerCase(), true);
       }
     };
 
