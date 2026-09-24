@@ -691,7 +691,24 @@ class Game {
     });
 
     window.addEventListener('resize', () => {
+      this.upwindow.addEventListener('resize', () => {
       this.updateFullscreenClass();
+    });
+
+    // Auto-resync when player focuses back into the browser tab
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        this.lastTime = performance.now();
+        if (this.ui) {
+          this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
+          this.ui.updateWaveButton(this.waveInProgress);
+          this.ui.updateAutoWaveButton(this.autoMode);
+          this.ui.updateSpeedButton(this.speedMultiplier);
+        }
+      }
+    });
+    
+    // Automatically clean up multiplayer rooms when closing or refreshing the tabdateFullscreenClass();
     });
     
     // Automatically clean up multiplayer rooms when closing or refreshing the tab

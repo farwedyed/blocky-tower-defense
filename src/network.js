@@ -1,6 +1,6 @@
 /* --- SECURE CLOUD NETWORKING MODULE (AZURE WEBSOCKETS) --- */
 
-import { Enemy, Runner, Quick, Slow, Hidden, Lead, Shadow, Goliath, Templar, GraveDigger, MoltenTitan, FallenGuardian, FallenKing, VoidReaver, Brute, FrostSpirit } from './enemy.js';
+import { Enemy, Runner, Quick, Slow, Hidden, Lead, Shadow, Goliath, Templar, GraveDigger, HazardGiant, MoltenTitan, FallenGuardian, FallenKing, VoidReaver, Brute, FrostSpirit } from './enemy.js';
 import { Scout, Minigunner, Commander, DJUnit, Pyromancer, Farm, Gladiator, Soldier, Sniper, Medic, Rocketeer, Demoman, Freezer, Shotgunner, CrookBoss, MilitaryBase, Ranger, Turret } from './tower.js';
 import { soundManager } from './sound.js';
 import { CrazyGamesManager } from './crazygames.js';
@@ -597,20 +597,35 @@ export const Network = {
                 }
                 const wallet = this.game.playerWallets[cPlayerId];
 
-                if (wallet >= cost && this.game.grid.isCellValidForPlacement(data.col, data.row)) {
+                const posX = data.x !== undefined ? data.x : data.col;
+                const posY = data.y !== undefined ? data.y : data.row;
+                const check = this.game.grid.isPositionValidForPlacement ? this.game.grid.isPositionValidForPlacement(posX, posY, 18) : { valid: true };
+
+                if (wallet >= cost && check.valid) {
                     this.game.selectedShopTower = type;
-                    this.game.placeShopAgent(data.col, data.row, cPlayerId);
+                    this.game.placeShopAgent(posX, posY, cPlayerId);
                 }
             }
         }
         else if (data.type === 'UPGRADE_TOWER') {
             if (this.game) {
-                const tower = this.game.grid.towers.get(`${data.col},${data.row}`);
-                if (tower) {
+                // Find tower by ID, key, pixel location, or grid cell
+                let tower = null;
+                if (data.towerId) tower = this.game.grid.towers.get(data.towerId);
+                if (!tower && data.key) tower = this.game.grid.towers.get(data.key);
+                if (!tower && data.x !== undefined && data.y !== undefined && this.game.grid.getTowerAt) {
+                    tower = this.game.grid.getTowerAt(data.x, data.y, 14);
+                }
+                if (!tower) {
+                    tower = this.game.grid.towers.get(`${data.col},${data.row}`);
+                }
+
+                if (tower && tower.level < 5) {
                     const cost = tower.getUpgradeCost();
                     const wallet = this.game.playerWallets ? this.game.playerWallets[cPlayerId] : this.game.gold;
                     if (wallet >= cost) {
                         tower.upgrade(this.game.effectManager);
+                        soundManager.playUpgrade();
                         if (this.game.playerWallets) {
                             this.game.playerWallets[cPlayerId] -= cost;
                         } else {
@@ -622,10 +637,19 @@ export const Network = {
         }
         else if (data.type === 'SELL_TOWER') {
             if (this.game) {
-                const tower = this.game.grid.towers.get(`${data.col},${data.row}`);
+                let tower = null;
+                if (data.towerId) tower = this.game.grid.towers.get(data.towerId);
+                if (!tower && data.key) tower = this.game.grid.towers.get(data.key);
+                if (!tower && data.x !== undefined && data.y !== undefined && this.game.grid.getTowerAt) {
+                    tower = this.game.grid.getTowerAt(data.x, data.y, 14);
+                }
+                if (!tower) {
+                    tower = this.game.grid.towers.get(`${data.col},${data.row}`);
+                }
+
                 if (tower) {
                     const refund = tower.getSellValue();
-                    this.game.grid.removeTower(data.col, data.row);
+                    this.game.grid.removeTower(tower);
                     if (this.game.playerWallets) {
                         this.game.playerWallets[cPlayerId] += refund;
                     } else {
@@ -669,8 +693,29 @@ export const Network = {
     applyGameState: function(data) {
         this.game.lives = data.lives;
         this.game.wave = data.wave;
+        if (data.maxWaves !== undefined) this.game.maxWaves = data.maxWaves;
         this.game.waveInProgress = data.waveInProgress;
         this.game.speedMultiplier = data.speedMultiplier !== undefined ? data.speedMultiplier : 1;
+
+        // Synchronize Victory/Defeat states even if tab was in background
+        if (data.gameState && data.gameState !== this.game.state) {
+            if (data.gameState === 'victory' && this.game.state === 'playing') {
+                this.game.state = 'victory';
+                CrazyGamesManager.gameplayStop();
+                soundManager.playVictory();
+                this.game.saveSpeedrunRecord();
+                this.game.saveStatsToStorage();
+                if (this.game.ui) this.game.ui.showMatchSummaryCard(true);
+                return;
+            } else if (data.gameState === 'gameover' && this.game.state === 'playing') {
+                this.game.state = 'gameover';
+                CrazyGamesManager.gameplayStop();
+                soundManager.playDefeat();
+                this.game.saveStatsToStorage();
+                if (this.game.ui) this.game.ui.showMatchSummaryCard(false);
+                return;
+            }
+        }
 
         // Instant fallback: If synced lives reach 0, immediately trigger Defeat screen
         if (this.game.lives <= 0 && this.game.state === 'playing') {
@@ -711,10 +756,14 @@ export const Network = {
 
         const activeKeys = new Set();
         data.towers.forEach(tData => {
-            const key = tData.key;
+            const key = tData.key || tData.id;
             activeKeys.add(key);
 
             let tower = this.game.grid.towers.get(key);
+            if (!tower && tData.x !== undefined && tData.y !== undefined && this.game.grid.getTowerAt) {
+                tower = this.game.grid.getTowerAt(tData.x, tData.y, 6);
+            }
+
             if (!tower) {
                 const size = this.game.grid.cellSize;
                 switch (tData.type) {
@@ -738,16 +787,31 @@ export const Network = {
                     case 'turret': tower = new Turret(tData.col, tData.row, size); break;
                 }
                 if (tower) {
+                    tower.id = key;
+                    if (tData.x !== undefined) tower.x = tData.x;
+                    if (tData.y !== undefined) tower.y = tData.y;
                     this.game.grid.towers.set(key, tower);
                 }
             }
+
             if (tower) {
-                tower.level = tData.level;
+                if (tData.x !== undefined) tower.x = tData.x;
+                if (tData.y !== undefined) tower.y = tData.y;
+
+                // Sync level and immediately refresh selection menu if currently selected
+                if (tower.level !== tData.level) {
+                    tower.level = tData.level;
+                    if (this.game.selectedPlacedTower === tower && this.game.ui) {
+                        this.game.ui.updateSelectionPanel(tower);
+                    }
+                }
+
                 tower.equippedSkin = tData.skin;
                 tower.targetingStrategy = tData.targetingStrategy;
                 tower.fireCooldown = tData.fireCooldown;
                 tower.recoilOffset = tData.recoilOffset;
                 tower.angle = tData.angle;
+                tower.ownerId = tData.ownerId;
                 if (!tower.timeAccumulator) tower.timeAccumulator = 0;
             }
         });
@@ -768,13 +832,14 @@ export const Network = {
                 case 'Shadow': return Shadow;
                 case 'Toxic Giant': return Goliath;
                 case 'Templar': return Templar;
+                case 'Brute': return Brute;
                 case 'Grave Digger': return GraveDigger;
+                case 'Hazard Giant': return HazardGiant; // Added Intermediate Boss mapping
                 case 'Molten Titan': return MoltenTitan;
                 case 'Fallen Guardian': return FallenGuardian;
                 case 'Fallen King': return FallenKing;
-                case 'Void Reaver': return VoidReaver;
-                case 'Brute': return Brute;
                 case 'Frost Spirit': return FrostSpirit;
+                case 'Void Reaver': return VoidReaver;
                 default: return Runner;
             }
         };
@@ -853,6 +918,7 @@ export const Network = {
 
         if (this.game.ui) {
             this.game.ui.updateSpeedButton(this.game.speedMultiplier);
+            this.game.ui.updateWaveButton(this.game.waveInProgress); // Keeps START/DEFENDING button in sync
             this.game.ui.updateHUD(this.game.lives, this.game.gold, this.game.wave, this.game.maxWaves);
         }
     },
@@ -898,6 +964,8 @@ export const Network = {
             lives: this.game.lives,
             gold: this.game.gold,
             wave: this.game.wave,
+            maxWaves: this.game.maxWaves, // Synchronize max waves
+            gameState: this.game.state,   // Synchronize match state
             waveInProgress: this.game.waveInProgress,
             speedMultiplier: this.game.speedMultiplier,
             skipVotesCount: this.game.skipVotes ? this.game.skipVotes.size : 0,
@@ -906,7 +974,10 @@ export const Network = {
             playerWallets: this.game.playerWallets || {},
 
             towers: Array.from(this.game.grid.towers.entries()).map(([key, t]) => ({
+                id: t.id || key,
                 key: key,
+                x: Math.round(t.x),
+                y: Math.round(t.y),
                 col: t.gridX,
                 row: t.gridY,
                 type: t.type,
@@ -915,7 +986,8 @@ export const Network = {
                 targetingStrategy: t.targetingStrategy,
                 fireCooldown: t.fireCooldown,
                 recoilOffset: t.recoilOffset,
-                angle: t.angle
+                angle: t.angle,
+                ownerId: t.ownerId
             })),
 
             enemies: this.game.enemies.map(e => ({

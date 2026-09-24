@@ -191,10 +191,19 @@ export function upgradeSelectedTower(game) {
   }
 
   if (Network.mode === 'CLIENT') {
-    Network.conn.send({ type: 'UPGRADE_TOWER', col: tower.gridX, row: tower.gridY });
+    // Send exact tower ID and pixel coordinates so the host finds the tower instantly
+    Network.conn.send({
+      type: 'UPGRADE_TOWER',
+      towerId: tower.id,
+      key: tower.id,
+      x: Math.round(tower.x),
+      y: Math.round(tower.y),
+      col: tower.gridX,
+      row: tower.gridY
+    });
   } else {
     game.gold -= cost;
-    game.playerWallets['p1'] = game.gold;
+    if (game.playerWallets) game.playerWallets['p1'] = game.gold;
 
     game.questProgress.cashSpent += cost;
     checkQuestCompletion(game);
@@ -285,6 +294,12 @@ export function startNextWave(game, isFromSkip = false) {
   if (game.showMapDirections) return;
   if (game.waveInProgress || game.state !== 'playing') return;
 
+  // Never attempt to start a wave past maxWaves
+  if (game.wave >= game.maxWaves) {
+    game.waveInProgress = false;
+    return;
+  }
+
   game.wave++;
   game.waveInProgress = true;
   game.ui.updateWaveButton(true);
@@ -303,7 +318,15 @@ export function startNextWave(game, isFromSkip = false) {
   else if (game.selectedDifficulty === 'fallen') blueprints = game.waveBlueprintsFallen;
 
   const blueprint = blueprints[game.wave - 1];
+  if (!blueprint) {
+    console.warn(`[Wave System] Blueprint missing for wave ${game.wave}.`);
+    game.waveInProgress = false;
+    return;
+  }
+
   const spawnList = [];
+  const bossList = []; // Kept separate so the Boss enters early
+
   for (let i = 0; i < (blueprint.runners || 0); i++) spawnList.push('runner');
   for (let i = 0; i < (blueprint.quicks || 0); i++) spawnList.push('quick');
   for (let i = 0; i < (blueprint.slows || 0); i++) spawnList.push('slow');
@@ -312,22 +335,26 @@ export function startNextWave(game, isFromSkip = false) {
   for (let i = 0; i < (blueprint.shadows || 0); i++) spawnList.push('shadow');
   for (let i = 0; i < (blueprint.goliaths || 0); i++) spawnList.push('goliath');
   for (let i = 0; i < (blueprint.templars || 0); i++) spawnList.push('templar');
-  for (let i = 0; i < (blueprint.brute || 0); i++) spawnList.push('brute');
+
+  // Boss units
+  for (let i = 0; i < (blueprint.brute || 0); i++) bossList.push('brute');
   for (let i = 0; i < (blueprint.diggers || 0); i++) {
-    if (game.selectedDifficulty === 'easy') {
-      spawnList.push('brute'); 
-    } else {
-      spawnList.push('grave_digger');
-    }
+    bossList.push(game.selectedDifficulty === 'easy' ? 'brute' : 'grave_digger');
   }
-  for (let i = 0; i < (blueprint.hazard_giants || 0); i++) spawnList.push('hazard_giant');
-  for (let i = 0; i < (blueprint.titans || 0); i++) spawnList.push('molten_titan');
-  for (let i = 0; i < (blueprint.guardians || 0); i++) spawnList.push('fallen_guardian');
-  for (let i = 0; i < (blueprint.kings || 0); i++) spawnList.push('fallen_king');
-  for (let i = 0; i < (blueprint.reavers || 0); i++) spawnList.push('void_reaver');
+  for (let i = 0; i < (blueprint.hazard_giants || 0); i++) bossList.push('hazard_giant');
+  for (let i = 0; i < (blueprint.titans || 0); i++) bossList.push('molten_titan');
+  for (let i = 0; i < (blueprint.guardians || 0); i++) bossList.push('fallen_guardian');
+  for (let i = 0; i < (blueprint.kings || 0); i++) bossList.push('fallen_king');
+  for (let i = 0; i < (blueprint.reavers || 0); i++) bossList.push('void_reaver');
+
+  // Shuffle minions, then place the Boss near the front (after 3 minions)
+  spawnList.sort(() => Math.random() - 0.5);
+  if (bossList.length > 0) {
+    spawnList.splice(Math.min(3, spawnList.length), 0, ...bossList);
+  }
 
   game.activeSpawners.push({
-    queue: spawnList.sort(() => Math.random() - 0.5),
+    queue: spawnList,
     timer: 0,
     interval: blueprint.rate
   });
