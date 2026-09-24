@@ -163,6 +163,31 @@ export class LobbyWizard {
     const w = canvas.width;
     const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
+
+    const mapSrcs = {
+      grassland: 'assets/maps/grassmap/grassmap.png',
+      desert: 'assets/maps/sandmap/sandmap.png',
+      tundra: 'assets/maps/snowmap/snowmap.png'
+    };
+
+    if (mapSrcs[mapId]) {
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, w, h);
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(0, 0, w, h);
+      };
+      img.src = mapSrcs[mapId];
+      if (img.complete && img.naturalWidth > 0) {
+        ctx.drawImage(img, 0, 0, w, h);
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(0, 0, w, h);
+        return;
+      }
+    }
+
     ctx.save();
     ctx.strokeStyle = '#222';
     ctx.lineWidth = 3;

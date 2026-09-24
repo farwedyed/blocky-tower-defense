@@ -550,11 +550,18 @@ export class GameUI {
         }
 
         btn.addEventListener('click', () => {
-          soundManager.playTick(); // Add click sound
-          document.querySelectorAll('.placement-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          this.game.setSelectedShopTower(type);
-          this.game.setSelectedPlacedTower(null);
+          soundManager.playTick();
+          if (btn.classList.contains('active')) {
+            // Re-clicking deselects the troop and exits placement mode
+            btn.classList.remove('active');
+            this.game.setSelectedShopTower(null);
+          } else {
+            // Select troop for placement
+            document.querySelectorAll('.placement-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            this.game.setSelectedShopTower(type);
+            this.game.setSelectedPlacedTower(null);
+          }
         });
 
         this.equippedAgentsList.appendChild(btn);

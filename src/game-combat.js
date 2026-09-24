@@ -69,10 +69,15 @@ export function evaluateSupportBuffs(game) {
 /**
  * Places an agent at specified tile coordinate, checking limits and wallets.
  */
-export function placeShopAgent(game, col, row, ownerId = 'p1') {
+export function placeShopAgent(game, posX, posY, ownerId = 'p1') {
+  // Support both pixel positions (posX > 30) and legacy tile indices (col, row)
+  const isPixel = posX > 25 || posY > 25;
+  const x = isPixel ? posX : posX * game.grid.cellSize + game.grid.cellSize / 2;
+  const y = isPixel ? posY : posY * game.grid.cellSize + game.grid.cellSize / 2;
+
   const totalPlacedTowers = game.grid.towers.size;
   if (totalPlacedTowers >= 40) {
-    game.effectManager.spawnText(col * game.grid.cellSize + 20, row * game.grid.cellSize + 20, "PLACEMENT LIMIT REACHED (40)", '#e74c3c');
+    game.effectManager.spawnText(x, y, "PLACEMENT LIMIT REACHED (40)", '#e74c3c');
     return;
   }
 
@@ -86,28 +91,29 @@ export function placeShopAgent(game, col, row, ownerId = 'p1') {
   const wallet = (Network.mode === 'HOST') ? game.playerWallets[ownerId] : game.gold;
 
   if (wallet < cost) {
-    game.effectManager.spawnText(col * game.grid.cellSize + 20, row * game.grid.cellSize + 20, "CASH INSUFFICIENT!", '#e74c3c');
+    game.effectManager.spawnText(x, y, "CASH INSUFFICIENT!", '#e74c3c');
     return;
   }
 
   let currentPlacedOfTypeCount = 0;
   for (const t of game.grid.towers.values()) {
-    if (t.type === type) {
-      currentPlacedOfTypeCount++;
-    }
+    if (t.type === type) currentPlacedOfTypeCount++;
   }
 
   // TDS Specific Placement Limits
   const limits = { farm: 8, commander: 3, dj: 1, medic: 3, crook_boss: 4, turret: 5, military_base: 5 };
   if (limits[type] !== undefined && currentPlacedOfTypeCount >= limits[type]) {
     const errorMsg = `LIMIT REACHED! (MAX ${limits[type]} ${type.replace('_', ' ').toUpperCase()}S)`;
-    game.effectManager.spawnText(col * game.grid.cellSize + 20, row * game.grid.cellSize + 20, errorMsg, '#e74c3c');
+    game.effectManager.spawnText(x, y, errorMsg, '#e74c3c');
     return;
   }
 
-  if (game.grid.isCellValidForPlacement(col, row)) {
+  const check = game.grid.isPositionValidForPlacement(x, y, 18);
+  if (check.valid) {
     let newAgent;
     const size = game.grid.cellSize;
+    const col = Math.floor(x / size);
+    const row = Math.floor(y / size);
 
     switch (type) {
       case 'scout': newAgent = new Scout(col, row, size); break;
@@ -132,8 +138,8 @@ export function placeShopAgent(game, col, row, ownerId = 'p1') {
 
     if (newAgent) {
       newAgent.equippedSkin = game.equippedSkins[type] || 'default';
-      newAgent.ownerId = ownerId; 
-      game.grid.placeTower(col, row, newAgent);
+      newAgent.ownerId = ownerId;
+      game.grid.placeTowerAt(x, y, newAgent);
       
       if (Network.mode === 'HOST') {
         if (ownerId === 'p1') {
@@ -211,18 +217,16 @@ export function upgradeSelectedTower(game) {
 export function sellSelectedTower(game) {
   if (!game.selectedPlacedTower) return;
   const tower = game.selectedPlacedTower;
-  const col = tower.gridX;
-  const row = tower.gridY;
 
   if (Network.mode === 'CLIENT') {
-    Network.conn.send({ type: 'SELL_TOWER', col: col, row: row });
+    Network.conn.send({ type: 'SELL_TOWER', id: tower.id, col: tower.gridX, row: tower.gridY });
     game.setSelectedPlacedTower(null);
   } else {
     const refund = game.tutorialActive ? tower.cost : tower.getSellValue();
     game.gold += refund;
-    game.playerWallets['p1'] = game.gold;
+    if (game.playerWallets) game.playerWallets['p1'] = game.gold;
 
-    game.grid.removeTower(col, row);
+    game.grid.removeTower(tower);
     game.effectManager.spawnPlacementSparks(tower.x, tower.y, 40);
     game.setSelectedPlacedTower(null);
     game.ui.updateHUD(game.lives, game.gold, game.wave, game.maxWaves);

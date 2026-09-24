@@ -122,6 +122,7 @@ class Game {
     this.initWaveBlueprints();
     this.initEventListeners();
 
+    
     // Network initialization
     if (typeof Network !== 'undefined') {
       Network.init(this, () => {
@@ -514,9 +515,12 @@ class Game {
   _handleGridInteraction() {
     if (this.state !== 'playing') return;
 
+    const mx = this.mousePos.x;
+    const my = this.mousePos.y;
+
     // Check if Cash Case was clicked
     if (this.activeCashCase && !this.showMapDirections) {
-      const dist = Math.hypot(this.mousePos.x - this.activeCashCase.x, this.mousePos.y - this.activeCashCase.y);
+      const dist = Math.hypot(mx - this.activeCashCase.x, my - this.activeCashCase.y);
       if (dist <= 30) {
         soundManager.playTick();
         this.ui.gameUI.showCashCaseModal(this.activeCashCase);
@@ -526,51 +530,42 @@ class Game {
 
     if (this.showMapDirections) {
       this.showMapDirections = false;
-      
-      if (!this.tutorialActive) {
-        CrazyGamesManager.gameplayStart();
-      }
-
+      if (!this.tutorialActive) CrazyGamesManager.gameplayStart();
       if (this.tutorialActive && this.tutorialStep === 0.5) {
         this.tutorialStep = 1;
         this.ui.showTutorialHint(1);
       }
       return;
     }
-    const col = this.mouseGrid.col;
-    const row = this.mouseGrid.row;
 
-    if (Network.mode === 'CLIENT') {
-      const key = `${col},${row}`;
-      if (this.grid.towers.has(key)) {
-        const agent = this.grid.towers.get(key);
-        this.setSelectedPlacedTower(agent);
-        this.selectedShopTower = null;
-      } else if (this.selectedShopTower) {
+    // Check if player clicked directly on an existing placed tower
+    const clickedTower = this.grid.getTowerAt(mx, my);
+
+    if (clickedTower) {
+      this.setSelectedPlacedTower(clickedTower);
+      this.selectedShopTower = null;
+      soundManager.playTick();
+      return;
+    }
+
+    // If placing a new troop from the shop at exact (x, y)
+    if (this.selectedShopTower) {
+      if (Network.mode === 'CLIENT') {
         const activeSkin = this.equippedSkins[this.selectedShopTower] || 'default';
         Network.conn.send({
           type: 'PLACE_TOWER',
-          col: col,
-          row: row,
+          x: mx,
+          y: my,
+          col: Math.floor(mx / this.grid.cellSize),
+          row: Math.floor(my / this.grid.cellSize),
           targetShopTower: this.selectedShopTower,
           skin: activeSkin
         });
       } else {
-        this.setSelectedPlacedTower(null);
+        this.placeShopAgent(mx, my, window.myPlayerId);
       }
     } else {
-      const key = `${col},${row}`;
-      if (this.grid.towers.has(key)) {
-        const agent = this.grid.towers.get(key);
-        this.setSelectedPlacedTower(agent);
-        this.selectedShopTower = null;
-      } else {
-        if (this.selectedShopTower) {
-          this.placeShopAgent(col, row, window.myPlayerId);
-        } else {
-          this.setSelectedPlacedTower(null);
-        }
-      }
+      this.setSelectedPlacedTower(null);
     }
   }
 
@@ -616,6 +611,14 @@ class Game {
     this.canvas.addEventListener('mouseleave', () => {
       this.isMouseOnCanvas = false;
       this.mouseGrid = { col: -1, row: -1 };
+    });
+
+    // Right-click anywhere on the map cancels placement mode
+    this.canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      this.setSelectedShopTower(null);
+      this.setSelectedPlacedTower(null);
+      document.querySelectorAll('.placement-btn').forEach(b => b.classList.remove('active'));
     });
 
     this.canvas.addEventListener('click', () => {
@@ -681,7 +684,9 @@ class Game {
         this.sellSelectedTower();
       } else if (key === 'escape') {
         e.preventDefault();
+        this.setSelectedShopTower(null);
         this.setSelectedPlacedTower(null);
+        document.querySelectorAll('.placement-btn').forEach(b => b.classList.remove('active'));
       }
     });
 
@@ -815,12 +820,12 @@ class Game {
         this.tutorialActive = true;
         this.tutorialStep = 0.5; 
         this.selectedShopTower = null;
-        // Mark tutorial completed permanently so subsequent page refreshes do NOT force-deploy to tutorial
         this.tutorialCompleted = true;
         this.saveStatsToStorage();
       } else {
         this.tutorialActive = false;
-        this.selectedShopTower = this.equippedAgents[0];
+        // Start match with clean battlefield (no troop pre-selected until clicked)
+        this.selectedShopTower = null;
       }
 
       this.playerWallets = {};
@@ -1321,14 +1326,14 @@ class Game {
   }
 
   getPlayerColor(id) {
-    if (id === 'p1') return '#3498db'; 
-    if (id === 'p2') return '#e67e22'; 
-    if (id === 'p3') return '#2ecc71'; 
-    if (id === 'p4') return '#9b59b6'; 
-    if (id === 'p5') return '#f1c40f'; 
-    if (id === 'p6') return '#e74c3c'; 
-    if (id === 'p7') return '#1abc9c'; 
-    return '#10ac84'; 
+    if (id === 'p1') return '#00d2ff'; // Cyan
+    if (id === 'p2') return '#ff7b00'; // Orange
+    if (id === 'p3') return '#2ecc71'; // Lime Green
+    if (id === 'p4') return '#bd00ff'; // Purple
+    if (id === 'p5') return '#ffd700'; // Gold
+    if (id === 'p6') return '#ff3b30'; // Red
+    if (id === 'p7') return '#ff2d78'; // Pink
+    return '#e0e7ff';                  // Silver
   }
 }
 

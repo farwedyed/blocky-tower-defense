@@ -84,6 +84,39 @@ const ENEMY_SPRITE_MAP = {
 
 const enemyCache = new Map();
 
+// ─── MULTIPLAYER MOUSE CURSOR SPRITES & SHINY THEMES ───
+const MOUSE_SPRITE_MAP = {
+  p1: 'assets/ui/mouses/sprite_04.png', // Cyan
+  p2: 'assets/ui/mouses/sprite_09.png', // Orange
+  p3: 'assets/ui/mouses/sprite_05.png', // Lime Green
+  p4: 'assets/ui/mouses/sprite_01.png', // Purple
+  p5: 'assets/ui/mouses/sprite_03.png', // Gold / Yellow
+  p6: 'assets/ui/mouses/sprite_02.png', // Red
+  p7: 'assets/ui/mouses/sprite_07.png', // Hot Pink
+  p8: 'assets/ui/mouses/sprite_08.png'  // Silver / White
+};
+
+const PLAYER_THEMES = {
+  p1: { color: '#00d2ff', light: '#70eaff', glow: 'rgba(0, 210, 255, 0.7)' },
+  p2: { color: '#ff7b00', light: '#ffaa40', glow: 'rgba(255, 123, 0, 0.7)' },
+  p3: { color: '#2ecc71', light: '#6bf0a3', glow: 'rgba(46, 204, 113, 0.7)' },
+  p4: { color: '#bd00ff', light: '#df70ff', glow: 'rgba(189, 0, 255, 0.7)' },
+  p5: { color: '#ffd700', light: '#ffe866', glow: 'rgba(255, 215, 0, 0.7)' },
+  p6: { color: '#ff3b30', light: '#ff7d75', glow: 'rgba(255, 59, 48, 0.7)' },
+  p7: { color: '#ff2d78', light: '#ff7aa9', glow: 'rgba(255, 45, 120, 0.7)' },
+  p8: { color: '#e0e7ff', light: '#ffffff', glow: 'rgba(224, 231, 255, 0.7)' }
+};
+
+const mouseImageCache = new Map();
+function getMouseSprite(pId) {
+  const src = MOUSE_SPRITE_MAP[pId] || MOUSE_SPRITE_MAP.p1;
+  if (mouseImageCache.has(src)) return mouseImageCache.get(src);
+  const img = new Image();
+  img.src = src;
+  mouseImageCache.set(src, img);
+  return img;
+}
+
 /**
  * Dynamically loads and retrieves a specific enemy sprite file on demand.
  */
@@ -108,7 +141,17 @@ export function preloadUIAssets(onComplete) {
     'assets/ui/background.png',
     'assets/ui/btd2dlogo.png',
     'assets/ui/loadingnotfull.png',
-    'assets/ui/loadingfull.png'
+    'assets/ui/loadingfull.png',
+    'assets/ui/mouses/sprite_01.png',
+    'assets/ui/mouses/sprite_02.png',
+    'assets/ui/mouses/sprite_03.png',
+    'assets/ui/mouses/sprite_04.png',
+    'assets/ui/mouses/sprite_05.png',
+    'assets/ui/mouses/sprite_06.png',
+    'assets/ui/mouses/sprite_07.png',
+    'assets/ui/mouses/sprite_08.png',
+    'assets/ui/mouses/sprite_09.png',
+    'assets/ui/mouses/sprite_10.png'
   ];
 
   let loaded = 0;
@@ -130,6 +173,17 @@ export function preloadUIAssets(onComplete) {
 
 export function preloadAllAssets(onProgress, onComplete) {
   const queue = [];
+
+  // Preload Map Backgrounds
+  const mapUrls = [
+    'assets/maps/grassmap/grassmap.png',
+    'assets/maps/sandmap/sandmap.png',
+    'assets/maps/snowmap/snowmap.png'
+  ];
+  mapUrls.forEach(url => {
+    const img = new Image();
+    queue.push({ type: 'map', key: url, url, img });
+  });
 
   // Add all individual Agent Sprites (5 columns per agent row)
   Object.keys(TOWER_SPRITE_MAP).forEach(type => {
@@ -285,10 +339,13 @@ export function drawAgent(game, agent) {
 
   const recoilX = -agent.recoilOffset;
 
+  // Offset by +5px along local X to center the character's body (accounting for the gun barrel)
+  const bodyOffsetX = (agent.type === 'farm' || agent.type === 'military_base') ? 0 : 5;
+
   const drawSize = agent.cellSize * 1.15;
   ctx.drawImage(
     img,
-    recoilX - drawSize / 2, -drawSize / 2,
+    recoilX - drawSize / 2 + bodyOffsetX, -drawSize / 2,
     drawSize, drawSize
   );
 
@@ -616,62 +673,114 @@ export function draw(game) {
  * Draws ranges, tile indicators, and semi-transparent ghost placement previews.
  */
 export function drawHoverVisuals(game) {
-  if (game.state !== 'playing' || !game.isMouseOnCanvas) return;
+  if (game.state !== 'playing') return;
 
+  const ctx = game.ctx;
+
+  // Selected Placed Tower: Display its attack range ring
   if (game.selectedPlacedTower) {
-    game.ctx.save();
-    game.ctx.globalAlpha = 0.12;
-    game.ctx.fillStyle = game.selectedPlacedTower.color;
-    game.ctx.beginPath();
-    const currentRange = game.selectedPlacedTower.range * (game.selectedPlacedTower.djRangeBuffed ? (game.selectedPlacedTower.level >= 5 ? 1.20 : 1.15) : 1.0);
-    game.ctx.arc(game.selectedPlacedTower.x, game.selectedPlacedTower.y, currentRange, 0, Math.PI * 2);
-    game.ctx.fill();
-    
-    game.ctx.globalAlpha = 0.45;
-    game.ctx.strokeStyle = game.selectedPlacedTower.color;
-    game.ctx.lineWidth = 2;
-    game.ctx.stroke();
-    game.ctx.restore();
+    ctx.save();
+    const t = game.selectedPlacedTower;
+    const currentRange = t.range * (t.djRangeBuffed ? (t.level >= 5 ? 1.20 : 1.15) : 1.0);
+
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = t.color;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, currentRange, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = t.color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Selection ring at base
+    ctx.strokeStyle = '#f1c40f';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, 20, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
-  if (game.selectedShopTower) {
-    const col = game.mouseGrid.col;
-    const row = game.mouseGrid.row;
-    if (col < 0 || col >= game.grid.cols || row < 0 || row >= game.grid.rows) return;
+  // Placing a Troop: Pixel feedback and collision outlines
+  if (game.selectedShopTower && game.isMouseOnCanvas) {
+    const mx = game.mousePos.x;
+    const my = game.mousePos.y;
+    const radius = 18;
+    const check = game.grid.isPositionValidForPlacement(mx, my, radius);
+    const isValid = check.valid;
+    const statusColor = isValid ? '#2ecc71' : '#e74c3c';
 
-    const size = game.grid.cellSize;
-    const isValid = game.grid.isCellValidForPlacement(col, row);
-    const color = isValid ? '#2ecc71' : '#e74c3c';
+    ctx.save();
 
-    game.ctx.save();
-    game.ctx.strokeStyle = color;
-    game.ctx.lineWidth = 3;
-    game.ctx.strokeRect(col * size + 2, row * size + 2, size - 4, size - 4);
-    game.ctx.fillStyle = isValid ? 'rgba(46, 204, 113, 0.15)' : 'rgba(231, 76, 60, 0.15)';
-    game.ctx.fillRect(col * size + 2, row * size + 2, size - 4, size - 4);
-    game.ctx.restore();
+    // 1. Show collision warning ONLY when actively placing, and only on nearby/colliding troops
+    for (const tower of game.grid.towers.values()) {
+      const dist = Math.hypot(mx - tower.x, my - tower.y);
+      const isColliding = check.reason === 'troop' && check.collidingTroop === tower;
 
-    const cx = game.mousePos.x;
-    const cy = game.mousePos.y;
+      if (isColliding) {
+        // Red collision warning outline ONLY on the troop being collided with
+        const pulse = Math.sin(Date.now() / 100) * 3;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(tower.x, tower.y, tower.collisionRadius || 18, 0, Math.PI * 2);
+        ctx.strokeStyle = '#e74c3c';
+        ctx.lineWidth = 3;
+        ctx.fillStyle = 'rgba(231, 76, 60, 0.35)';
+        ctx.fill();
+        ctx.stroke();
 
-    game.ctx.save();
-    const range = getTowerRange(game.selectedShopTower);
-    if (range > 0) {
-      game.ctx.globalAlpha = 0.08;
-      game.ctx.fillStyle = color;
-      game.ctx.beginPath();
-      game.ctx.arc(cx, cy, range, 0, Math.PI * 2);
-      game.ctx.fill();
-
-      game.ctx.globalAlpha = 0.35;
-      game.ctx.strokeStyle = color;
-      game.ctx.lineWidth = 1.5;
-      game.ctx.beginPath();
-      game.ctx.arc(cx, cy, range, 0, Math.PI * 2);
-      game.ctx.stroke();
+        ctx.fillStyle = '#e74c3c';
+        ctx.font = "bold 10px 'Fredoka', sans-serif";
+        ctx.textAlign = 'center';
+        ctx.fillText("COLLISION", tower.x, tower.y - 24 + pulse);
+        ctx.restore();
+      } else if (dist < 55) {
+        // Only show a subtle footprint ring if your cursor is directly next to this troop
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(tower.x, tower.y, tower.collisionRadius || 18, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
+    // (Obstacle red outline circle removed per request - obstacles quietly block placement without visual rings)
+
+    // 2. Draw Range Ring around cursor
+    const range = getTowerRange(game.selectedShopTower);
+    if (range > 0) {
+      ctx.globalAlpha = isValid ? 0.10 : 0.15;
+      ctx.fillStyle = statusColor;
+      ctx.beginPath();
+      ctx.arc(mx, my, range, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.globalAlpha = isValid ? 0.45 : 0.70;
+      ctx.strokeStyle = statusColor;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(mx, my, range, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // 4. Draw Circular Troop Footprint around cursor
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = statusColor;
+    ctx.lineWidth = 2.5;
+    ctx.fillStyle = isValid ? 'rgba(46, 204, 113, 0.18)' : 'rgba(231, 76, 60, 0.25)';
+    ctx.beginPath();
+    ctx.arc(mx, my, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // 5. Draw ghost sprite preview
     let tempAgent;
+    const size = game.grid.cellSize;
     switch (game.selectedShopTower) {
       case 'scout': tempAgent = new Scout(0, 0, size); break;
       case 'minigunner': tempAgent = new Minigunner(0, 0, size); break;
@@ -692,23 +801,33 @@ export function drawHoverVisuals(game) {
       case 'ranger': tempAgent = new Ranger(0, 0, size); break;
       case 'turret': tempAgent = new Turret(0, 0, size); break;
     }
+
     if (tempAgent) {
-      tempAgent.x = cx;
-      tempAgent.y = cy;
-      tempAgent.angle = Math.atan2(game.mousePos.y - cy, game.mousePos.x - cx);
-      game.ctx.globalAlpha = 0.55;
-      drawAgent(game, tempAgent); // Draw the semi-transparent ghost sprite under the mouse!
+      tempAgent.x = mx;
+      tempAgent.y = my;
+      ctx.globalAlpha = isValid ? 0.65 : 0.35;
+      drawAgent(game, tempAgent);
     }
 
-    game.ctx.restore();
+    // 6. Red X indicator if hovering over road or an invalid spot
+    if (!isValid) {
+      ctx.strokeStyle = '#e74c3c';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(mx - 8, my - 8); ctx.lineTo(mx + 8, my + 8);
+      ctx.moveTo(mx + 8, my - 8); ctx.lineTo(mx - 8, my + 8);
+      ctx.stroke();
+    }
+
+    ctx.restore();
   }
 }
 
-/**
- * Draws replicated player cursor arrows and name tags on co-op maps.
- */
+
 export function drawPlayerCursors(game) {
   if (Network.mode === 'OFFLINE' || !window.playerCursors) return;
+
+  const ctx = game.ctx;
 
   for (const [pId, cursor] of Object.entries(window.playerCursors)) {
     if (pId === window.myPlayerId) continue; 
@@ -716,41 +835,113 @@ export function drawPlayerCursors(game) {
 
     const cx = cursor.mouseX;
     const cy = cursor.mouseY;
-
-    game.ctx.save();
-    game.ctx.fillStyle = game.getPlayerColor(pId);
-    game.ctx.strokeStyle = '#222';
-    game.ctx.lineWidth = 2;
-
-    game.ctx.beginPath();
-    game.ctx.moveTo(cx, cy);
-    game.ctx.lineTo(cx + 5, cy + 15);
-    game.ctx.lineTo(cx + 10, cy + 10);
-    game.ctx.closePath();
-    game.ctx.fill();
-    game.ctx.stroke();
-
+    const theme = PLAYER_THEMES[pId] || PLAYER_THEMES.p1;
     const name = (window.lobbyPlayers[pId] || "Player").split(" [")[0];
-    game.ctx.fillStyle = '#fff';
-    game.ctx.font = "900 11px 'Fredoka', sans-serif";
-    game.ctx.strokeStyle = '#222';
-    game.ctx.lineWidth = 3;
-    game.ctx.strokeText(name, cx + 12, cy + 12);
-    game.ctx.fillText(name, cx + 12, cy + 12);
+    const isPlacing = cursor.selectedShopTower && cursor.selectedShopTower !== 'null';
 
-    if (cursor.selectedShopTower && cursor.selectedShopTower !== 'null') {
-      game.ctx.globalAlpha = 0.22;
-      game.ctx.strokeStyle = game.getPlayerColor(pId);
-      game.ctx.lineWidth = 1.5;
+    ctx.save();
+
+    // 1. Draw Teammate Placement Range Preview on the Ground
+    if (isPlacing) {
       const range = getTowerRange(cursor.selectedShopTower);
       if (range > 0) {
-        game.ctx.beginPath();
-        game.ctx.arc(cx, cy, range, 0, Math.PI * 2);
-        game.ctx.stroke();
+        ctx.save();
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle = theme.color;
+        ctx.beginPath();
+        ctx.arc(cx, cy, range, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.globalAlpha = 0.50;
+        ctx.strokeStyle = theme.color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.stroke();
+        ctx.restore();
       }
     }
 
-    game.ctx.restore();
+    // 2. Render Custom Cursor Sprite (Anchor tip at cx, cy)
+    const cursorImg = getMouseSprite(pId);
+    const size = 30;
+
+    ctx.save();
+    // Drop shadow under the mouse arrow
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 3;
+
+    if (cursorImg.complete && cursorImg.naturalWidth > 0) {
+      ctx.drawImage(cursorImg, cx - 2, cy - 2, size, size);
+    } else {
+      // Fallback vector arrow
+      ctx.fillStyle = theme.color;
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + 6, cy + 18);
+      ctx.lineTo(cx + 12, cy + 12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // 3. Render Shiny Glass Name Badge
+    ctx.save();
+    ctx.font = "900 11px 'Fredoka', 'Nunito', sans-serif";
+    const textWidth = ctx.measureText(name).width;
+    const subText = isPlacing ? cursor.selectedShopTower.replace('_', ' ').toUpperCase() : null;
+    const subWidth = subText ? ctx.measureText(subText).width * 0.75 : 0;
+    const badgeWidth = Math.max(textWidth + 24, subWidth + 24);
+    const badgeHeight = subText ? 28 : 18;
+    const badgeX = cx + 18;
+    const badgeY = cy + 10;
+
+    // Outer glow & dark glass pill background
+    ctx.shadowColor = theme.glow;
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = 'rgba(10, 15, 26, 0.90)';
+    ctx.strokeStyle = theme.color;
+    ctx.lineWidth = 1.6;
+
+    ctx.beginPath();
+    ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    // Reset shadow so text renders crisp
+    ctx.shadowBlur = 0;
+
+    // Glowing Theme Gem/Dot indicator
+    ctx.fillStyle = theme.color;
+    ctx.beginPath();
+    ctx.arc(badgeX + 9, badgeY + (subText ? 10 : 9), 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Polished Two-Tone Gradient Name Text
+    const grad = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + 14);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(1, theme.light);
+
+    ctx.fillStyle = grad;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2.5;
+    ctx.strokeText(name, badgeX + 17, badgeY + (subText ? 13 : 13));
+    ctx.fillText(name, badgeX + 17, badgeY + (subText ? 13 : 13));
+
+    // Secondary Sub-Tag if teammate is aiming/placing a tower
+    if (subText) {
+      ctx.font = "800 8.5px 'Fredoka', sans-serif";
+      ctx.fillStyle = theme.color;
+      ctx.fillText(`PLACING: ${subText}`, badgeX + 17, badgeY + 23);
+    }
+
+    ctx.restore();
+
+    ctx.restore();
   }
 }
 
