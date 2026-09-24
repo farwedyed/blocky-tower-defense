@@ -1022,8 +1022,11 @@ class Game {
       this.smoothHoverPos.y += (this.targetHoverPos.y - this.smoothHoverPos.y) * 18 * dt;
     }
 
-    if (Network.mode === 'CLIENT') {
+    if (Network.mode === 'CLIENT' || Network.mode === 'HOST') {
       Network.sendClientData();
+    }
+
+    if (Network.mode === 'CLIENT') {
       Network.checkHostHeartbeat();
       this.effectManager.update(dt);
 

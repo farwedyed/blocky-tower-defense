@@ -281,6 +281,30 @@ export const Network = {
             return;
         }
 
+        // Direct peer-to-peer mouse updates
+        if (data.type === 'P_DATA') {
+            const pId = data.senderId;
+            if (pId && pId !== window.myPlayerId) {
+                if (!window.playerCursors) window.playerCursors = {};
+                let c = window.playerCursors[pId];
+                if (!c) {
+                    c = {
+                        x: data.mouseX,
+                        y: data.mouseY,
+                        targetX: data.mouseX,
+                        targetY: data.mouseY,
+                        lastTime: performance.now()
+                    };
+                    window.playerCursors[pId] = c;
+                }
+                c.targetX = data.mouseX;
+                c.targetY = data.mouseY;
+                c.selectedShopTower = data.selectedShopTower;
+                c.equippedSkin = data.equippedSkin;
+            }
+            return;
+        }
+
         // Room Creation Confirmation
         if (data.type === 'ROOM_CREATED') {
             this.roomId = data.roomId;
@@ -662,7 +686,22 @@ export const Network = {
         this.game.skipVotesCount = data.skipVotesCount !== undefined ? data.skipVotesCount : 0;
         this.game.skipVotesRequired = data.skipVotesRequired !== undefined ? data.skipVotesRequired : 1;
 
-        window.playerCursors = data.playerCursors || {};
+        // Smoothly blend cursor targets without snapping
+        if (data.playerCursors) {
+            if (!window.playerCursors) window.playerCursors = {};
+            for (const [pId, cData] of Object.entries(data.playerCursors)) {
+                if (pId === window.myPlayerId) continue;
+                let c = window.playerCursors[pId];
+                if (!c) {
+                    c = { x: cData.mouseX, y: cData.mouseY, targetX: cData.mouseX, targetY: cData.mouseY, lastTime: performance.now() };
+                    window.playerCursors[pId] = c;
+                }
+                c.targetX = cData.mouseX;
+                c.targetY = cData.mouseY;
+                c.selectedShopTower = cData.selectedShopTower;
+                c.equippedSkin = cData.equippedSkin;
+            }
+        }
 
         if (data.playerWallets && data.playerWallets[window.myPlayerId] !== undefined) {
             this.game.gold = data.playerWallets[window.myPlayerId];
@@ -914,15 +953,17 @@ export const Network = {
     },
 
     sendClientData: function() {
-        const now = Date.now();
-        if (now - this.lastClientUpdate < 45) return;
+        if (this.mode === 'OFFLINE') return;
+        const now = performance.now();
+        // Send responsive mouse updates (~35Hz / every 28ms)
+        if (now - this.lastClientUpdate < 28) return;
         this.lastClientUpdate = now;
 
-        if (this.game) {
+        if (this.game && this.game.mousePos) {
             this.send({
                 type: 'P_DATA',
-                mouseX: this.game.mousePos ? this.game.mousePos.x : 0,
-                mouseY: this.game.mousePos ? this.game.mousePos.y : 0,
+                mouseX: Math.round(this.game.mousePos.x),
+                mouseY: Math.round(this.game.mousePos.y),
                 selectedShopTower: this.game.selectedShopTower || null,
                 equippedSkin: (this.game.equippedSkins && this.game.selectedShopTower)
                     ? (this.game.equippedSkins[this.game.selectedShopTower] || 'default')

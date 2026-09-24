@@ -828,13 +828,39 @@ export function drawPlayerCursors(game) {
   if (Network.mode === 'OFFLINE' || !window.playerCursors) return;
 
   const ctx = game.ctx;
+  const now = performance.now();
 
   for (const [pId, cursor] of Object.entries(window.playerCursors)) {
     if (pId === window.myPlayerId) continue; 
-    if (!cursor || cursor.mouseX === undefined) continue;
+    if (!cursor) continue;
 
-    const cx = cursor.mouseX;
-    const cy = cursor.mouseY;
+    // Initialize position coordinates
+    if (cursor.x === undefined) {
+      cursor.x = cursor.targetX !== undefined ? cursor.targetX : (cursor.mouseX || 0);
+      cursor.y = cursor.targetY !== undefined ? cursor.targetY : (cursor.mouseY || 0);
+      cursor.lastTime = now;
+    }
+
+    const tx = cursor.targetX !== undefined ? cursor.targetX : cursor.x;
+    const ty = cursor.targetY !== undefined ? cursor.targetY : cursor.y;
+
+    // Delta time calculation
+    const dt = Math.min(0.05, (now - (cursor.lastTime || now)) / 1000.0);
+    cursor.lastTime = now;
+
+    // Silky smooth exponential lerp (tracks target instantly at 60Hz - 144Hz)
+    const factor = 1.0 - Math.exp(-30 * dt);
+    cursor.x += (tx - cursor.x) * factor;
+    cursor.y += (ty - cursor.y) * factor;
+
+    // Snap if distance is huge (e.g. initial spawn or tab switch)
+    if (Math.hypot(tx - cursor.x, ty - cursor.y) > 300) {
+      cursor.x = tx;
+      cursor.y = ty;
+    }
+
+    const cx = Math.round(cursor.x);
+    const cy = Math.round(cursor.y);
     const theme = PLAYER_THEMES[pId] || PLAYER_THEMES.p1;
     const name = (window.lobbyPlayers[pId] || "Player").split(" [")[0];
     const isPlacing = cursor.selectedShopTower && cursor.selectedShopTower !== 'null';
