@@ -179,7 +179,7 @@ export class GameUI {
     });
   }
 
-  showInGameAlert(message, title = "TACTICAL NOTICE") {
+  showInGameAlert(message, title = "TACTICAL NOTICE", onClose = null) {
     // If there's an existing styled alert modal, remove it
     const oldModal = document.getElementById('ingame-custom-alert');
     if (oldModal) oldModal.remove();
@@ -241,6 +241,101 @@ export class GameUI {
     okBtn.addEventListener('click', () => {
       soundManager.playTick();
       modal.remove();
+      if (typeof onClose === 'function') {
+        onClose();
+      }
+    });
+  }
+
+  showCashCaseModal(cashCase) {
+    const oldModal = document.getElementById('cash-case-modal');
+    if (oldModal) oldModal.remove();
+
+    // CrazyGames requirement: pause active gameplay when opening Cash Case popup
+    CrazyGamesManager.gameplayStop();
+
+    const modal = document.createElement('div');
+    modal.id = 'cash-case-modal';
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 1000000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.15s ease-out;
+    `;
+
+    modal.innerHTML = `
+      <div style="
+        background: #1a2230;
+        border: 4px solid #f1c40f;
+        border-radius: 16px;
+        width: 320px;
+        padding: 20px;
+        box-shadow: 0 0 25px rgba(241,196,15,0.4);
+        text-align: center;
+        color: #fff;
+        font-family: var(--font-body);
+      ">
+        <img src="assets/sprites/CashCase.png" style="width: 64px; height: auto; margin-bottom: 8px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));" />
+        <h3 style="font-family: var(--font-title); font-size: 1.4rem; color: #f1c40f; margin-bottom: 6px;">AIRDROP CASH CASE!</h3>
+        <p style="font-size: 0.85rem; font-weight: 800; color: #cbd5e1; margin-bottom: 15px;">
+          Watch a quick sponsor video to claim <strong style="color: #2ecc71;">+$${cashCase.reward} In-Game Cash</strong>!
+        </p>
+        <button id="btn-claim-cash-case" class="btn" style="
+          width: 100%;
+          background: #27ae60;
+          color: #fff;
+          font-size: 1.05rem;
+          padding: 10px;
+          margin-bottom: 8px;
+          box-shadow: 0 4px 0 #219653;
+        "><span style="display:inline-block; border: 2px solid #fff; border-radius: 3px; padding: 1px 5px; font-size: 0.8em; line-height: 1; margin-right: 4px;">▶</span> WATCH AD (+ $${cashCase.reward})</button>
+        <button id="btn-dismiss-cash-case" class="btn btn-secondary" style="
+          width: 100%;
+          background: #34495e;
+          color: #fff;
+          font-size: 0.85rem;
+          padding: 8px;
+        ">NO THANKS (DISMISS)</button>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const claimBtn = modal.querySelector('#btn-claim-cash-case');
+    const dismissBtn = modal.querySelector('#btn-dismiss-cash-case');
+
+    claimBtn.addEventListener('click', () => {
+      claimBtn.disabled = true;
+      claimBtn.textContent = "LOADING AD...";
+
+      CrazyGamesManager.requestRewardedAd(
+        () => {
+          this.game.claimCashCase(window.myPlayerId || 'p1');
+          modal.remove();
+          // CrazyGames requirement: resume active gameplay when popup closes after reward
+          CrazyGamesManager.gameplayStart();
+        },
+        () => {
+          claimBtn.disabled = false;
+          claimBtn.innerHTML = `<span style="display:inline-block; border: 2px solid #fff; border-radius: 3px; padding: 1px 5px; font-size: 0.8em; line-height: 1; margin-right: 4px;">▶</span> WATCH AD (+ $${cashCase.reward})`;
+        }
+      );
+    });
+
+    dismissBtn.addEventListener('click', () => {
+      soundManager.playTick();
+      modal.remove();
+      // CrazyGames requirement: Cash Case must disappear immediately when offer popup is closed
+      this.game.dismissCashCase();
+      // CrazyGames requirement: resume active gameplay when popup is dismissed
+      CrazyGamesManager.gameplayStart();
     });
   }
 
@@ -801,6 +896,8 @@ export class GameUI {
   }
 
   hideOverlay() {
+    const callout = document.getElementById('cg-like-bottom-callout');
+    if (callout) callout.remove();
     this.overlay.className = 'overlay-content hidden';
   }
 
@@ -839,7 +936,12 @@ export class GameUI {
     }
     CrazyGamesManager.gameplayStop();
     if (this.parentUI.lobby) {
-      this.parentUI.lobby.showSplashState();
+      // If still in a co-op party, return to the Squad Lobby; otherwise return to the Solo Menu
+      if (typeof Network !== 'undefined' && Network.mode !== 'OFFLINE' && Network.roomId) {
+        this.parentUI.lobby.showCoopLobbyState();
+      } else {
+        this.parentUI.lobby.showSplashState();
+      }
     }
   }
 
@@ -986,6 +1088,8 @@ export class GameUI {
 
     let oldCard = document.getElementById('match-summary-card');
     if (oldCard) oldCard.remove();
+    let oldCallout = document.getElementById('cg-like-bottom-callout');
+    if (oldCallout) oldCallout.remove();
 
     // Awards and persists match rewards immediately on summary appearance
     const rewards = awardMatchRewards(this.game);
@@ -1041,13 +1145,41 @@ export class GameUI {
       `;
     }
 
+    // ─── CRAZYGAMES LIKE PROMPT BANNER ───
+    const likePromptHtml = `
+      <div id="summary-like-prompt" style="
+        margin: 10px 0 6px 0;
+        background: linear-gradient(135deg, rgba(241, 196, 15, 0.15), rgba(46, 204, 113, 0.15));
+        border: 2px dashed #f1c40f;
+        border-radius: 10px;
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        animation: pulseLikePrompt 2.2s infinite ease-in-out;
+      ">
+        <div style="text-align: left; line-height: 1.3;">
+          <div style="font-family: var(--font-title); font-size: 0.95rem; color: #f1c40f; font-weight: 900;">
+            ENJOYING BTD 2D?
+          </div>
+          <div style="font-size: 0.74rem; color: #ecf0f1; font-weight: 800;">
+            Please leave a <strong style="color: #2ecc71;">👍 Like</strong> below the game!
+          </div>
+        </div>
+        <div style="font-size: 1.6rem; animation: bounceDownArrow 0.8s infinite alternate ease-in-out;">
+          👇
+        </div>
+      </div>
+    `;
+
     const feedbackSubmittedBefore = localStorage.getItem('tds_feedback_submitted') === 'true';
     let feedbackFormHtml = '';
 
     if (!feedbackSubmittedBefore) {
       feedbackFormHtml = `
         <div id="summary-feedback-container" style="
-          margin-top: 10px;
+          margin-top: 8px;
           background: rgba(241, 196, 15, 0.04);
           border: 2px dashed rgba(241, 196, 15, 0.3);
           border-radius: 8px;
@@ -1111,11 +1243,41 @@ export class GameUI {
         </div>
       </div>
       ${reviveButtonHtml}
+      ${likePromptHtml}
       ${feedbackFormHtml}
       ${returnButtonsHtml}
     `;
 
     this.overlay.appendChild(summaryCard);
+
+    // ─── BOTTOM-LEFT POINTER CALLOUT (Points straight to CrazyGames thumbs-up rating button) ───
+    const cgLikeCallout = document.createElement('div');
+    cgLikeCallout.id = 'cg-like-bottom-callout';
+    cgLikeCallout.style.cssText = `
+      position: absolute;
+      bottom: 12px;
+      left: 16px;
+      z-index: 10001;
+      background: #111827;
+      border: 2.5px solid #2ecc71;
+      border-radius: 12px;
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.7), 0 0 14px rgba(46, 204, 113, 0.4);
+      animation: floatLikeCallout 2s infinite ease-in-out;
+      pointer-events: none;
+    `;
+    cgLikeCallout.innerHTML = `
+      <span style="font-size: 1.4rem;">👍</span>
+      <div style="text-align: left; line-height: 1.15;">
+        <span style="font-family: var(--font-title); font-size: 0.8rem; font-weight: 900; color: #ffffff;">Leave a Like below!</span><br/>
+        <span style="font-size: 0.65rem; color: #2ecc71; font-weight: 800;">(CrazyGames Rating)</span>
+      </div>
+      <span style="font-size: 1.3rem; animation: bounceDownArrow 0.7s infinite alternate ease-in-out;">👇</span>
+    `;
+    this.overlay.appendChild(cgLikeCallout);
 
     const feedbackInput = document.getElementById('input-feedback-msg');
     const feedbackContainer = document.getElementById('summary-feedback-container');
@@ -1162,6 +1324,11 @@ export class GameUI {
       });
     }
 
+    const cleanupCallout = () => {
+      const callout = document.getElementById('cg-like-bottom-callout');
+      if (callout) callout.remove();
+    };
+
     const reviveBtn = document.getElementById('btn-summary-revive');
     if (reviveBtn) {
       reviveBtn.addEventListener('click', () => {
@@ -1170,6 +1337,7 @@ export class GameUI {
 
         CrazyGamesManager.requestRewardedAd(
           () => {
+            cleanupCallout();
             if (Network.mode === 'CLIENT') {
               Network.conn.send({ type: 'REQUEST_TEAM_REVIVE' });
             } else {
@@ -1193,6 +1361,7 @@ export class GameUI {
 
     const closeBtn = document.getElementById('btn-summary-close');
     closeBtn.addEventListener('click', () => {
+      cleanupCallout();
       summaryCard.remove();
       this.overlay.className = 'overlay-content hidden';
       this.overlayTitle.classList.remove('hidden');
@@ -1203,6 +1372,7 @@ export class GameUI {
     const disconnectBtn = document.getElementById('btn-summary-disconnect');
     if (disconnectBtn) {
       disconnectBtn.addEventListener('click', () => {
+        cleanupCallout();
         Network.intentionalDisconnect = true;
         
         summaryCard.remove();

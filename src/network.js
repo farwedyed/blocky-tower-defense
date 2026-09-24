@@ -28,6 +28,11 @@ export const Network = {
     conns: [], // Preserves legacy compatibility for vote count checks
     _effectsIntercepted: false,
     _soundsIntercepted: false,
+    isJoining: false,
+    isInviteLinkJoin: false,
+    attemptedRoomCode: null,
+    connectionTimeout: null,
+    connectionWatchdog: null,
 
     // Backward compatibility shim for Network.conn.send(...)
     conn: {
@@ -74,14 +79,23 @@ export const Network = {
 
             this.ws.onerror = (err) => {
                 console.warn("[Network Error] WebSocket error:", err);
+                if (this.isJoining) {
+                    this.handleJoinError('CONNECTION_FAILED');
+                }
             };
 
             this.ws.onclose = () => {
                 console.log("[Network] Cloud socket closed.");
+                if (this.isJoining) {
+                    this.handleJoinError('CONNECTION_FAILED');
+                }
             };
         } catch (err) {
             console.error("[Network] Failed to initialize WebSocket:", err);
             this.mode = 'OFFLINE';
+            if (this.isJoining) {
+                this.handleJoinError('CONNECTION_FAILED');
+            }
         }
     },
 
@@ -107,13 +121,25 @@ export const Network = {
         }
     },
 
-    join: function(roomId, playerName, onConnected) {
+    join: function(roomId, playerName, onConnected, isInviteLink = false) {
+        this.clearConnectionTimers();
         this.mode = 'CLIENT';
+        this.isJoining = true;
+        this.isInviteLinkJoin = !!isInviteLink;
+        this.attemptedRoomCode = (roomId || '').toUpperCase();
         this.onConnectedCallback = onConnected;
 
         const sendJoin = () => {
-            this.send({ type: 'JOIN_ROOM', roomId: roomId.toUpperCase(), name: playerName });
+            this.send({ type: 'JOIN_ROOM', roomId: this.attemptedRoomCode, name: playerName });
         };
+
+        // 8-second watchdog timer matching CrazyGames QA checklist
+        this.connectionTimeout = setTimeout(() => {
+            if (this.isJoining) {
+                console.warn("[Network] Connection watchdog timeout (8s) triggered.");
+                this.handleJoinError('TIMEOUT');
+            }
+        }, 8000);
 
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
             this.init(this.game, sendJoin);
@@ -124,8 +150,12 @@ export const Network = {
 
     disconnect: function() {
         const leavingRoomId = this.roomId;
+        this.clearConnectionTimers();
         this.mode = 'OFFLINE';
         this.roomId = null;
+        this.isJoining = false;
+        this.isInviteLinkJoin = false;
+        this.attemptedRoomCode = null;
         window.lobbyPlayers = { p1: "Host Survivor", p2: "", p3: "", p4: "", p5: "", p6: "", p7: "", p8: "" };
         window.myPlayerId = "p1";
         window.playerCursors = {};
@@ -147,6 +177,98 @@ export const Network = {
         }
     },
 
+    clearConnectionTimers: function() {
+        if (this.connectionTimeout) {
+            clearTimeout(this.connectionTimeout);
+            this.connectionTimeout = null;
+        }
+        if (this.connectionWatchdog) {
+            clearTimeout(this.connectionWatchdog);
+            this.connectionWatchdog = null;
+        }
+    },
+
+    syncRoomPresence: function() {
+        if (!this.roomId || this.mode === 'OFFLINE') return;
+
+        // Based on actual player count rather than a specific player slot
+        let activePlayerCount = 0;
+        if (window.lobbyPlayers && typeof window.lobbyPlayers === 'object') {
+            for (const slot of ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8']) {
+                const name = window.lobbyPlayers[slot];
+                if (name && typeof name === 'string' && name.trim() !== '') {
+                    activePlayerCount++;
+                }
+            }
+        } else {
+            activePlayerCount = 1;
+        }
+
+        const inLobby = !this.game || this.game.state === 'lobby';
+        const waveInProgress = this.game ? !!this.game.waveInProgress : false;
+        const isJoinable = (activePlayerCount < 8) && inLobby && !waveInProgress;
+
+        CrazyGamesManager.updateRoomPresence(this.roomId.toLowerCase(), isJoinable);
+    },
+
+    handleJoinError: function(reason, customMsg) {
+        this.isJoining = false;
+        this.clearConnectionTimers();
+        const wasInvite = this.isInviteLinkJoin;
+        const roomCode = this.attemptedRoomCode || '---';
+
+        try {
+            const url = new URL(window.location.href);
+            if (url.searchParams.has('roomId')) {
+                url.searchParams.delete('roomId');
+                window.history.replaceState({}, document.title, url.pathname + url.search);
+            }
+        } catch (e) {}
+
+        this.disconnect();
+
+        let title = "CONNECTION NOTICE ⚠️";
+        let message = "Unable to connect to the squad.";
+
+        if (reason === 'ROOM_FULL') {
+            title = "ROOM IS FULL ⚠️";
+            message = "This squad room is currently full (8/8 players). Please try another squad or host your own.";
+        } else if (reason === 'ROOM_NOT_FOUND') {
+            if (wasInvite) {
+                title = "ROOM NOT AVAILABLE ⚠️";
+                message = "This squad room is no longer available or has been disbanded by the host.";
+            } else {
+                title = "ROOM NOT FOUND ⚠️";
+                message = `No active squad was found with room code: ${roomCode}. Please verify the code and try again.`;
+            }
+        } else if (reason === 'MATCH_IN_PROGRESS') {
+            title = "BATTLE IN PROGRESS ⚠️";
+            message = "That squad is already in battle! You can only join open squads in the lobby.";
+        } else if (reason === 'TIMEOUT' || reason === 'CONNECTION_FAILED') {
+            title = "CONNECTION FAILED ⚠️";
+            message = customMsg || "Connection timed out. Unable to reach the squad session. Please check your network and try again.";
+        }
+
+        const returnToMenu = () => {
+            if (this.game && this.game.ui && this.game.ui.lobby) {
+                if (reason === 'ROOM_NOT_FOUND' && !wasInvite) {
+                    if (this.game.ui.lobby.coop && typeof this.game.ui.lobby.coop.resetJoinControls === 'function') {
+                        this.game.ui.lobby.coop.resetJoinControls();
+                        return;
+                    }
+                }
+                this.game.ui.lobby.showSplashState();
+            }
+        };
+
+        if (this.game && this.game.ui && this.game.ui.gameUI) {
+            this.game.ui.gameUI.showInGameAlert(message, title, returnToMenu);
+        } else {
+            alert(`${title}\n\n${message}`);
+            returnToMenu();
+        }
+    },
+
     checkHostHeartbeat: function() {
         // No-op: Handled by server keep-alives automatically
     },
@@ -164,19 +286,24 @@ export const Network = {
             this.roomId = data.roomId;
             window.myPlayerId = 'p1';
             window.lobbyPlayers = data.lobbyPlayers;
+            this.syncRoomPresence();
             if (this.onCreatedCallback) this.onCreatedCallback(data.roomId);
             if (this.game && this.game.ui) this.game.ui.updateCoopPlayerList();
         }
 
         // Rejection when joining mid-match
         else if (data.type === 'MATCH_IN_PROGRESS_REJECT') {
-            if (this.game && this.game.ui && this.game.ui.gameUI) {
-                this.game.ui.gameUI.showInGameAlert("That squad is already in battle! You can only join open squads in the lobby.", "BATTLE IN PROGRESS ⚠️");
-            }
-            this.disconnect();
-            if (this.game && this.game.ui && this.game.ui.lobby) {
-                this.game.ui.lobby.showSplashState();
-            }
+            this.handleJoinError('MATCH_IN_PROGRESS');
+        }
+
+        // Server Rejection: Room is Full (8/8)
+        else if (data.type === 'ROOM_FULL_REJECT' || data.type === 'ROOM_FULL') {
+            this.handleJoinError('ROOM_FULL');
+        }
+
+        // Server Rejection: Room Code Not Found or Disbanded
+        else if (data.type === 'JOIN_FAILED' || data.type === 'ROOM_NOT_FOUND') {
+            this.handleJoinError('ROOM_NOT_FOUND');
         }
 
         // Room Browser Updates
@@ -188,11 +315,15 @@ export const Network = {
 
         // Client Joined Confirmation
         else if (data.type === 'LOBBY_WELCOME') {
+            this.isJoining = false;
+            this.clearConnectionTimers();
             this.roomId = data.roomId || this.roomId;
             window.myPlayerId = data.assignedId;
             window.lobbyPlayers = data.lobbyPlayers;
             this.game.selectedMap = data.selectedMap;
             this.game.isHardcore = data.isHardcore;
+
+            this.syncRoomPresence();
 
             if (this.onConnectedCallback) this.onConnectedCallback();
             if (this.game && this.game.ui) this.game.ui.updateCoopPlayerList();
@@ -202,14 +333,7 @@ export const Network = {
         else if (data.type === 'LOBBY_UPDATE') {
             window.lobbyPlayers = data.lobbyPlayers;
             
-            // In the lobby, the room IS ALWAYS JOINABLE AND INVITABLE for all players as long as slots < 8
-            const currentPlayers = Object.values(window.lobbyPlayers).filter(p => p && p.trim() !== '').length;
-            const inLobby = !this.game || this.game.state === 'lobby';
-            const isJoinable = (currentPlayers < 8) && inLobby;
-
-            if (this.roomId) {
-                CrazyGamesManager.updateRoomPresence(this.roomId.toLowerCase(), isJoinable);
-            }
+            this.syncRoomPresence();
 
             if (this.mode === 'HOST' && this.game) {
                 if (!this.game.playerWallets) this.game.playerWallets = {};
@@ -238,10 +362,7 @@ export const Network = {
             if (data.roomId) this.roomId = data.roomId;
             if (data.lobbyPlayers) window.lobbyPlayers = data.lobbyPlayers;
 
-            // Sync new host status with CrazyGames
-            if (this.roomId) {
-                CrazyGamesManager.updateRoomPresence(this.roomId.toLowerCase(), true);
-            }
+            this.syncRoomPresence();
 
             // Unhide privacy toggle and copy link icon for newly promoted host
             const hostPrivacyBox = document.getElementById('host-privacy-container');
@@ -306,9 +427,6 @@ export const Network = {
             this.game.tutorialActive = false;
             this.game.showMapDirections = true;
 
-            // Trigger gameplayStart for connected multiplayer clients as well
-            CrazyGamesManager.gameplayStart();
-
             // Disable joining once active match begins
             if (this.roomId) {
                 CrazyGamesManager.updateRoomPresence(this.roomId.toLowerCase(), false);
@@ -346,7 +464,13 @@ export const Network = {
         else if (data.type === 'RETURN_TO_LOBBY') {
             if (this.game) {
                 this.game.state = 'lobby';
-                if (this.game.ui) this.game.ui.showLobbyLayout();
+                this.game.waveInProgress = false;
+                if (this.game.ui) {
+                    const summaryCard = document.getElementById('match-summary-card');
+                    if (summaryCard) summaryCard.remove();
+                    this.game.ui.hideOverlay();
+                    this.game.ui.showLobbyLayout();
+                }
             }
         }
 
@@ -380,6 +504,38 @@ export const Network = {
                 if (this.game.ui) {
                     this.game.ui.updateHUD(this.game.lives, this.game.gold, this.game.wave, this.game.maxWaves);
                     this.game.ui.showMatchSummaryCard(data.isVictory);
+                }
+            }
+        }
+
+        // Cash Case Multiplayer Sync
+        else if (data.type === 'SPAWN_CASH_CASE') {
+            if (this.game) {
+                this.game.activeCashCase = data.cashCase;
+                soundManager.playCrateDrop();
+            }
+        }
+        else if (data.type === 'CONSUME_CASH_CASE') {
+            if (this.game) {
+                this.game.activeCashCase = null;
+                const modal = document.getElementById('cash-case-modal');
+                if (modal) {
+                    modal.remove();
+                    CrazyGamesManager.gameplayStart();
+                }
+                if (data.claimedBy === window.myPlayerId && data.reward) {
+                    this.game.gold += data.reward;
+                }
+                this.game.ui.updateHUD(this.game.lives, this.game.gold, this.game.wave, this.game.maxWaves);
+            }
+        }
+        else if (data.type === 'DISMISS_CASH_CASE') {
+            if (this.game) {
+                this.game.activeCashCase = null;
+                const modal = document.getElementById('cash-case-modal');
+                if (modal) {
+                    modal.remove();
+                    CrazyGamesManager.gameplayStart();
                 }
             }
         }
@@ -472,6 +628,16 @@ export const Network = {
             if (this.game) {
                 this.game.revivePlayer();
                 this.broadcastToAll({ type: 'TEAM_REVIVE' });
+            }
+        }
+        else if (data.type === 'CONSUME_CASH_CASE') {
+            if (this.game) {
+                this.game.claimCashCase(cPlayerId);
+            }
+        }
+        else if (data.type === 'DISMISS_CASH_CASE') {
+            if (this.game) {
+                this.game.dismissCashCase();
             }
         }
     },
@@ -818,3 +984,5 @@ export const Network = {
         wrap('playDefeat');
     }
 };
+
+window.Network = Network;

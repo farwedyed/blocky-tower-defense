@@ -41,7 +41,7 @@ import {
   spawnZombie 
 } from './game-combat.js';
 
-import { draw, preloadAllAssets } from './game-renderer.js';
+import { draw, preloadAllAssets, preloadUIAssets } from './game-renderer.js';
 
 class Game {
   constructor() {
@@ -89,6 +89,12 @@ class Game {
     this.selectedMap = 'grassland';
     this.waveInProgress = false;
     this.hasRevivedThisMatch = false; 
+
+    // Cash Case Airdrop System
+    this.activeCashCase = null;
+    this.cashCaseSpawnTimer = 40.0;
+    this.cashCaseImg = new Image();
+    this.cashCaseImg.src = 'assets/sprites/CashCase.png'; 
 
     // Skipping properties
     this.skipCooldown = 0;
@@ -156,57 +162,119 @@ class Game {
         }
       });
 
-      const barFill = document.getElementById('loading-bar-fill');
+      const barFillImg = document.getElementById('loading-bar-fill-img');
+      const percentText = document.getElementById('loading-percent');
       const statusText = document.getElementById('loading-status');
-      preloadAllAssets(
-        (percent, loaded, total) => {
-          if (barFill) barFill.style.width = `${percent}%`;
-          if (statusText) statusText.textContent = `Deploying Assets: ${loaded} / ${total} (${percent}%)`;
-        },
-        () => {
-          if (statusText) statusText.textContent = "Operational Ready!";
-          setTimeout(() => {
-            const loader = document.getElementById('loading-screen');
-            if (loader) loader.classList.add('fade-out');
 
-            CrazyGamesManager.gameLoadingStop();
+      // ─── HYBRID ASYMPTOTIC PROGRESS ENGINE ───
+      let displayedPercent = 0;
+      let targetPercent = 5;
+      let isFullyLoaded = false;
+      let lastFrameTime = performance.now();
 
-            const params = new URLSearchParams(window.location.search);
-            const startupRoomId = params.get('roomId');
-
-            if (CrazyGamesManager.isInstantMultiplayer() || startupRoomId) {
-              console.log('[CrazyGames] Multiplayer join/host triggered on launch. Bypassing onboarding.');
-              this.tutorialCompleted = true;
-              this.tutorialActive = false;
-              this.saveStatsToStorage();
-
-              if (startupRoomId) {
-                this.handleCrazyGamesInvite(startupRoomId);
-              } else {
-                this.autoHostMultiplayerLobby();
-              }
-              return;
-            }
-
-            if (!this.tutorialCompleted) {
-              console.log('[Onboarding] First-time player detected! Deploying directly to tutorial match.');
-              this.selectedMap = 'grassland';
-              this.selectedDifficulty = 'easy';
-              this.deployToMatch();
-            } else {
-              if (this.ui && this.ui.lobby) {
-                this.ui.lobby.showSplashState();
-              }
-            }
-
-            if (this.ui && this.ui.lobby) {
-              this.ui.lobby.drawAllStaticPreviews();
-              this.ui.lobby.renderDailyQuests();
-              this.ui.lobby.renderLeaderboard(this.selectedMap);
-            }
-          }, 400);
+      const updateProgressVisuals = (pct) => {
+        const rounded = Math.min(100, Math.floor(pct));
+        if (barFillImg) {
+          barFillImg.style.clipPath = `inset(0 ${100 - pct}% 0 0)`;
+          barFillImg.style.webkitClipPath = `inset(0 ${100 - pct}% 0 0)`;
         }
-      );
+        if (percentText) percentText.textContent = `${rounded}%`;
+      };
+
+      // Continuous loop: creeps forward on slow net, surges forward when assets download
+      const progressLoop = (now) => {
+        const dt = Math.min(0.1, (now - lastFrameTime) / 1000);
+        lastFrameTime = now;
+
+        if (!isFullyLoaded) {
+          // Creep forward slowly (min 2.5% per sec) so it never completely stops
+          targetPercent = Math.min(92, targetPercent + 2.5 * dt);
+
+          // Fast smooth interpolation toward the target
+          const catchUpSpeed = displayedPercent < targetPercent ? 10.0 : 3.0;
+          displayedPercent += (targetPercent - displayedPercent) * Math.min(1.0, dt * catchUpSpeed);
+          updateProgressVisuals(displayedPercent);
+
+          requestAnimationFrame(progressLoop);
+        } else {
+          // Final surge to 100%
+          displayedPercent += (100 - displayedPercent) * Math.min(1.0, dt * 18.0);
+          updateProgressVisuals(displayedPercent);
+
+          if (displayedPercent < 99.5) {
+            requestAnimationFrame(progressLoop);
+          } else {
+            updateProgressVisuals(100);
+          }
+        }
+      };
+      requestAnimationFrame(progressLoop);
+
+      if (statusText) statusText.textContent = "Loading Interface Assets...";
+
+      // Step 1: Preload UI folder
+      preloadUIAssets(() => {
+        targetPercent = Math.max(targetPercent, 18);
+        if (statusText) statusText.textContent = "Deploying Combat Units...";
+
+        // Step 2: Preload game sprites
+        preloadAllAssets(
+          (percent, loaded, total) => {
+            // Map real download progress from 18% to 92%
+            const realMapped = 18 + (percent * 0.74);
+            if (realMapped > targetPercent) {
+              targetPercent = realMapped; // Instant surge forward when batch finishes!
+            }
+            if (statusText) statusText.textContent = `Deploying Assets: ${loaded} / ${total}`;
+          },
+          () => {
+            // All assets finished downloading!
+            isFullyLoaded = true;
+            if (statusText) statusText.textContent = "Operational Ready!";
+
+            setTimeout(() => {
+              const loader = document.getElementById('loading-screen');
+              if (loader) loader.classList.add('fade-out');
+
+              CrazyGamesManager.gameLoadingStop();
+
+              const params = new URLSearchParams(window.location.search);
+              const startupRoomId = params.get('roomId');
+
+              if (CrazyGamesManager.isInstantMultiplayer() || startupRoomId) {
+                console.log('[CrazyGames] Multiplayer join/host triggered on launch. Bypassing onboarding.');
+                this.tutorialCompleted = true;
+                this.tutorialActive = false;
+                this.saveStatsToStorage();
+
+                if (startupRoomId) {
+                  this.handleCrazyGamesInvite(startupRoomId);
+                } else {
+                  this.autoHostMultiplayerLobby();
+                }
+                return;
+              }
+
+              if (!this.tutorialCompleted) {
+                console.log('[Onboarding] First-time player detected! Deploying directly to tutorial match.');
+                this.selectedMap = 'grassland';
+                this.selectedDifficulty = 'easy';
+                this.deployToMatch();
+              } else {
+                if (this.ui && this.ui.lobby) {
+                  this.ui.lobby.showSplashState();
+                }
+              }
+
+              if (this.ui && this.ui.lobby) {
+                this.ui.lobby.drawAllStaticPreviews();
+                this.ui.lobby.renderDailyQuests();
+                this.ui.lobby.renderLeaderboard(this.selectedMap);
+              }
+            }, 450);
+          }
+        );
+      });
     });
 
     requestAnimationFrame((t) => this.loop(t));
@@ -250,6 +318,15 @@ class Game {
 
   startNextWave(isFromSkip = false) {
     startNextWave(this, isFromSkip);
+
+    // Trigger mid-game Cash Case 5 seconds into scheduled mid-game waves
+    if (Network.mode !== 'CLIENT' && this.cashCaseTargetWaves && this.cashCaseTargetWaves.includes(this.wave) && this.cashCaseSpawnCount < this.maxCashCasesPerMatch) {
+      setTimeout(() => {
+        if (this.state === 'playing' && !this.activeCashCase) {
+          this.spawnCashCase();
+        }
+      }, 5000);
+    }
   }
 
   triggerCommanderAlerts() {
@@ -393,8 +470,8 @@ class Game {
       }
       this.ui.lobby.updateCoopPlayerList();
       this.ui.lobby.toggleSoloElements(false);
-      CrazyGamesManager.updateRoomPresence(roomId.toLowerCase(), true);
-    });
+      Network.syncRoomPresence();
+    }, true);
   }
   
   autoHostMultiplayerLobby() {
@@ -436,6 +513,16 @@ class Game {
 
   _handleGridInteraction() {
     if (this.state !== 'playing') return;
+
+    // Check if Cash Case was clicked
+    if (this.activeCashCase && !this.showMapDirections) {
+      const dist = Math.hypot(this.mousePos.x - this.activeCashCase.x, this.mousePos.y - this.activeCashCase.y);
+      if (dist <= 30) {
+        soundManager.playTick();
+        this.ui.gameUI.showCashCaseModal(this.activeCashCase);
+        return;
+      }
+    }
 
     if (this.showMapDirections) {
       this.showMapDirections = false;
@@ -687,9 +774,6 @@ class Game {
       this.state = 'playing';
       this.showMapDirections = true;
       this.autoStartTimer = 0; 
-
-      // Notify CrazyGames that active gameplay has officially started
-      CrazyGamesManager.gameplayStart();
       
       this.grid.selectMap(this.selectedMap);
 
@@ -713,6 +797,14 @@ class Game {
       this.bullets = [];
       this.spawnQueue = [];
       this.activeSpawners = [];
+      this.activeCashCase = null;
+
+      // Limit to 1 - 2 drops per game, scheduled for mid-game waves
+      this.cashCaseSpawnCount = 0;
+      this.maxCashCasesPerMatch = Math.random() < 0.5 ? 1 : 2;
+      const firstWave = Math.max(6, Math.floor(this.maxWaves * 0.25));
+      const secondWave = Math.max(firstWave + 7, Math.floor(this.maxWaves * 0.60));
+      this.cashCaseTargetWaves = this.maxCashCasesPerMatch === 2 ? [firstWave, secondWave] : [firstWave];
 
       this.grid.clear();
       this.effectManager.clear();
@@ -793,7 +885,7 @@ class Game {
       this.waveInProgress = false;
       this.ui.showLobbyLayout();
       if (Network.mode === 'HOST' && Network.roomId) {
-        CrazyGamesManager.updateRoomPresence(Network.roomId.toLowerCase(), true);
+        Network.syncRoomPresence();
       }
     };
 
@@ -802,9 +894,7 @@ class Game {
       this.ui.showLobbyLayout();
 
       if (Network.mode === 'HOST') {
-        if (Network.peer && Network.peer.id) {
-          CrazyGamesManager.updateRoomPresence(Network.peer.id.toLowerCase(), true);
-        }
+        Network.syncRoomPresence();
         Network.broadcastToAll({
           type: 'RETURN_TO_LOBBY'
         });
@@ -813,40 +903,23 @@ class Game {
     }
 
     if (Network.mode !== 'OFFLINE') {
-      try {
-        CrazyGamesManager.leaveRoomPresence();
-      } catch (err) {
-        console.warn("[CrazyGames] leftRoom notification exception caught:", err);
-      }
-
-      try {
-        if (Network.mode === 'CLIENT') {
-          if (Network.conn) {
-            Network.conn.close();
-            Network.conn = null;
-          }
-        } else if (Network.mode === 'HOST') {
-          Network.conns.forEach(c => {
-            if (c) c.close();
-          });
-          Network.conns = [];
+        try {
+          CrazyGamesManager.leaveRoomPresence();
+        } catch (err) {
+          console.warn("[CrazyGames] leftRoom notification exception caught:", err);
         }
-        if (Network.peer && !Network.peer.destroyed) {
-          Network.peer.destroy();
-          Network.peer = null;
-        }
-      } catch (err) {
-        console.warn("[Network] P2P cleanup exception ignored during Quit to Lobby:", err);
+
+        // Properly disconnect from WebSocket server so room is purged immediately
+        Network.disconnect();
+
+        Network.mode = 'OFFLINE';
+        window.lobbyPlayers = { p1: "Host Survivor", p2: "", p3: "", p4: "", p5: "", p6: "", p7: "", p8: "" };
+        window.myPlayerId = "p1";
+
+        CrazyGamesManager.requestMidgameAd(returnAction);
+      } else {
+        returnAction();
       }
-
-      Network.mode = 'OFFLINE';
-      window.lobbyPlayers = { p1: "Host Survivor", p2: "", p3: "", p4: "", p5: "", p6: "", p7: "", p8: "" };
-      window.myPlayerId = "p1";
-
-      CrazyGamesManager.requestMidgameAd(returnAction);
-    } else {
-      returnAction();
-    }
   }
 
   revivePlayer() {
@@ -992,6 +1065,14 @@ class Game {
         if (this.ui) {
           this.ui.showAutoCountdown(Math.ceil(this.autoStartTimer));
         }
+      }
+    }
+
+    // Cash Case Lifespan Timer (Disappears after 25s if not claimed)
+    if (this.activeCashCase && !this.showMapDirections) {
+      this.activeCashCase.life -= dt;
+      if (this.activeCashCase.life <= 0) {
+        this.dismissCashCase();
       }
     }
 
@@ -1149,6 +1230,94 @@ class Game {
     if (this.ui) {
       this.ui.updateWaveButton(waveInProgress);
     }
+  }
+
+  spawnCashCase() {
+    if (this.cashCaseSpawnCount >= this.maxCashCasesPerMatch) return;
+
+    // Filter for valid open spots that are NEVER on the road and NEVER on top of agents
+    const validSpots = [];
+    for (let col = 1; col < this.grid.cols - 1; col++) {
+      for (let row = 1; row < this.grid.rows - 1; row++) {
+        const key = `${col},${row}`;
+        if (this.grid.pathTiles && this.grid.pathTiles.has(key)) continue; // Not on the road
+        if (this.grid.towers && this.grid.towers.has(key)) continue;       // Not on top of agents
+        validSpots.push({ col, row });
+      }
+    }
+
+    if (validSpots.length === 0) return;
+
+    const chosen = validSpots[Math.floor(Math.random() * validSpots.length)];
+    const x = chosen.col * this.grid.cellSize + this.grid.cellSize / 2;
+    const y = chosen.row * this.grid.cellSize + this.grid.cellSize / 2;
+    const reward = Math.round(200 + (this.wave * 50));
+
+    const newCase = {
+      id: 'case_' + Date.now(),
+      x: Math.round(x),
+      y: Math.round(y),
+      reward: reward,
+      life: 25.0,
+      maxLife: 25.0
+    };
+
+    this.activeCashCase = newCase;
+    this.cashCaseSpawnCount++;
+    soundManager.playCrateDrop();
+
+    if (Network.mode === 'HOST') {
+      Network.broadcastToAll({
+        type: 'SPAWN_CASH_CASE',
+        cashCase: newCase
+      });
+    }
+  }
+
+  dismissCashCase() {
+    if (!this.activeCashCase) return;
+    const caseId = this.activeCashCase.id;
+    this.activeCashCase = null;
+
+    const modal = document.getElementById('cash-case-modal');
+    if (modal) {
+      modal.remove();
+      CrazyGamesManager.gameplayStart();
+    }
+
+    if (Network.mode === 'CLIENT') {
+      Network.conn.send({ type: 'DISMISS_CASH_CASE', id: caseId });
+    } else if (Network.mode === 'HOST') {
+      Network.broadcastToAll({ type: 'DISMISS_CASH_CASE', id: caseId });
+    }
+  }
+
+  claimCashCase(claimedBy = 'p1') {
+    if (!this.activeCashCase) return;
+    const reward = this.activeCashCase.reward;
+    const caseId = this.activeCashCase.id;
+
+    this.activeCashCase = null;
+    soundManager.playVictory();
+
+    if (Network.mode === 'CLIENT') {
+      Network.conn.send({ type: 'CONSUME_CASH_CASE', id: caseId, claimedBy: window.myPlayerId, reward: reward });
+      this.gold += reward;
+    } else {
+      if (Network.mode === 'HOST') {
+        if (claimedBy === 'p1') {
+          this.gold += reward;
+        } else if (this.playerWallets) {
+          this.playerWallets[claimedBy] = (this.playerWallets[claimedBy] || 0) + reward;
+        }
+        Network.broadcastToAll({ type: 'CONSUME_CASH_CASE', id: caseId, claimedBy: claimedBy, reward: reward });
+      } else {
+        this.gold += reward;
+      }
+    }
+
+    this.effectManager.spawnPlacementSparks(this.canvas.width / 2, this.canvas.height / 2, 50);
+    this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
   }
 
   getPlayerColor(id) {

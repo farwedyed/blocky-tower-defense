@@ -16,10 +16,11 @@
   <!-- LOADING SCREEN OVERLAY -->
   <div id="loading-screen">
     <div class="loading-content">
-      <h1 class="blocky-title loading-logo">BTD 2D</h1>
-      <span class="tagline" style="color: #cbd5e1; margin-bottom: 25px;">SQUAD TACTICAL DEFENSE TERMINAL</span>
+      <img id="loading-logo-img" src="assets/ui/btd2dlogo.png" alt="Blocky Tower Defense 2D" />
       <div class="loading-bar-container">
-        <div id="loading-bar-fill"></div>
+        <img src="assets/ui/loadingnotfull.png" class="loading-bar-bg" alt="Loading Bar Frame" />
+        <img id="loading-bar-fill-img" src="assets/ui/loadingfull.png" class="loading-bar-fill" alt="Loading Progress" />
+        <span id="loading-percent">0%</span>
       </div>
       <p id="loading-status">Booting Tactical Engine...</p>
     </div>

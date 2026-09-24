@@ -126,6 +126,10 @@ export class LobbyUI {
     this.coop.showSplashState();
   }
 
+  showCoopLobbyState() {
+    this.coop.showCoopLobbyState();
+  }
+
   toggleSoloElements(visible) {
     const mapsStep = document.getElementById('wizard-step-maps');
     const diffStep = document.getElementById('wizard-step-diff');

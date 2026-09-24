@@ -233,6 +233,58 @@ export class LobbyCoop {
     }
   }
 
+  showCoopLobbyState() {
+    const splash = document.getElementById('lobby-splash-container');
+    if (splash) splash.style.display = 'none';
+
+    const matchmakingHeader = document.getElementById('coop-header-panel');
+    if (matchmakingHeader) matchmakingHeader.classList.remove('hidden');
+
+    const matchmakingFooter = document.getElementById('coop-footer-panel');
+    if (matchmakingFooter) {
+      matchmakingFooter.classList.remove('hidden');
+      matchmakingFooter.style.display = 'block';
+    }
+
+    const coopControls = document.getElementById('coop-setup-controls');
+    if (coopControls) coopControls.classList.add('hidden');
+
+    const coopLobbyStatus = document.getElementById('coop-lobby-status-container');
+    if (coopLobbyStatus) coopLobbyStatus.classList.remove('hidden');
+
+    const usernameContainer = document.getElementById('username-container');
+    if (usernameContainer) usernameContainer.style.display = 'none';
+
+    const labelRoomCode = document.getElementById('label-room-code');
+    if (labelRoomCode && Network.roomId) {
+      labelRoomCode.textContent = `ROOM CODE: ${Network.roomId.toUpperCase()}`;
+    }
+
+    const copyCodeBtn = document.getElementById('btn-copy-code');
+    if (copyCodeBtn) copyCodeBtn.classList.remove('hidden');
+
+    const labelStatus = document.getElementById('label-lobby-status');
+    const hostPrivacyBox = document.getElementById('host-privacy-container');
+
+    if (Network.mode === 'HOST') {
+      if (hostPrivacyBox) hostPrivacyBox.classList.remove('hidden');
+      if (labelStatus) {
+        labelStatus.textContent = "HOSTING SQUAD LOBBY";
+        labelStatus.style.color = "var(--primary-green-dark)";
+      }
+      this.lobbyUI.toggleSoloElements(true);
+    } else {
+      if (hostPrivacyBox) hostPrivacyBox.classList.add('hidden');
+      if (labelStatus) {
+        labelStatus.textContent = "IN SQUAD (WAITING FOR LEADER)";
+        labelStatus.style.color = "var(--primary-blue)";
+      }
+      this.lobbyUI.toggleSoloElements(false);
+    }
+
+    this.updateCoopPlayerList();
+  }
+
   renderServerBrowser(rooms) {
     const listEl = document.getElementById('server-browser-list');
     const countEl = document.getElementById('label-server-count');
@@ -295,6 +347,41 @@ export class LobbyCoop {
         if (btnJoinCoop) btnJoinCoop.click();
       });
     });
+  }
+
+  resetJoinControls() {
+    const coopControls = document.getElementById('coop-setup-controls');
+    if (coopControls) coopControls.classList.remove('hidden');
+
+    const coopLobbyStatus = document.getElementById('coop-lobby-status-container');
+    if (coopLobbyStatus) coopLobbyStatus.classList.add('hidden');
+
+    const coopLobbyFooter = document.getElementById('coop-footer-panel');
+    if (coopLobbyFooter) {
+      coopLobbyFooter.classList.add('hidden');
+      coopLobbyFooter.style.display = 'none';
+    }
+
+    const usernameContainer = document.getElementById('username-container');
+    if (usernameContainer) usernameContainer.style.display = 'flex';
+
+    const labelStatus = document.getElementById('label-lobby-status');
+    if (labelStatus) {
+      labelStatus.textContent = 'OFFLINE';
+      labelStatus.style.color = '#7f8c8d';
+    }
+
+    const inputJoinCode = document.getElementById('input-join-code');
+    if (inputJoinCode) {
+      inputJoinCode.disabled = false;
+      inputJoinCode.focus();
+    }
+
+    const btnJoin = document.getElementById('btn-join-coop');
+    if (btnJoin) btnJoin.disabled = false;
+
+    const btnHost = document.getElementById('btn-host-coop');
+    if (btnHost) btnHost.disabled = false;
   }
 
   initEventListeners() {
@@ -413,7 +500,7 @@ export class LobbyCoop {
           }
           this.updateCoopPlayerList();
           this.lobbyUI.toggleSoloElements(true);
-          CrazyGamesManager.updateRoomPresence(roomCode.toLowerCase(), true);
+          Network.syncRoomPresence();
         });
       });
     }
@@ -475,8 +562,8 @@ export class LobbyCoop {
           }
           this.updateCoopPlayerList();
           this.lobbyUI.toggleSoloElements(false);
-          CrazyGamesManager.updateRoomPresence(code, true);
-        });
+          Network.syncRoomPresence();
+        }, false);
       });
     }
 

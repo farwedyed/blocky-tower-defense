@@ -103,6 +103,31 @@ function getEnemySprite(sheetName, rowIndex, colIndex) {
 }
 
 // ─── 3. PRELOADING SYSTEM ───
+export function preloadUIAssets(onComplete) {
+  const uiImages = [
+    'assets/ui/background.png',
+    'assets/ui/btd2dlogo.png',
+    'assets/ui/loadingnotfull.png',
+    'assets/ui/loadingfull.png'
+  ];
+
+  let loaded = 0;
+  const total = uiImages.length;
+
+  uiImages.forEach(src => {
+    const img = new Image();
+    img.onload = () => {
+      loaded++;
+      if (loaded >= total && onComplete) onComplete();
+    };
+    img.onerror = () => {
+      loaded++;
+      if (loaded >= total && onComplete) onComplete();
+    };
+    img.src = src;
+  });
+}
+
 export function preloadAllAssets(onProgress, onComplete) {
   const queue = [];
 
@@ -419,6 +444,53 @@ export function draw(game) {
 
     for (const bullet of game.bullets) {
       bullet.draw(game.ctx);
+    }
+
+    // Render Shiny Cash Case Airdrop
+    if (game.activeCashCase) {
+      const c = game.activeCashCase;
+      const ctx = game.ctx;
+      const pulse = Math.sin(Date.now() / 150) * 4;
+
+      ctx.save();
+      ctx.translate(c.x, c.y + pulse);
+
+      // Glowing Aura
+      const glowGrad = ctx.createRadialGradient(0, 0, 8, 0, 0, 32);
+      glowGrad.addColorStop(0, 'rgba(241, 196, 15, 0.6)');
+      glowGrad.addColorStop(1, 'rgba(241, 196, 15, 0)');
+      ctx.fillStyle = glowGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, 32, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw CashCase Sprite
+      if (game.cashCaseImg && game.cashCaseImg.complete && game.cashCaseImg.naturalWidth > 0) {
+        ctx.drawImage(game.cashCaseImg, -20, -16, 40, 32);
+      } else {
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillRect(-16, -12, 32, 24);
+        ctx.strokeRect(-16, -12, 32, 24);
+      }
+
+      // Sparkles & Tag
+      ctx.fillStyle = '#f1c40f';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 3;
+      ctx.font = "900 11px 'Fredoka', sans-serif";
+      ctx.textAlign = 'center';
+      ctx.strokeText(`+$${c.reward}`, 0, -22);
+      ctx.fillText(`+$${c.reward}`, 0, -22);
+
+      // Remaining Lifespan Ring
+      const progress = Math.max(0, c.life / c.maxLife);
+      ctx.strokeStyle = progress > 0.3 ? '#2ecc71' : '#e74c3c';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+      ctx.stroke();
+
+      ctx.restore();
     }
 
     drawHoverVisuals(game);
