@@ -589,6 +589,7 @@ export const Network = {
         else if (data.type === 'PLACE_TOWER') {
             if (this.game) {
                 const type = data.towerType || data.targetShopTower;
+                if (!type) return;
                 const cost = this.game.getTowerCost(type);
 
                 if (!this.game.playerWallets) this.game.playerWallets = {};
@@ -602,8 +603,8 @@ export const Network = {
                 const check = this.game.grid.isPositionValidForPlacement ? this.game.grid.isPositionValidForPlacement(posX, posY, 18) : { valid: true };
 
                 if (wallet >= cost && check.valid) {
-                    this.game.selectedShopTower = type;
-                    this.game.placeShopAgent(posX, posY, cPlayerId);
+                    // Pass `type` directly without overwriting the Host's own selectedShopTower!
+                    this.game.placeShopAgent(posX, posY, cPlayerId, type);
                 }
             }
         }

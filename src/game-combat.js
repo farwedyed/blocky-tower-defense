@@ -69,7 +69,7 @@ export function evaluateSupportBuffs(game) {
 /**
  * Places an agent at specified tile coordinate, checking limits and wallets.
  */
-export function placeShopAgent(game, posX, posY, ownerId = 'p1') {
+export function placeShopAgent(game, posX, posY, ownerId = 'p1', towerType = null) {
   // Support both pixel positions (posX > 30) and legacy tile indices (col, row)
   const isPixel = posX > 25 || posY > 25;
   const x = isPixel ? posX : posX * game.grid.cellSize + game.grid.cellSize / 2;
@@ -81,7 +81,10 @@ export function placeShopAgent(game, posX, posY, ownerId = 'p1') {
     return;
   }
 
-  const type = game.selectedShopTower;
+  // Use the passed towerType directly (prevents hijacking other players' active cursor)
+  const type = towerType || game.selectedShopTower;
+  if (!type) return;
+
   const cost = game.getTowerCost(type);
 
   if (!game.playerWallets) game.playerWallets = {};
