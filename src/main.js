@@ -318,6 +318,9 @@ class Game {
   }
 
   startNextWave(isFromSkip = false) {
+    // Only the Host can trigger a wave start in multiplayer
+    if (Network.mode === 'CLIENT') return;
+
     startNextWave(this, isFromSkip);
 
     // Trigger mid-game Cash Case 5 seconds into scheduled mid-game waves
@@ -981,9 +984,18 @@ class Game {
   toggleAutoMode() {
     this.autoMode = !this.autoMode;
     if (!this.autoMode) {
+      // Paused: Cancel timer and make "START WAVE" clickable
       this.autoStartTimer = 0;
       if (this.ui) {
         this.ui.updateWaveButton(this.waveInProgress);
+      }
+    } else {
+      // Unpaused: If between waves, start countdown to begin next wave
+      if (!this.waveInProgress && this.state === 'playing') {
+        this.autoStartTimer = 3.0;
+        if (this.ui) {
+          this.ui.showAutoCountdown(Math.ceil(this.autoStartTimer));
+        }
       }
     }
     this.ui.updateAutoWaveButton(this.autoMode);
@@ -1243,8 +1255,15 @@ class Game {
           Network.broadcastGameOver(this.wave);
         }
       } else {
-        this.autoStartTimer = this.selectedDifficulty === 'easy' ? 6.0 : 4.0;
-        this.ui.showAutoCountdown(Math.ceil(this.autoStartTimer));
+        // Only run countdown if Auto Wave is ON. 
+        // If Auto Wave is OFF (paused), unlock the "START WAVE" button immediately!
+        if (this.autoMode) {
+          this.autoStartTimer = this.selectedDifficulty === 'easy' ? 6.0 : 4.0;
+          this.ui.showAutoCountdown(Math.ceil(this.autoStartTimer));
+        } else {
+          this.autoStartTimer = 0;
+          this.ui.updateWaveButton(false); // Unlocks the green "START WAVE" button
+        }
       }
 
       this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
