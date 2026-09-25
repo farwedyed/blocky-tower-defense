@@ -18,7 +18,7 @@ if (!window.playerCursors) {
 export const Network = {
     ws: null,
     mode: 'OFFLINE',
-    serverUrl: 'wss://btd2d-farwed.duckdns.org', // Your secure SSL domain
+    serverUrl: 'wss://server.farwede.workers.dev', // Your secure SSL domain
     roomId: null,
     lastUpdate: 0,
     lastClientUpdate: 0,
