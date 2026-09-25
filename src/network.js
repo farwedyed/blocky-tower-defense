@@ -459,8 +459,17 @@ export const Network = {
 
             if (data.obstacles) this.game.grid.obstacles = data.obstacles;
 
+            const startingCash = data.gold !== undefined ? data.gold : (data.isHardcore ? 250 : 600);
+            this.game.playerWallets = data.playerWallets || {};
+            for (const slot of ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8']) {
+              if (this.game.playerWallets[slot] === undefined) {
+                this.game.playerWallets[slot] = startingCash;
+              }
+            }
             this.game.lives = data.lives !== undefined ? data.lives : (data.isHardcore ? 10 : 150);
-            this.game.gold = data.gold !== undefined ? (this.game.playerWallets[window.myPlayerId] || data.gold) : (data.isHardcore ? 250 : 600);
+            this.game.gold = (this.game.playerWallets[window.myPlayerId] !== undefined)
+              ? this.game.playerWallets[window.myPlayerId]
+              : startingCash;
             this.game.maxWaves = data.maxWaves !== undefined ? data.maxWaves : 30;
 
             this.game.wave = 0;
@@ -882,10 +891,38 @@ export const Network = {
             y: bData.y,
             color: bData.color,
             radius: bData.radius,
+            isRocket: bData.isRocket || bData.color === '#e67e22' || bData.color === '#e74c3c' || bData.radius >= 5,
             draw: function(ctx) {
                 ctx.save();
-                ctx.fillStyle = this.color;
-                ctx.fillRect(this.x - this.radius, this.y - this.radius, this.radius * 2, this.radius * 2);
+                if (this.isRocket) {
+                    // Draw vibrant blocky missile with orange body and yellow warhead
+                    ctx.fillStyle = '#e67e22';
+                    ctx.strokeStyle = '#222';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.rect(this.x - 6, this.y - 3, 12, 6);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Yellow nose cone tip
+                    ctx.fillStyle = '#f1c40f';
+                    ctx.beginPath();
+                    ctx.rect(this.x + 6, this.y - 3, 3, 6);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Red exhaust flame
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.fillRect(this.x - 9, this.y - 2, 3, 4);
+                } else {
+                    ctx.fillStyle = (this.color && this.color !== '#34495e') ? this.color : '#f1c40f';
+                    ctx.strokeStyle = '#222';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.rect(this.x - this.radius, this.y - this.radius, this.radius * 2, this.radius * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                }
                 ctx.restore();
             }
         }));
@@ -1015,7 +1052,8 @@ export const Network = {
                 x: b.x,
                 y: b.y,
                 color: b.color,
-                radius: b.radius
+                radius: b.radius,
+                isRocket: !!(b.splashRadius || b.damageType === 'explosive')
             })),
 
             events: [...this.pendingEvents]

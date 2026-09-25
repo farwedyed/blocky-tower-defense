@@ -301,8 +301,8 @@ class Game {
     evaluateSupportBuffs(this);
   }
 
-  placeShopAgent(col, row, ownerId) {
-    placeShopAgent(this, col, row, ownerId);
+  placeShopAgent(col, row, ownerId, towerType = null) {
+    placeShopAgent(this, col, row, ownerId, towerType);
   }
 
   upgradeSelectedTower() {
@@ -694,13 +694,41 @@ class Game {
     });
 
     window.addEventListener('resize', () => {
-      this.upwindow.addEventListener('resize', () => {
       this.updateFullscreenClass();
     });
 
-    // Auto-resync when player focuses back into the browser tab
+    // Background Web Worker ticker keeps host ticking when tab is switched
+    try {
+      const tickerBlob = new Blob([
+        `let timer = null;
+         self.onmessage = function(e) {
+           if (e.data === 'start') {
+             if (!timer) timer = setInterval(() => self.postMessage('tick'), 1000 / 30);
+           } else if (e.data === 'stop') {
+             if (timer) { clearInterval(timer); timer = null; }
+           }
+         };`
+      ], { type: 'application/javascript' });
+      this._bgWorker = new Worker(URL.createObjectURL(tickerBlob));
+      this._bgWorker.onmessage = () => {
+        if (document.hidden && this.state === 'playing') {
+          this.loop(performance.now());
+        }
+      };
+    } catch (e) {
+      console.warn('[Background Ticker] Fallback initialized');
+    }
+
+    // Auto-resync and background simulation when switching tabs
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
+      if (document.hidden) {
+        if (this._bgWorker) {
+          this._bgWorker.postMessage('start');
+        }
+      } else {
+        if (this._bgWorker) {
+          this._bgWorker.postMessage('stop');
+        }
         this.lastTime = performance.now();
         if (this.ui) {
           this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
@@ -709,9 +737,6 @@ class Game {
           this.ui.updateSpeedButton(this.speedMultiplier);
         }
       }
-    });
-    
-    // Automatically clean up multiplayer rooms when closing or refreshing the tabdateFullscreenClass();
     });
     
     // Automatically clean up multiplayer rooms when closing or refreshing the tab
@@ -850,9 +875,8 @@ class Game {
 
       this.playerWallets = {};
       for (const slot of ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8']) {
-        if (window.lobbyPlayers[slot]) {
-          this.playerWallets[slot] = this.gold;
-        }
+        // Guarantee all slots receive full starting gold regardless of connection state
+        this.playerWallets[slot] = this.gold;
       }
 
       if (Network.mode === 'HOST') {
@@ -1151,7 +1175,10 @@ class Game {
         const reward = zombie.goldReward || 10;
         this.gold += reward;
         if (this.playerWallets) {
-          this.playerWallets['p1'] = (this.playerWallets['p1'] || 0) + reward;
+          // Distribute bounty reward to all active player wallets
+          for (const pId of Object.keys(this.playerWallets)) {
+            this.playerWallets[pId] = (this.playerWallets[pId] || 0) + reward;
+          }
         }
         this.effectManager.spawnText(zombie.x, zombie.y - 10, `+$${reward}`, '#f1c40f');
         this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);

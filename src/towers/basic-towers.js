@@ -351,7 +351,7 @@ export class Demoman extends Agent {
     bullets.push(new Rocket(this.x, this.y, this.target, {
       speed: 280,
       damage: this.damage,
-      color: '#34495e',
+      color: '#e67e22',
       radius: 5,
       splashRadius: 60 + this.level * 8
     }));
