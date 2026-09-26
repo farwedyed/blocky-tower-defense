@@ -37,9 +37,9 @@ export const CrazyGamesManager = {
         // Asynchronously initialize the SDK
         await this.sdk.init();
 
-        // Check if domain is disabled (e.g. GitHub Pages)
+        // If hosted on GitHub Pages or custom domain, CrazyGames disables itself
         if (this.sdk.environment === 'disabled') {
-          console.warn('[CrazyGames] SDK disabled on this domain (GitHub Pages/external). Running in standalone mode.');
+          console.warn('[CrazyGames] SDK disabled on this domain (GitHub Pages/standalone). Running in offline fallback.');
           this.isInitialized = false;
           this._resolveInit();
           return this.initPromise;
@@ -49,30 +49,24 @@ export const CrazyGamesManager = {
         console.log('[CrazyGames] SDK successfully initialized in', this.sdk.environment, 'environment!');
 
         // Dynamic Auth Listener
-        if (this.sdk.user) {
-          const authListener = (user) => {
-            if (user) {
-              console.log('[CrazyGames] Auth Listener triggered:', user);
-              this.handleUserLoggedIn(user);
-            }
-          };
-
-          try {
+        try {
+          if (this.sdk.user) {
+            const authListener = (user) => {
+              if (user) {
+                console.log('[CrazyGames] Auth Listener triggered:', user);
+                this.handleUserLoggedIn(user);
+              }
+            };
             this.sdk.user.addAuthListener(authListener);
-          } catch (e) {
-            console.warn('[CrazyGames] Failed to register auth listener:', e);
-          }
 
-          // Initial check: Attempt to fetch current user immediately on startup
-          try {
             const initialUser = await this.sdk.user.getUser();
             if (initialUser) {
               console.log('[CrazyGames] Initial user session detected:', initialUser);
               this.handleUserLoggedIn(initialUser);
             }
-          } catch (e) {
-            console.warn('[CrazyGames] Failed to sync startup user profile:', e);
           }
+        } catch (e) {
+          console.warn('[CrazyGames] Auth initialization bypassed:', e);
         }
 
         // Register multiplayer room join listeners safely
@@ -181,11 +175,19 @@ export const CrazyGamesManager = {
    * Check if game has been launched in instant multiplayer mode
    */
   isInstantMultiplayer: function() {
-    if (this.sdk && this.sdk.game) {
-      return !!this.sdk.game.isInstantMultiplayer;
+    if (this.isAvailable()) {
+      try {
+        return !!this.sdk.game.isInstantMultiplayer;
+      } catch (e) {
+        // Fallback safely if SDK throws on external domains
+      }
     }
-    const params = new URLSearchParams(window.location.search);
-    return params.get('isInstantMultiplayer') === 'true' || params.get('instantJoin') === 'true';
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('isInstantMultiplayer') === 'true' || params.get('instantJoin') === 'true';
+    } catch (e) {
+      return false;
+    }
   },
 
   /**

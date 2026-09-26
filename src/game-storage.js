@@ -189,7 +189,8 @@ export function saveStatsToStorage(game) {
     setStorageItem('tds_quest_rewarded', JSON.stringify(game.questRewarded));
     setStorageItem('tds_tutorial_completed', game.tutorialCompleted ? 'true' : 'false');
     setStorageItem('tds_solo_guided', game.soloGuided ? 'true' : 'false');
-    setStorageItem('tds_leaderboard', JSON.stringify(game.leaderboard));
+    const safeLeaderboard = (game.leaderboard && typeof game.leaderboard === 'object') ? game.leaderboard : {};
+    setStorageItem('tds_leaderboard', JSON.stringify(safeLeaderboard));
   } catch (e) {
     console.warn("Storage save failed.", e);
   }

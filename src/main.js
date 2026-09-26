@@ -244,7 +244,14 @@ class Game {
               const params = new URLSearchParams(window.location.search);
               const startupRoomId = params.get('roomId');
 
-              if (CrazyGamesManager.isInstantMultiplayer() || startupRoomId) {
+              let isInstantMulti = false;
+              try {
+                isInstantMulti = CrazyGamesManager.isInstantMultiplayer();
+              } catch (e) {
+                isInstantMulti = false;
+              }
+
+              if (isInstantMulti || startupRoomId) {
                 console.log('[CrazyGames] Multiplayer join/host triggered on launch. Bypassing onboarding.');
                 this.tutorialCompleted = true;
                 this.tutorialActive = false;
@@ -867,7 +874,9 @@ class Game {
       this.grid.clear();
       this.effectManager.clear();
 
-      if (isTutorial || (this.tutorialActive && Network.mode === 'OFFLINE')) {
+      const isTutorialMatch = isTutorial || (this.tutorialActive && Network.mode === 'OFFLINE');
+
+      if (isTutorialMatch) {
         this.tutorialActive = true;
         this.tutorialStep = 0.5; 
         this.selectedShopTower = null;
@@ -916,7 +925,7 @@ class Game {
       this.ui.updateWaveButton(false);
       this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
 
-      if (runTutorialThisMatch) {
+      if (isTutorialMatch) {
         this.tutorialStep = 0.5;
       }
     } catch (e) {
