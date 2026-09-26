@@ -58,6 +58,13 @@ export class LobbyUI {
       }
     });
 
+    // Guard against triggering startup animations or confetti
+    this._animationsReady = false;
+    this._armTimer = null;
+    this._lastDisplayedCoins = undefined;
+    this._lastDisplayedLevel = undefined;
+    this._lastDisplayedXp = undefined;
+
     // Default Lobby UI to clean Splash State on startup
     this.showSplashState();
   }
@@ -513,17 +520,15 @@ export class LobbyUI {
 
   updateLobbyMeta(level, xp, coins) {
     const isLobbyVisible = this.lobbyView && !this.lobbyView.classList.contains('hidden');
+    const nextLevelXp = level * 100;
 
-    // ─── COINS ANIMATION ───
-    if (this._lastDisplayedCoins === undefined) {
+    // ─── STARTUP GUARD: Never play animations, sounds, or confetti on boot ───
+    if (!this._animationsReady) {
       this._lastDisplayedCoins = coins;
-      if (this.playerCoinsVal) this.playerCoinsVal.textContent = coins.toLocaleString();
-    } else if (coins > this._lastDisplayedCoins && isLobbyVisible) {
-      const prev = this._lastDisplayedCoins;
-      this._lastDisplayedCoins = coins;
-      this.animateCoinIncrease(prev, coins);
-    } else {
-      if (isLobbyVisible) this._lastDisplayedCoins = coins;
+      this._lastDisplayedLevel = level;
+      this._lastDisplayedXp = xp;
+
+      if (this.playerLevel) this.playerLevel.textContent = level;
       if (this.playerCoinsVal) {
         this.playerCoinsVal.textContent = coins.toLocaleString();
       } else if (this.playerCoins) {
@@ -531,50 +536,69 @@ export class LobbyUI {
         if (valEl) valEl.textContent = coins.toLocaleString();
         else this.playerCoins.textContent = `🪙 ${coins}`;
       }
-    }
 
-    // ─── LEVEL & XP ANIMATION ───
-    if (this._lastDisplayedLevel === undefined) {
-      this._lastDisplayedLevel = level;
-      this._lastDisplayedXp = xp;
-
-      if (this.playerLevel) this.playerLevel.textContent = level;
-      const nextLevelXp = level * 100;
       const percent = Math.min(100, (xp / nextLevelXp) * 100);
       if (this.playerXpFill) this.playerXpFill.style.width = `${percent}%`;
       if (this.playerXpText) this.playerXpText.textContent = `${xp} / ${nextLevelXp}`;
-    } else if (isLobbyVisible) {
-      if (level > this._lastDisplayedLevel) {
-        // Player Leveled Up!
-        const pLevel = this._lastDisplayedLevel;
-        const pXp = this._lastDisplayedXp;
-        this._lastDisplayedLevel = level;
-        this._lastDisplayedXp = xp;
-        this.animateLevelUp(pLevel, pXp, level, xp);
-      } else if (xp > this._lastDisplayedXp) {
-        // Gained XP within same level
-        const pXp = this._lastDisplayedXp;
-        this._lastDisplayedXp = xp;
-        this.animateXpIncrease(pXp, xp, level);
+
+      // Arm animations 1.5s after boot once saved stats are fully loaded
+      if (!this._armTimer) {
+        this._armTimer = setTimeout(() => {
+          this._animationsReady = true;
+          if (this.game) {
+            this._lastDisplayedCoins = this.game.playerCoins;
+            this._lastDisplayedLevel = this.game.playerLevel;
+            this._lastDisplayedXp = this.game.playerXp;
+          }
+        }, 1500);
+      }
+    } else {
+      // ─── ACTIVE GAMEPLAY: COINS ANIMATION ───
+      if (coins > this._lastDisplayedCoins && isLobbyVisible) {
+        const prev = this._lastDisplayedCoins;
+        this._lastDisplayedCoins = coins;
+        this.animateCoinIncrease(prev, coins);
       } else {
-        this._lastDisplayedLevel = level;
-        this._lastDisplayedXp = xp;
+        if (isLobbyVisible) this._lastDisplayedCoins = coins;
+        if (this.playerCoinsVal) {
+          this.playerCoinsVal.textContent = coins.toLocaleString();
+        } else if (this.playerCoins) {
+          const valEl = document.getElementById('player-coins-val');
+          if (valEl) valEl.textContent = coins.toLocaleString();
+          else this.playerCoins.textContent = `🪙 ${coins}`;
+        }
+      }
+
+      // ─── ACTIVE GAMEPLAY: LEVEL & XP ANIMATION ───
+      if (isLobbyVisible) {
+        if (level > this._lastDisplayedLevel) {
+          // Player leveled up during gameplay!
+          const pLevel = this._lastDisplayedLevel;
+          const pXp = this._lastDisplayedXp;
+          this._lastDisplayedLevel = level;
+          this._lastDisplayedXp = xp;
+          this.animateLevelUp(pLevel, pXp, level, xp);
+        } else if (xp > this._lastDisplayedXp) {
+          // Gained match XP
+          const pXp = this._lastDisplayedXp;
+          this._lastDisplayedXp = xp;
+          this.animateXpIncrease(pXp, xp, level);
+        } else {
+          this._lastDisplayedLevel = level;
+          this._lastDisplayedXp = xp;
+          if (this.playerLevel) this.playerLevel.textContent = level;
+          const percent = Math.min(100, (xp / nextLevelXp) * 100);
+          if (this.playerXpFill) this.playerXpFill.style.width = `${percent}%`;
+          if (this.playerXpText) this.playerXpText.textContent = `${xp} / ${nextLevelXp}`;
+        }
+      } else {
+        // Lobby currently hidden (in battle): update DOM quietly
         if (this.playerLevel) this.playerLevel.textContent = level;
-        const nextLevelXp = level * 100;
         const percent = Math.min(100, (xp / nextLevelXp) * 100);
         if (this.playerXpFill) this.playerXpFill.style.width = `${percent}%`;
         if (this.playerXpText) this.playerXpText.textContent = `${xp} / ${nextLevelXp}`;
       }
-    } else {
-      // Lobby hidden: update DOM quietly without advancing animation state
-      if (this.playerLevel) this.playerLevel.textContent = level;
-      const nextLevelXp = level * 100;
-      const percent = Math.min(100, (xp / nextLevelXp) * 100);
-      if (this.playerXpFill) this.playerXpFill.style.width = `${percent}%`;
-      if (this.playerXpText) this.playerXpText.textContent = `${xp} / ${nextLevelXp}`;
     }
-
-    const nextLevelXp = level * 100;
 
     // Toggle Level 5 Cosmetic Shop (Crates) view
     const cratesLockedView = document.getElementById('crates-locked-view');
