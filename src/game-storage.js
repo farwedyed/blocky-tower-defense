@@ -68,6 +68,7 @@ export async function loadStatsFromStorage(game) {
     const quests = getStorageItem('tds_quests');
     const questRewarded = getStorageItem('tds_quest_rewarded');
     const tutorial = getStorageItem('tds_tutorial_completed');
+    const soloGuided = getStorageItem('tds_solo_guided');
     const leaderboard = getStorageItem('tds_leaderboard');
 
     if (level) game.playerLevel = parseInt(level);
@@ -116,12 +117,14 @@ export async function loadStatsFromStorage(game) {
       }
     }
     
+    game.soloGuided = (soloGuided === 'true');
     if (tutorial === 'true') {
       game.tutorialCompleted = true;
       game.tutorialActive = false;
     } else {
       game.tutorialCompleted = false;
       game.tutorialActive = true;
+      game.soloGuided = false;
     }
     
     if (leaderboard) {
@@ -184,6 +187,7 @@ export function saveStatsToStorage(game) {
     setStorageItem('tds_quests', JSON.stringify(game.questProgress));
     setStorageItem('tds_quest_rewarded', JSON.stringify(game.questRewarded));
     setStorageItem('tds_tutorial_completed', game.tutorialCompleted ? 'true' : 'false');
+    setStorageItem('tds_solo_guided', game.soloGuided ? 'true' : 'false');
     setStorageItem('tds_leaderboard', JSON.stringify(game.leaderboard));
   } catch (e) {
     console.warn("Storage save failed.", e);

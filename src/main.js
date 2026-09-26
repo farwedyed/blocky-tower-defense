@@ -78,6 +78,8 @@ class Game {
     this.tutorialCompleted = false;
     this.tutorialActive = false;
     this.tutorialStep = 0;
+    this.soloGuided = false;
+    this.shouldShowSoloGuide = false;
 
     // In-Match stats
     this.lives = 150;
@@ -260,7 +262,10 @@ class Game {
                 console.log('[Onboarding] First-time player detected! Deploying directly to tutorial match.');
                 this.selectedMap = 'grassland';
                 this.selectedDifficulty = 'easy';
-                this.deployToMatch();
+                this.tutorialActive = true;
+                this.tutorialCompleted = true; // Permanently saved so it never appears again
+                this.saveStatsToStorage();
+                this.deployToMatch(true);
               } else {
                 if (this.ui && this.ui.lobby) {
                   this.ui.lobby.showSplashState();
@@ -810,18 +815,18 @@ class Game {
     this.saveStatsToStorage();
   }
 
-  deployToMatch() {
+  deployToMatch(isTutorial = false) {
     // Avoid calling midgame ads for first-time players entering the tutorial match
-    if (Network.mode === 'OFFLINE' && this.tutorialCompleted) {
+    if (Network.mode === 'OFFLINE' && !isTutorial) {
       CrazyGamesManager.requestMidgameAd(() => {
-        this.continueDeployment();
+        this.continueDeployment(isTutorial);
       });
     } else {
-      this.continueDeployment();
+      this.continueDeployment(isTutorial);
     }
   }
 
-  continueDeployment() {
+  continueDeployment(isTutorial = false) {
     try {
       this._rewardsClaimed = false; // Reset rewards claim flag for new match
       this.state = 'playing';
@@ -862,13 +867,12 @@ class Game {
       this.grid.clear();
       this.effectManager.clear();
 
-      const runTutorialThisMatch = !this.tutorialCompleted && (Network.mode === 'OFFLINE');
-
-      if (runTutorialThisMatch) {
+      if (isTutorial || (this.tutorialActive && Network.mode === 'OFFLINE')) {
         this.tutorialActive = true;
         this.tutorialStep = 0.5; 
         this.selectedShopTower = null;
         this.tutorialCompleted = true;
+        this.shouldShowSoloGuide = true; // Prepare guide arrow for when they return to lobby
         this.saveStatsToStorage();
       } else {
         this.tutorialActive = false;

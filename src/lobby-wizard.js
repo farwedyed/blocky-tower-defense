@@ -36,18 +36,6 @@ export class LobbyWizard {
           this.stepDiff.classList.add('active');
         }
         this.drawAllBossPreviews();
-
-        // Tutorial Step 2: Point directly to PREPARATION button
-        if (!this.game.tutorialCompleted) {
-          this.lobbyUI.parentUI.hidePointer();
-          document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
-          
-          const nextDiffBtn = document.getElementById('btn-wizard-next-diff');
-          if (nextDiffBtn) {
-            this.lobbyUI.parentUI.showPointerAt(nextDiffBtn, 'down');
-            nextDiffBtn.classList.add('tut-highlight');
-          }
-        }
       });
     }
 
@@ -60,7 +48,6 @@ export class LobbyWizard {
           this.stepMaps.classList.remove('hidden');
           this.stepMaps.classList.add('active');
         }
-        this.lobbyUI.triggerStep1Pointer();
       });
     }
 
@@ -73,18 +60,6 @@ export class LobbyWizard {
           this.stepPrep.classList.remove('hidden');
           this.stepPrep.classList.add('active');
         }
-
-        // Tutorial Step 3: Point to DEPLOY TO MATCH button
-        if (!this.game.tutorialCompleted) {
-          this.lobbyUI.parentUI.hidePointer();
-          document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
-          
-          const deployBtn = document.getElementById('btn-deploy');
-          if (deployBtn) {
-            this.lobbyUI.parentUI.showPointerAt(deployBtn, 'down');
-            deployBtn.classList.add('tut-highlight');
-          }
-        }
       });
     }
 
@@ -96,17 +71,6 @@ export class LobbyWizard {
         if (this.stepDiff) {
           this.stepDiff.classList.remove('hidden');
           this.stepDiff.classList.add('active');
-        }
-
-        if (!this.game.tutorialCompleted) {
-          this.lobbyUI.parentUI.hidePointer();
-          document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
-          
-          const nextDiffBtn = document.getElementById('btn-wizard-next-diff');
-          if (nextDiffBtn) {
-            this.lobbyUI.parentUI.showPointerAt(nextDiffBtn, 'down');
-            nextDiffBtn.classList.add('tut-highlight');
-          }
         }
       });
     }
@@ -131,17 +95,6 @@ export class LobbyWizard {
         const mapId = card.getAttribute('data-map-id');
         this.game.setSelectedMap(mapId);
         this.renderLeaderboard(mapId);
-
-        if (!this.game.tutorialCompleted) {
-          this.lobbyUI.parentUI.hidePointer();
-          document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
-          
-          const nextMapsBtn = document.getElementById('btn-wizard-next-maps');
-          if (nextMapsBtn) {
-            this.lobbyUI.parentUI.showPointerAt(nextMapsBtn, 'down');
-            nextMapsBtn.classList.add('tut-highlight');
-          }
-        }
       });
     });
   }

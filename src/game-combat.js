@@ -231,7 +231,17 @@ export function sellSelectedTower(game) {
   const tower = game.selectedPlacedTower;
 
   if (Network.mode === 'CLIENT') {
-    Network.conn.send({ type: 'SELL_TOWER', id: tower.id, col: tower.gridX, row: tower.gridY });
+    Network.conn.send({
+      type: 'SELL_TOWER',
+      towerId: tower.id,
+      id: tower.id,
+      key: tower.id,
+      x: Math.round(tower.x),
+      y: Math.round(tower.y),
+      col: tower.gridX,
+      row: tower.gridY,
+      senderId: window.myPlayerId
+    });
     game.setSelectedPlacedTower(null);
   } else {
     const refund = game.tutorialActive ? tower.cost : tower.getSellValue();

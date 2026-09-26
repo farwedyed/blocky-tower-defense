@@ -221,15 +221,17 @@ export class LobbyCoop {
 
     this.lobbyUI.toggleSoloElements(false);
 
-    if (!this.game.tutorialCompleted) {
-      this.lobbyUI.parentUI.hidePointer();
+    // Show gliding hand guide on PLAY SOLO only if they finished tutorial and haven't clicked Play Solo yet
+    if (this.game.shouldShowSoloGuide && !this.game.soloGuided) {
       setTimeout(() => {
         const playSoloBtn = document.getElementById('btn-select-solo');
         if (playSoloBtn) {
-          this.lobbyUI.parentUI.showPointerAt(playSoloBtn, 'down');
           playSoloBtn.classList.add('tut-highlight');
+          if (this.lobbyUI.parentUI && this.lobbyUI.parentUI.gameUI) {
+            this.lobbyUI.parentUI.gameUI.showHandGuide(null, playSoloBtn);
+          }
         }
-      }, 400);
+      }, 350);
     }
   }
 
@@ -390,6 +392,13 @@ export class LobbyCoop {
 
     if (btnSelectSolo) {
       btnSelectSolo.addEventListener('click', () => {
+        // Clear tutorial highlight and arrow forever
+        btnSelectSolo.classList.remove('tut-highlight');
+        this.lobbyUI.parentUI.hidePointer();
+        this.game.shouldShowSoloGuide = false;
+        this.game.soloGuided = true;
+        this.game.saveStatsToStorage();
+
         // If the player was previously hosting or connected to a room, disconnect cleanly
         if (Network.mode !== 'OFFLINE') {
           Network.disconnect();

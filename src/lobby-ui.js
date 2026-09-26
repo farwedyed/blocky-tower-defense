@@ -143,7 +143,6 @@ export class LobbyUI {
       if (mapsStep) {
         mapsStep.classList.remove('hidden');
         mapsStep.classList.add('active');
-        this.triggerStep1Pointer();
       }
       if (diffStep) diffStep.classList.add('hidden');
       if (prepStep) prepStep.classList.add('hidden');
@@ -151,16 +150,7 @@ export class LobbyUI {
   }
 
   triggerStep1Pointer() {
-    if (!this.game.tutorialCompleted) {
-      this.parentUI.hidePointer();
-      document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
-      
-      const nextMapsBtn = document.getElementById('btn-wizard-next-maps');
-      if (nextMapsBtn) {
-        this.parentUI.showPointerAt(nextMapsBtn, 'down');
-        nextMapsBtn.classList.add('tut-highlight');
-      }
-    }
+    // Left intentionally empty: the lobby wizard never displays tutorial highlights
   }
 
   initEventListeners() {

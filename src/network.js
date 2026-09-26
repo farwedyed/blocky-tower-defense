@@ -647,25 +647,39 @@ export const Network = {
         }
         else if (data.type === 'SELL_TOWER') {
             if (this.game) {
+                const targetPlayerId = data.senderId || cPlayerId || 'p1';
                 let tower = null;
-                if (data.towerId) tower = this.game.grid.towers.get(data.towerId);
-                if (!tower && data.key) tower = this.game.grid.towers.get(data.key);
+
+                const targetId = data.towerId || data.id || data.key;
+                if (targetId) tower = this.game.grid.towers.get(targetId);
                 if (!tower && data.x !== undefined && data.y !== undefined && this.game.grid.getTowerAt) {
-                    tower = this.game.grid.getTowerAt(data.x, data.y, 14);
+                    tower = this.game.grid.getTowerAt(data.x, data.y, 20);
                 }
                 if (!tower) {
                     tower = this.game.grid.towers.get(`${data.col},${data.row}`);
                 }
 
                 if (tower) {
+                    // Only allow players to sell their own towers (or allow Host to sell anything)
+                    if (tower.ownerId && tower.ownerId !== targetPlayerId && targetPlayerId !== 'p1') {
+                        return;
+                    }
+
                     const refund = tower.getSellValue();
                     this.game.grid.removeTower(tower);
-                    if (this.game.playerWallets) {
-                        this.game.playerWallets[cPlayerId] += refund;
-                    } else {
-                        this.game.gold -= refund;
+
+                    if (!this.game.playerWallets) this.game.playerWallets = {};
+                    if (this.game.playerWallets[targetPlayerId] === undefined) {
+                        this.game.playerWallets[targetPlayerId] = this.game.gold;
                     }
+                    this.game.playerWallets[targetPlayerId] += refund;
+
+                    if (targetPlayerId === 'p1') {
+                        this.game.gold += refund;
+                    }
+
                     this.game.effectManager.spawnPlacementSparks(tower.x, tower.y, 40);
+                    soundManager.playPlace();
                 }
             }
         }

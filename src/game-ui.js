@@ -382,142 +382,157 @@ export class GameUI {
     ctx.restore();
   }
 
-  showPointerAt(targetElement, direction = 'down') {
-    this.hidePointer();
-    if (!this.game.tutorialActive) return; // Prevent pointers outside tutorial
-    if (!targetElement) return;
+  /* ─── POLISHED GLIDING HAND GUIDE ENGINE ─── */
+  showHandGuide(startTarget, endTarget) {
+    this.hideHandGuide();
+    const guideEl = document.getElementById('tutorial-hand-guide');
+    if (!guideEl) return;
 
-    this.activePointerTarget = targetElement;
-    this.activePointerDirection = direction;
+    this.activeHandStart = startTarget;
+    this.activeHandEnd = endTarget;
+    guideEl.classList.remove('hidden');
 
-    const arrow = document.createElement('div');
-    arrow.id = 'active-tut-arrow';
-    arrow.style.cssText = `
-      position: fixed;
-      z-index: 20000;
-      pointer-events: none;
-      width: 0;
-      height: 0;
-      border-left: 12px solid transparent;
-      border-right: 12px solid transparent;
-      border-top: 20px solid #f1c40f;
-      filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6));
-      transition: all 0.2s ease-out;
-    `;
+    const handImg = document.getElementById('tut-hand-img');
+    const rippleEl = document.getElementById('tut-hand-ripple');
 
-    document.body.appendChild(arrow);
-    this.repositionPointer(targetElement, direction);
-  }
+    let startTime = performance.now();
+    const cycleDuration = 1800; // 1.8 second smooth loop
 
-  showPointerAtCanvasCenter() {
-    this.hidePointer();
-    if (!this.game.tutorialActive) return;
-    const canvas = document.getElementById('game-canvas');
-    if (!canvas) return;
+    const animLoop = (now) => {
+      if (!this.activeHandEnd) return;
 
-    const arrow = document.createElement('div');
-    arrow.id = 'active-tut-arrow';
-    arrow.style.cssText = `
-      position: fixed;
-      z-index: 20000;
-      pointer-events: none;
-      width: 0;
-      height: 0;
-      border-left: 12px solid transparent;
-      border-right: 12px solid transparent;
-      border-top: 20px solid #f1c40f;
-      filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6));
-      transition: all 0.2s ease-out;
-    `;
-    document.body.appendChild(arrow);
+      const startCoords = this.getTargetScreenCoords(this.activeHandStart || this.activeHandEnd);
+      const endCoords = this.getTargetScreenCoords(this.activeHandEnd);
 
-    const reposition = () => {
-      const rect = canvas.getBoundingClientRect();
-      arrow.style.animation = 'tutArrowBounce 0.6s infinite ease-in-out';
-      arrow.style.transform = 'none';
-      arrow.style.top = `${rect.top + rect.height / 2 - 45}px`;
-      arrow.style.left = `${rect.left + rect.width / 2 - 12}px`;
+      if (!endCoords) {
+        this.handAnimFrame = requestAnimationFrame(animLoop);
+        return;
+      }
+
+      const effectiveStart = startCoords || endCoords;
+      const elapsed = (now - startTime) % cycleDuration;
+      const progress = elapsed / cycleDuration;
+
+      let curX = endCoords.x;
+      let curY = endCoords.y;
+
+      if (progress < 0.45) {
+        // Phase 1: Gliding smoothly from Start to Target
+        const p = progress / 0.45;
+        const ease = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+        curX = effectiveStart.x + (endCoords.x - effectiveStart.x) * ease;
+        curY = effectiveStart.y + (endCoords.y - effectiveStart.y) * ease;
+
+        guideEl.style.opacity = Math.min(1, p * 3);
+        if (handImg) handImg.style.transform = 'scale(1)';
+        if (rippleEl) {
+          rippleEl.style.transform = 'scale(0)';
+          rippleEl.style.opacity = '0';
+        }
+      } else if (progress < 0.65) {
+        // Phase 2: Tap down / Click animation with expanding ripple
+        const tapP = (progress - 0.45) / 0.20;
+        curX = endCoords.x;
+        curY = endCoords.y;
+
+        guideEl.style.opacity = '1';
+        if (handImg) handImg.style.transform = `scale(${1 - Math.sin(tapP * Math.PI) * 0.22})`;
+
+        if (rippleEl) {
+          rippleEl.style.transform = `scale(${0.4 + tapP * 2.2})`;
+          rippleEl.style.opacity = `${1 - tapP}`;
+        }
+      } else if (progress < 0.82) {
+        // Phase 3: Hold at destination
+        curX = endCoords.x;
+        curY = endCoords.y;
+        guideEl.style.opacity = '1';
+        if (handImg) handImg.style.transform = 'scale(1)';
+        if (rippleEl) {
+          rippleEl.style.opacity = '0';
+        }
+      } else {
+        // Phase 4: Fade out before looping back
+        const fadeP = (progress - 0.82) / 0.18;
+        curX = endCoords.x;
+        curY = endCoords.y;
+        guideEl.style.opacity = `${1 - fadeP}`;
+      }
+
+      guideEl.style.left = `${curX}px`;
+      guideEl.style.top = `${curY}px`;
+
+      this.handAnimFrame = requestAnimationFrame(animLoop);
     };
 
-    reposition();
-    window.addEventListener('resize', reposition);
-    arrow._cleanupResize = () => window.removeEventListener('resize', reposition);
+    this.handAnimFrame = requestAnimationFrame(animLoop);
   }
 
-  showPointerAtCanvasTile(col, row) {
-    this.hidePointer();
-    if (!this.game.tutorialActive) return;
-    const canvas = document.getElementById('game-canvas');
-    if (!canvas) return;
+  hideHandGuide() {
+    this.activeHandStart = null;
+    this.activeHandEnd = null;
+    if (this.handAnimFrame) {
+      cancelAnimationFrame(this.handAnimFrame);
+      this.handAnimFrame = null;
+    }
+    const guideEl = document.getElementById('tutorial-hand-guide');
+    if (guideEl) guideEl.classList.add('hidden');
+  }
 
-    const arrow = document.createElement('div');
-    arrow.id = 'active-tut-arrow';
-    arrow.style.cssText = `
-      position: fixed;
-      z-index: 20000;
-      pointer-events: none;
-      width: 0;
-      height: 0;
-      border-left: 12px solid transparent;
-      border-right: 12px solid transparent;
-      border-top: 20px solid #f1c40f;
-      filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6));
-      transition: all 0.2s ease-out;
-    `;
-    document.body.appendChild(arrow);
+  getTargetScreenCoords(target) {
+    if (!target) return null;
 
-    const reposition = () => {
+    // Canvas grid coordinates { col, row }
+    if (typeof target.col === 'number' && typeof target.row === 'number') {
+      const canvas = document.getElementById('game-canvas');
+      if (!canvas) return null;
       const rect = canvas.getBoundingClientRect();
       const scaleX = rect.width / 800;
       const scaleY = rect.height / 600;
-      
-      const tileX = (col * 40 + 20) * scaleX;
-      const tileY = (row * 40 + 20) * scaleY;
+      return {
+        x: rect.left + (target.col * 40 + 20) * scaleX,
+        y: rect.top + (target.row * 40 + 20) * scaleY
+      };
+    }
 
-      arrow.style.animation = 'tutArrowBounce 0.6s infinite ease-in-out';
-      arrow.style.transform = 'none';
-      arrow.style.top = `${rect.top + tileY - 45}px`;
-      arrow.style.left = `${rect.left + tileX - 12}px`;
-    };
+    // Canvas normalized viewport percentages { canvasPercentX, canvasPercentY }
+    if (typeof target.canvasPercentX === 'number') {
+      const canvas = document.getElementById('game-canvas');
+      if (!canvas) return null;
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width * target.canvasPercentX,
+        y: rect.top + rect.height * target.canvasPercentY
+      };
+    }
 
-    reposition();
-    window.addEventListener('resize', reposition);
-    arrow._cleanupResize = () => window.removeEventListener('resize', reposition);
+    // DOM Element
+    if (target instanceof HTMLElement && target.isConnected) {
+      const rect = target.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      };
+    }
+
+    return null;
   }
 
-  repositionPointer(targetElement, direction = 'down') {
-    const arrow = document.getElementById('active-tut-arrow');
-    if (!arrow || !targetElement) return;
+  // Compatibility shims so older calls won't crash
+  showPointerAt(targetElement) {
+    this.showHandGuide(this.commanderWrapper, targetElement);
+  }
 
-    const rect = targetElement.getBoundingClientRect();
+  showPointerAtCanvasCenter() {
+    this.showHandGuide(this.commanderWrapper, { canvasPercentX: 0.5, canvasPercentY: 0.5 });
+  }
 
-    if (direction === 'down') {
-      arrow.style.animation = 'tutArrowBounce 0.6s infinite ease-in-out';
-      arrow.style.transform = 'none';
-      arrow.style.top = `${rect.top - 28}px`;
-      arrow.style.left = `${rect.left + rect.width / 2 - 12}px`;
-    } else if (direction === 'left') {
-      arrow.style.animation = 'tutArrowBounceLeft 0.6s infinite ease-in-out';
-      arrow.style.transform = 'rotate(90deg)';
-      arrow.style.top = `${rect.top + rect.height / 2 - 10}px`;
-      arrow.style.left = `${rect.right + 12}px`;
-    } else if (direction === 'right') {
-      arrow.style.animation = 'tutArrowBounceRight 0.6s infinite ease-in-out';
-      arrow.style.transform = 'rotate(-90deg)';
-      arrow.style.top = `${rect.top + rect.height / 2 - 10}px`;
-      arrow.style.left = `${rect.left - 28}px`;
-    }
+  showPointerAtCanvasTile(col, row) {
+    this.showHandGuide(this.commanderWrapper, { col, row });
   }
 
   hidePointer() {
-    this.activePointerTarget = null;
-    const arrow = document.getElementById('active-tut-arrow');
-    if (arrow) {
-      if (arrow._cleanupResize) {
-        arrow._cleanupResize();
-      }
-      arrow.remove();
-    }
+    this.hideHandGuide();
   }
 
   renderPlacementShop() {
@@ -934,16 +949,26 @@ export class GameUI {
 
   showTutorialHint(step) {
     if (!this.game.tutorialActive) return;
-    this.dismissCommanderDialog(); 
     if (!this.commanderWrapper) return;
 
+    // Show the dark cinematic shadow
+    const dimOverlay = document.getElementById('tutorial-dim-overlay');
+    if (dimOverlay) dimOverlay.classList.remove('hidden');
+
     this.commanderWrapper.classList.remove('hidden');
+
+    // Trigger juicy pop-up animation and alert sound
+    this.commanderWrapper.classList.remove('commander-pop-anim');
+    void this.commanderWrapper.offsetWidth; // Force CSS reflow
+    this.commanderWrapper.classList.add('commander-pop-anim');
+    soundManager.playTick();
+
     this.drawCommanderFace();
 
     const messages = {
-      0.5: "Welcome to the battleground, rookie! I am your Commander. Tap anywhere on the map grid to clear the direction directives and ready up.",
+      0.5: "Welcome to the battleground, rookie! I am your Commander. Tap anywhere on the map grid to clear the directives and ready up.",
       1: "Let's set up a perimeter. Select the Scout from your troops panel on the right.",
-      1.5: "Excellent. Now, place your Scout near the path (like the highlighted tile). You can place him anywhere valid!",
+      1.5: "Now, drag him over and deploy him near the road on the highlighted tile!",
       2: "Good job! Now, tap directly on your placed Scout to select him.",
       2.5: "Great! Now press UPGRADE in your action panel to power him up before starting the wave.",
       3: "Looking strong! Now, press 'START WAVE' to summon the training zombies!",
@@ -953,11 +978,7 @@ export class GameUI {
     this.commanderText.textContent = messages[step] || "Awaiting operational instructions...";
 
     if (this.btnCommanderSkip) {
-      if (step >= 0.5 && step < 4) {
-        this.btnCommanderSkip.style.display = 'block';
-      } else {
-        this.btnCommanderSkip.style.display = 'none';
-      }
+      this.btnCommanderSkip.style.display = (step >= 0.5 && step < 4) ? 'block' : 'none';
     }
 
     if (step === 4) {
@@ -965,6 +986,7 @@ export class GameUI {
       this.btnCommanderAction.onclick = () => {
         this.game.tutorialCompleted = true;
         this.game.tutorialActive = false; 
+        this.game.shouldShowSoloGuide = true;
         this.game.saveStatsToStorage();
         this.dismissTutorial();
         CrazyGamesManager.gameplayStart();
@@ -987,6 +1009,11 @@ export class GameUI {
     }
 
     this.commanderWrapper.classList.remove('hidden');
+    this.commanderWrapper.classList.remove('commander-pop-anim');
+    void this.commanderWrapper.offsetWidth;
+    this.commanderWrapper.classList.add('commander-pop-anim');
+    soundManager.playTick();
+
     this.drawCommanderFace();
     this.commanderText.textContent = msg;
     this.btnCommanderAction.textContent = "DISMISS ✓";
@@ -996,22 +1023,23 @@ export class GameUI {
   }
 
   activateStepPointers(step) {
-    this.hidePointer();
+    document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
     if (!this.game.tutorialActive) return;
 
     if (step === 0.5) {
-      this.showPointerAtCanvasCenter(); 
-    }
+      // Hand glides from Commander to the center of the battlefield
+      this.showHandGuide(this.commanderWrapper, { canvasPercentX: 0.5, canvasPercentY: 0.5 });
+    } 
     else if (step === 1) {
+      // Hand glides from Commander to Scout in shop
       const scoutBtn = this.equippedAgentsList.querySelector('.placement-btn[data-type="scout"]');
       if (scoutBtn) {
-        this.showPointerAt(scoutBtn, 'right');
         scoutBtn.classList.add('tut-highlight');
+        this.showHandGuide(this.commanderWrapper, scoutBtn);
 
         const onScoutSelect = () => {
           scoutBtn.removeEventListener('click', onScoutSelect);
           scoutBtn.classList.remove('tut-highlight');
-          this.hidePointer();
           if (this.game.tutorialActive) {
             this.game.tutorialStep = 1.5;
             this.showTutorialHint(1.5);
@@ -1021,33 +1049,31 @@ export class GameUI {
       }
     } 
     else if (step === 1.5) {
-      this.showPointerAtCanvasTile(2, 2); 
-    }
+      // Hand glides from Scout button in shop -> across into tile (2, 2) on the map on loop!
+      const scoutBtn = this.equippedAgentsList.querySelector('.placement-btn[data-type="scout"]');
+      this.showHandGuide(scoutBtn || this.commanderWrapper, { col: 2, row: 2 });
+    } 
     else if (step === 2) {
-      let scout = null;
-      for (const t of this.game.grid.towers.values()) {
-        if (t.type === 'scout') {
-          scout = t;
-          break;
-        }
-      }
-      if (scout) {
-        this.showPointerAtCanvasTile(scout.gridX, scout.gridY);
-      } else {
-        this.showPointerAtCanvasTile(2, 2);
-      }
-    }
+      // Hand guides clicking the placed Scout
+      this.showHandGuide(this.commanderWrapper, { col: 2, row: 2 });
+    } 
     else if (step === 2.5) {
+      // Hand guides clicking the UPGRADE button
       if (this.btnUpgrade) {
-        this.showPointerAt(this.btnUpgrade, 'left');
         this.btnUpgrade.classList.add('tut-highlight');
+        this.showHandGuide({ col: 2, row: 2 }, this.btnUpgrade);
+      }
+    } 
+    else if (step === 3) {
+      // Hand glides to START WAVE button
+      if (this.btnNextWave) {
+        this.btnNextWave.classList.add('tut-highlight');
+        this.showHandGuide(this.commanderWrapper, this.btnNextWave);
       }
     }
-    else if (step === 3) {
-      if (this.btnNextWave) {
-        this.showPointerAt(this.btnNextWave, 'down');
-        this.btnNextWave.classList.add('tut-highlight');
-      }
+    else if (step === 4) {
+      // Hand points to FINISH TUTORIAL button
+      this.showHandGuide(this.commanderWrapper, this.btnCommanderAction);
     }
   }
 
@@ -1059,7 +1085,10 @@ export class GameUI {
 
   dismissTutorial() {
     document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
-    this.hidePointer();
+    this.hideHandGuide();
+
+    const dimOverlay = document.getElementById('tutorial-dim-overlay');
+    if (dimOverlay) dimOverlay.classList.add('hidden');
 
     if (this.btnCommanderSkip) {
       this.btnCommanderSkip.style.display = 'none';
