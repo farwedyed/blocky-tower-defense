@@ -372,7 +372,7 @@ export function startNextWave(game, isFromSkip = false) {
     interval: blueprint.rate
   });
 
-  game.effectManager.spawnText(400, 300, `WAVE ${game.wave}`, '#f1c40f');
+  game.effectManager.spawnWaveText(`WAVE ${game.wave} / ${game.maxWaves}`, '#f1c40f');
 
   if (game.tutorialActive && game.tutorialStep === 3) {
     game.tutorialStep = 4;

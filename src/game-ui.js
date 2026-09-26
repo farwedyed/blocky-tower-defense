@@ -71,12 +71,14 @@ export class GameUI {
     }
 
     this.btnReturnLobby.addEventListener('click', () => {
-      soundManager.playTick(); // Add click sound
-      this.game.quitToLobby(true); // Force fully leaving/disconnecting from the co-op match
+      if (this.game.tutorialActive && this.game.tutorialStep < 4) return;
+      soundManager.playTick();
+      this.game.quitToLobby(true);
     });
 
     this.btnNextWave.addEventListener('click', () => {
-      soundManager.playTick(); // Add click sound
+      if (this.game.tutorialActive && this.game.tutorialStep !== 3) return;
+      soundManager.playTick();
       this.game.startNextWave();
     });
 
@@ -145,6 +147,7 @@ export class GameUI {
     });
 
     this.btnSell.addEventListener('click', () => {
+      if (this.game.tutorialActive) return; // Block selling during tutorial
       this.game.sellSelectedTower();
     });
 
@@ -162,6 +165,7 @@ export class GameUI {
     // Global listener to close upgrade/selection panel when clicking outside
     document.addEventListener('click', (e) => {
       if (this.game.state !== 'playing') return;
+      if (this.game.tutorialActive) return; // Prevent deselecting during tutorial
 
       const canvas = document.getElementById('game-canvas');
       const selectionPanel = document.getElementById('selection-panel');
@@ -171,6 +175,12 @@ export class GameUI {
           selectionPanel && !selectionPanel.contains(e.target) &&
           (!sidebarToggle || !sidebarToggle.contains(e.target))) {
         this.game.setSelectedPlacedTower(null);
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (this.game.tutorialActive && this.activeSpotlightTarget) {
+        this.setSpotlightCutout(this.activeSpotlightTarget);
       }
     });
 
@@ -337,6 +347,67 @@ export class GameUI {
       // CrazyGames requirement: resume active gameplay when popup is dismissed
       CrazyGamesManager.gameplayStart();
     });
+  }
+
+  setSpotlightCutout(target) {
+    this.activeSpotlightTarget = target;
+    const cutoutRect = document.getElementById('tut-cutout-rect');
+    const cutoutBorder = document.getElementById('tut-cutout-border');
+    const overlay = document.getElementById('tutorial-dim-overlay');
+    if (!cutoutRect || !overlay) return;
+
+    if (!target) {
+      cutoutRect.setAttribute('width', '0');
+      cutoutRect.setAttribute('height', '0');
+      if (cutoutBorder) {
+        cutoutBorder.setAttribute('width', '0');
+        cutoutBorder.classList.add('hidden');
+      }
+      return;
+    }
+
+    const overlayRect = overlay.getBoundingClientRect();
+    let x = 0, y = 0, w = 0, h = 0, rx = 10;
+
+    if (typeof target.col === 'number' && typeof target.row === 'number') {
+      const canvas = document.getElementById('game-canvas');
+      if (!canvas) return;
+      const cRect = canvas.getBoundingClientRect();
+      const scaleX = cRect.width / 800;
+      const scaleY = cRect.height / 600;
+
+      const pad = 8;
+      const tileW = 40 * scaleX;
+      const tileH = 40 * scaleY;
+      x = (cRect.left - overlayRect.left) + (target.col * 40 * scaleX) - pad;
+      y = (cRect.top - overlayRect.top) + (target.row * 40 * scaleY) - pad;
+      w = tileW + pad * 2;
+      h = tileH + pad * 2;
+      rx = 8;
+    } else if (target instanceof HTMLElement && target.isConnected) {
+      const elRect = target.getBoundingClientRect();
+      const pad = 6;
+      x = (elRect.left - overlayRect.left) - pad;
+      y = (elRect.top - overlayRect.top) - pad;
+      w = elRect.width + pad * 2;
+      h = elRect.height + pad * 2;
+      rx = 10;
+    }
+
+    cutoutRect.setAttribute('x', Math.round(x));
+    cutoutRect.setAttribute('y', Math.round(y));
+    cutoutRect.setAttribute('width', Math.round(w));
+    cutoutRect.setAttribute('height', Math.round(h));
+    cutoutRect.setAttribute('rx', rx);
+
+    if (cutoutBorder) {
+      cutoutBorder.setAttribute('x', Math.round(x));
+      cutoutBorder.setAttribute('y', Math.round(y));
+      cutoutBorder.setAttribute('width', Math.round(w));
+      cutoutBorder.setAttribute('height', Math.round(h));
+      cutoutBorder.setAttribute('rx', rx);
+      cutoutBorder.classList.remove('hidden');
+    }
   }
 
   drawCommanderFace() {
@@ -566,6 +637,9 @@ export class GameUI {
 
         btn.addEventListener('click', () => {
           soundManager.playTick();
+          if (this.game.tutorialActive) {
+            if (this.game.tutorialStep !== 1 || type !== 'scout') return;
+          }
           if (btn.classList.contains('active')) {
             // Re-clicking deselects the troop and exits placement mode
             btn.classList.remove('active');
@@ -1024,17 +1098,20 @@ export class GameUI {
 
   activateStepPointers(step) {
     document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
-    if (!this.game.tutorialActive) return;
+    if (!this.game.tutorialActive) {
+      this.setSpotlightCutout(null);
+      return;
+    }
 
     if (step === 0.5) {
-      // Hand glides from Commander to the center of the battlefield
+      this.setSpotlightCutout(null);
       this.showHandGuide(this.commanderWrapper, { canvasPercentX: 0.5, canvasPercentY: 0.5 });
     } 
     else if (step === 1) {
-      // Hand glides from Commander to Scout in shop
       const scoutBtn = this.equippedAgentsList.querySelector('.placement-btn[data-type="scout"]');
       if (scoutBtn) {
         scoutBtn.classList.add('tut-highlight');
+        this.setSpotlightCutout(scoutBtn);
         this.showHandGuide(this.commanderWrapper, scoutBtn);
 
         const onScoutSelect = () => {
@@ -1049,30 +1126,30 @@ export class GameUI {
       }
     } 
     else if (step === 1.5) {
-      // Hand glides from Scout button in shop -> across into tile (2, 2) on the map on loop!
       const scoutBtn = this.equippedAgentsList.querySelector('.placement-btn[data-type="scout"]');
+      this.setSpotlightCutout({ col: 2, row: 2 });
       this.showHandGuide(scoutBtn || this.commanderWrapper, { col: 2, row: 2 });
     } 
     else if (step === 2) {
-      // Hand guides clicking the placed Scout
+      this.setSpotlightCutout({ col: 2, row: 2 });
       this.showHandGuide(this.commanderWrapper, { col: 2, row: 2 });
     } 
     else if (step === 2.5) {
-      // Hand guides clicking the UPGRADE button
       if (this.btnUpgrade) {
         this.btnUpgrade.classList.add('tut-highlight');
+        this.setSpotlightCutout(this.btnUpgrade);
         this.showHandGuide({ col: 2, row: 2 }, this.btnUpgrade);
       }
     } 
     else if (step === 3) {
-      // Hand glides to START WAVE button
       if (this.btnNextWave) {
         this.btnNextWave.classList.add('tut-highlight');
+        this.setSpotlightCutout(this.btnNextWave);
         this.showHandGuide(this.commanderWrapper, this.btnNextWave);
       }
     }
     else if (step === 4) {
-      // Hand points to FINISH TUTORIAL button
+      this.setSpotlightCutout(this.btnCommanderAction);
       this.showHandGuide(this.commanderWrapper, this.btnCommanderAction);
     }
   }
@@ -1086,6 +1163,7 @@ export class GameUI {
   dismissTutorial() {
     document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
     this.hideHandGuide();
+    this.setSpotlightCutout(null);
 
     const dimOverlay = document.getElementById('tutorial-dim-overlay');
     if (dimOverlay) dimOverlay.classList.add('hidden');

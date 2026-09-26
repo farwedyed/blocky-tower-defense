@@ -553,6 +553,44 @@ class Game {
       return;
     }
 
+    // ─── STRICT TUTORIAL INTERACTION BOUNDARY ───
+    if (this.tutorialActive) {
+      if (this.tutorialStep === 1) {
+        // Step 1: Must select Scout from shop first!
+        return;
+      }
+      if (this.tutorialStep === 1.5) {
+        // Step 1.5: Must deploy Scout onto the highlighted tile (col 2, row 2)
+        const col = Math.floor(mx / this.grid.cellSize);
+        const row = Math.floor(my / this.grid.cellSize);
+        if (col !== 2 || row !== 2) {
+          this.effectManager.spawnText(mx, my, "DEPLOY ON HIGHLIGHTED TILE!", '#e74c3c');
+          return;
+        }
+        const placeX = 2 * this.grid.cellSize + this.grid.cellSize / 2;
+        const placeY = 2 * this.grid.cellSize + this.grid.cellSize / 2;
+        this.placeShopAgent(placeX, placeY, window.myPlayerId, 'scout');
+        return;
+      }
+      if (this.tutorialStep === 2) {
+        // Step 2: Must tap directly on the placed Scout
+        const clickedTower = this.grid.getTowerAt(mx, my);
+        if (clickedTower && clickedTower.gridX === 2 && clickedTower.gridY === 2) {
+          this.setSelectedPlacedTower(clickedTower);
+          soundManager.playTick();
+        }
+        return;
+      }
+      if (this.tutorialStep === 2.5) {
+        // Step 2.5: Must tap UPGRADE button in the action panel! Ignore canvas clicks so panel stays open
+        return;
+      }
+      if (this.tutorialStep >= 3) {
+        // Step 3 & 4: Prevent rogue canvas clicks while starting wave / finishing
+        return;
+      }
+    }
+
     // Check if player clicked directly on an existing placed tower
     const clickedTower = this.grid.getTowerAt(mx, my);
 
@@ -885,8 +923,8 @@ class Game {
         this.saveStatsToStorage();
       } else {
         this.tutorialActive = false;
-        // Start match with clean battlefield (no troop pre-selected until clicked)
-        this.selectedShopTower = null;
+        // Auto-equip the first agent in player loadout upon match spawn
+        this.selectedShopTower = (this.equippedAgents && this.equippedAgents.length > 0) ? this.equippedAgents[0] : 'scout';
       }
 
       this.playerWallets = {};

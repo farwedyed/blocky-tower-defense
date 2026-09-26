@@ -224,6 +224,47 @@ export class SwingArcParticle {
   }
 }
 
+// Floating Wave Progress Banner (Slow upward float from center)
+export class WaveText {
+  constructor(x, y, text, color = '#f1c40f') {
+    this.x = x;
+    this.y = y;
+    this.text = text;
+    this.color = color;
+    this.vy = -30; // Floats upwards slowly
+    this.maxLife = 2.8; // Stays on screen for 2.8 seconds
+    this.life = 2.8;
+  }
+
+  update(dt) {
+    this.y += this.vy * dt;
+    this.life -= dt;
+  }
+
+  draw(ctx) {
+    const progress = 1 - (this.life / this.maxLife);
+    let alpha = 1;
+    if (progress < 0.12) {
+      alpha = progress / 0.12; // Smooth fade-in
+    } else if (progress > 0.70) {
+      alpha = (1 - progress) / 0.30; // Smooth fade-out
+    }
+
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+    ctx.font = "900 36px 'Fredoka', sans-serif";
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 6;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    ctx.strokeText(this.text, this.x, this.y);
+    ctx.fillStyle = this.color;
+    ctx.fillText(this.text, this.x, this.y);
+    ctx.restore();
+  }
+}
+
 // Display Level Up notifications and match rewards
 export class LevelText {
   constructor(x, y, text, color = '#f1c40f') {
@@ -378,6 +419,12 @@ export class EffectManager {
 
   spawnSwingArc(x, y, angle, range) {
     this.particles.push(new SwingArcParticle(x, y, angle, range));
+  }
+
+  spawnWaveText(text, color = '#f1c40f') {
+    // Remove any previous wave banner so they do not overlap
+    this.particles = this.particles.filter(p => !(p instanceof WaveText));
+    this.particles.push(new WaveText(400, 300, text, color));
   }
 
   spawnText(x, y, text, color = '#f1c40f') {

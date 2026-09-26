@@ -483,7 +483,7 @@ export const Network = {
             this.game.grid.clear();
             this.game.effectManager.clear();
             this.game.setSelectedPlacedTower(null);
-            this.game.selectedShopTower = this.game.equippedAgents[0];
+            this.game.selectedShopTower = (this.game.equippedAgents && this.game.equippedAgents.length > 0) ? this.game.equippedAgents[0] : 'scout';
 
             let mapName = data.selectedMap.replace('_', ' ').toUpperCase();
             this.game.ui.showGameLayout(mapName);
@@ -715,6 +715,14 @@ export const Network = {
     },
 
     applyGameState: function(data) {
+        // Trigger floating wave banner for multiplayer clients when wave advances
+        if (data.wave > this.game.wave && this.game.state === 'playing') {
+            const maxW = data.maxWaves !== undefined ? data.maxWaves : this.game.maxWaves;
+            if (this.game.effectManager && this.game.effectManager.spawnWaveText) {
+                this.game.effectManager.spawnWaveText(`WAVE ${data.wave} / ${maxW}`, '#f1c40f');
+            }
+        }
+
         this.game.lives = data.lives;
         this.game.wave = data.wave;
         if (data.maxWaves !== undefined) this.game.maxWaves = data.maxWaves;
@@ -957,7 +965,8 @@ export const Network = {
                             muzzleFlash: 'spawnMuzzleFlash',
                             explosion: 'spawnExplosion',
                             swingArc: 'spawnSwingArc',
-                            text: 'spawnText'
+                            text: 'spawnText',
+                            waveText: 'spawnWaveText'
                         };
                         const realMethod = methodMap[evt.type];
                         if (realMethod && em[realMethod]) {
@@ -1123,6 +1132,7 @@ export const Network = {
         wrap('spawnPlacementSparks', 'placementSparks');
         wrap('spawnExplosion', 'explosion');
         wrap('spawnText', 'text');
+        wrap('spawnWaveText', 'waveText');
         // impact, muzzleFlash, and swingArc run purely on client-side simulation to protect bandwidth
     },
 
