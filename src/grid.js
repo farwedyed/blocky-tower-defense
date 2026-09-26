@@ -295,6 +295,9 @@ export class Grid {
         });
       }
     }
+
+    // Pre-sort once so rendering doesn't allocate and sort arrays every frame
+    this.obstacles.sort((a, b) => (a.baseY || a.y) - (b.baseY || b.y));
   }
 
   pixelToGrid(x, y) {
@@ -446,11 +449,10 @@ export class Grid {
       }
     }
 
-    // 2. Draw Decorative Obstacles sorted by Y (so tall trees overlap realistically)
+    // 2. Draw Decorative Obstacles (pre-sorted on generation for peak 60+ FPS performance)
     if (this.obstacles && this.obstacles.length > 0) {
-      const sorted = [...this.obstacles].sort((a, b) => (a.baseY || a.y) - (b.baseY || b.y));
-      for (const obs of sorted) {
-        this.drawObstacle(ctx, obs);
+      for (let i = 0; i < this.obstacles.length; i++) {
+        this.drawObstacle(ctx, this.obstacles[i]);
       }
     }
   }

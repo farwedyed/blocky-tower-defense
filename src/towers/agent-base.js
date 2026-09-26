@@ -93,49 +93,60 @@ export class Agent {
   }
 
   acquireTarget(enemies) {
-    // Camo status checks. DJ level 3+ grants Camo Detection.
-    // Note: Ranger has "this.camoDetection = false" natively and relies on support.
     const hasCamoDetection = this.camoDetection || this.djCamoDetectionBuffed;
+    const djMultiplier = this.djRangeBuffed ? (this.type !== 'dj' && this.level >= 5 ? 1.20 : 1.15) : 1.0;
+    const effectiveRange = this.range * djMultiplier;
+    const maxRangeSq = effectiveRange * effectiveRange;
 
-    const inRange = enemies.filter(enemy => {
-      if (enemy.health <= 0) return false;
-      if (this.isMeleeOnly && enemy.isFlying) return false;
-      
-      // Specialized Camo immunity check:
-      if (enemy.isCamo && !hasCamoDetection) return false;
+    let bestTarget = null;
+    let bestMetric = -Infinity;
 
-      const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
-      const djMultiplier = this.djRangeBuffed ? (this.type !== 'dj' && this.level >= 5 ? 1.20 : 1.15) : 1.0;
-      return dist <= (this.range * djMultiplier);
-    });
+    for (let i = 0; i < enemies.length; i++) {
+      const enemy = enemies[i];
+      if (enemy.health <= 0) continue;
+      if (this.isMeleeOnly && enemy.isFlying) continue;
+      if (enemy.isCamo && !hasCamoDetection) continue;
 
-    if (inRange.length === 0) return null;
+      const dx = enemy.x - this.x;
+      const dy = enemy.y - this.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq > maxRangeSq) continue;
 
-    if (this.targetingStrategy === 'first') {
-      return inRange.reduce((best, curr) => {
-        const bestVal = best.targetNodeIndex * 1000 - Math.hypot(best.x - this.x, best.y - this.y);
-        const currVal = curr.targetNodeIndex * 1000 - Math.hypot(curr.x - this.x, curr.y - this.y);
-        return currVal > bestVal ? curr : best;
-      });
+      if (!bestTarget) {
+        bestTarget = enemy;
+        if (this.targetingStrategy === 'first') bestMetric = enemy.targetNodeIndex * 10000 - distSq;
+        else if (this.targetingStrategy === 'last') bestMetric = -(enemy.targetNodeIndex * 10000 - distSq);
+        else if (this.targetingStrategy === 'strongest') bestMetric = enemy.health;
+        else if (this.targetingStrategy === 'weakest') bestMetric = -enemy.health;
+        continue;
+      }
+
+      if (this.targetingStrategy === 'first') {
+        const metric = enemy.targetNodeIndex * 10000 - distSq;
+        if (metric > bestMetric) {
+          bestMetric = metric;
+          bestTarget = enemy;
+        }
+      } else if (this.targetingStrategy === 'last') {
+        const metric = -(enemy.targetNodeIndex * 10000 - distSq);
+        if (metric > bestMetric) {
+          bestMetric = metric;
+          bestTarget = enemy;
+        }
+      } else if (this.targetingStrategy === 'strongest') {
+        if (enemy.health > bestMetric) {
+          bestMetric = enemy.health;
+          bestTarget = enemy;
+        }
+      } else if (this.targetingStrategy === 'weakest') {
+        if (-enemy.health > bestMetric) {
+          bestMetric = -enemy.health;
+          bestTarget = enemy;
+        }
+      }
     }
 
-    if (this.targetingStrategy === 'last') {
-      return inRange.reduce((best, curr) => {
-        const bestVal = best.targetNodeIndex * 1000 - Math.hypot(best.x - this.x, best.y - this.y);
-        const currVal = curr.targetNodeIndex * 1000 - Math.hypot(curr.x - this.x, curr.y - this.y);
-        return currVal < bestVal ? curr : best;
-      });
-    }
-
-    if (this.targetingStrategy === 'strongest') {
-      return inRange.reduce((best, curr) => curr.health > best.health ? curr : best);
-    }
-
-    if (this.targetingStrategy === 'weakest') {
-      return inRange.reduce((best, curr) => curr.health < best.health ? curr : best);
-    }
-
-    return inRange[0];
+    return bestTarget;
   }
 
   update(enemies, effectManager, bullets, dt) {

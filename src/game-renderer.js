@@ -778,36 +778,30 @@ export function drawHoverVisuals(game) {
     ctx.fill();
     ctx.stroke();
 
-    // 5. Draw ghost sprite preview
-    let tempAgent;
-    const size = game.grid.cellSize;
-    switch (game.selectedShopTower) {
-      case 'scout': tempAgent = new Scout(0, 0, size); break;
-      case 'minigunner': tempAgent = new Minigunner(0, 0, size); break;
-      case 'commander': tempAgent = new Commander(0, 0, size); break;
-      case 'dj': tempAgent = new DJUnit(0, 0, size); break;
-      case 'pyromancer': tempAgent = new Pyromancer(0, 0, size); break;
-      case 'farm': tempAgent = new Farm(0, 0, size); break;
-      case 'gladiator': tempAgent = new Gladiator(0, 0, size); break;
-      case 'soldier': tempAgent = new Soldier(0, 0, size); break;
-      case 'sniper': tempAgent = new Sniper(0, 0, size); break;
-      case 'medic': tempAgent = new Medic(0, 0, size); break;
-      case 'rocketeer': tempAgent = new Rocketeer(0, 0, size); break;
-      case 'demoman': tempAgent = new Demoman(0, 0, size); break;
-      case 'freezer': tempAgent = new Freezer(0, 0, size); break;
-      case 'shotgunner': tempAgent = new Shotgunner(0, 0, size); break;
-      case 'crook_boss': tempAgent = new CrookBoss(0, 0, size); break;
-      case 'military_base': tempAgent = new MilitaryBase(0, 0, size); break;
-      case 'ranger': tempAgent = new Ranger(0, 0, size); break;
-      case 'turret': tempAgent = new Turret(0, 0, size); break;
+    // 5. Draw ghost sprite preview (Reuses cached dummy object to prevent GC stutter)
+    if (!game._ghostAgentCache) {
+      game._ghostAgentCache = {};
+    }
+    let tempAgent = game._ghostAgentCache[game.selectedShopTower];
+    if (!tempAgent) {
+      tempAgent = {
+        type: game.selectedShopTower,
+        level: 1,
+        angle: 0,
+        cellSize: game.grid.cellSize,
+        recoilOffset: 0,
+        timeAccumulator: 0,
+        djRangeBuffed: false,
+        commanderSpeedBuffed: false,
+        draw: (c) => {}
+      };
+      game._ghostAgentCache[game.selectedShopTower] = tempAgent;
     }
 
-    if (tempAgent) {
-      tempAgent.x = mx;
-      tempAgent.y = my;
-      ctx.globalAlpha = isValid ? 0.65 : 0.35;
-      drawAgent(game, tempAgent);
-    }
+    tempAgent.x = mx;
+    tempAgent.y = my;
+    ctx.globalAlpha = isValid ? 0.65 : 0.35;
+    drawAgent(game, tempAgent);
 
     // 6. Red X indicator if hovering over road or an invalid spot
     if (!isValid) {
@@ -892,12 +886,6 @@ export function drawPlayerCursors(game) {
     const size = 30;
 
     ctx.save();
-    // Drop shadow under the mouse arrow
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 3;
-
     if (cursorImg.complete && cursorImg.naturalWidth > 0) {
       ctx.drawImage(cursorImg, cx - 2, cy - 2, size, size);
     } else {
@@ -915,7 +903,7 @@ export function drawPlayerCursors(game) {
     }
     ctx.restore();
 
-    // 3. Render Shiny Glass Name Badge
+    // 3. Render Crisp Blocky Name Badge (Shadow blur removed for massive FPS boost)
     ctx.save();
     ctx.font = "900 11px 'Fredoka', 'Nunito', sans-serif";
     const textWidth = ctx.measureText(name).width;
@@ -926,20 +914,15 @@ export function drawPlayerCursors(game) {
     const badgeX = cx + 18;
     const badgeY = cy + 10;
 
-    // Outer glow & dark glass pill background
-    ctx.shadowColor = theme.glow;
-    ctx.shadowBlur = 8;
-    ctx.fillStyle = 'rgba(10, 15, 26, 0.90)';
+    // Crisp high-performance blocky border & background
+    ctx.fillStyle = '#0a0f1a';
     ctx.strokeStyle = theme.color;
-    ctx.lineWidth = 1.6;
+    ctx.lineWidth = 2;
 
     ctx.beginPath();
-    ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 6);
+    ctx.rect(badgeX, badgeY, badgeWidth, badgeHeight);
     ctx.fill();
     ctx.stroke();
-
-    // Reset shadow so text renders crisp
-    ctx.shadowBlur = 0;
 
     // Glowing Theme Gem/Dot indicator
     ctx.fillStyle = theme.color;

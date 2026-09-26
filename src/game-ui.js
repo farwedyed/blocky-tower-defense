@@ -573,41 +573,21 @@ export class GameUI {
 
   updateHUD(lives, gold, wave, maxWaves) {
     try {
-      if (this.hudLives) {
-        const valEl = document.getElementById('hud-lives-val');
-        if (valEl) {
-          valEl.textContent = Math.max(0, lives);
-        } else {
-          this.hudLives.textContent = `❤️ ${Math.max(0, lives)}`;
-        }
-      }
-      if (this.hudGold) {
-        const valEl = document.getElementById('hud-gold-val');
-        if (valEl) {
-          valEl.textContent = `$${gold}`;
-        } else {
-          this.hudGold.textContent = `💵 $${gold}`;
-        }
-      }
-      if (this.hudWave) {
-        const valEl = document.getElementById('hud-wave-val');
-        if (valEl) {
-          valEl.textContent = `${wave} / ${maxWaves}`;
-        } else {
-          this.hudWave.textContent = `🌊 ${wave} / ${maxWaves}`;
-        }
-      }
+      if (!this._valLivesEl) this._valLivesEl = document.getElementById('hud-lives-val');
+      if (!this._valGoldEl) this._valGoldEl = document.getElementById('hud-gold-val');
+      if (!this._valWaveEl) this._valWaveEl = document.getElementById('hud-wave-val');
 
-      const placementBtns = document.querySelectorAll('.placement-btn');
-      placementBtns.forEach(btn => {
+      if (this._valLivesEl) this._valLivesEl.textContent = Math.max(0, lives);
+      if (this._valGoldEl) this._valGoldEl.textContent = `$${gold}`;
+      if (this._valWaveEl) this._valWaveEl.textContent = `${wave} / ${maxWaves}`;
+
+      const placementBtns = this.equippedAgentsList ? this.equippedAgentsList.children : [];
+      for (let i = 0; i < placementBtns.length; i++) {
+        const btn = placementBtns[i];
         const type = btn.getAttribute('data-type');
         const cost = this.game.getTowerCost(type);
-        if (gold < cost) {
-          btn.style.opacity = '0.4';
-        } else {
-          btn.style.opacity = '1.0';
-        }
-      });
+        btn.style.opacity = gold < cost ? '0.4' : '1.0';
+      }
 
       if (this.btnSkipWave) {
         // Only allow showing Skip Wave controls on the Host machine

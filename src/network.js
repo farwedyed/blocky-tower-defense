@@ -955,9 +955,13 @@ export const Network = {
         }
 
         if (this.game.ui) {
-            this.game.ui.updateSpeedButton(this.game.speedMultiplier);
-            this.game.ui.updateWaveButton(this.game.waveInProgress); // Keeps START/DEFENDING button in sync
-            this.game.ui.updateHUD(this.game.lives, this.game.gold, this.game.wave, this.game.maxWaves);
+            // Only update HUD elements when stats actually change to avoid layout thrashing
+            if (this._lastUiGold !== this.game.gold || this._lastUiLives !== this.game.lives || this._lastUiWave !== this.game.wave) {
+                this._lastUiGold = this.game.gold;
+                this._lastUiLives = this.game.lives;
+                this._lastUiWave = this.game.wave;
+                this.game.ui.updateHUD(this.game.lives, this.game.gold, this.game.wave, this.game.maxWaves);
+            }
         }
     },
 
@@ -1095,19 +1099,17 @@ export const Network = {
             if (!original) return;
             em[methodName] = function(...args) {
                 original.apply(this, args);
-                if (self.mode === 'HOST') {
+                // ONLY broadcast large, essential visual events (prevents flooding during giant fights)
+                if (self.mode === 'HOST' && self.pendingEvents.length < 30) {
                     self.pendingEvents.push({ type, args });
                 }
             };
         };
 
         wrap('spawnPlacementSparks', 'placementSparks');
-        wrap('spawnImpact', 'impact');
-        wrap('spawnMusicNote', 'musicNote');
-        wrap('spawnMuzzleFlash', 'muzzleFlash');
         wrap('spawnExplosion', 'explosion');
-        wrap('spawnSwingArc', 'swingArc');
         wrap('spawnText', 'text');
+        // impact, muzzleFlash, and swingArc run purely on client-side simulation to protect bandwidth
     },
 
     interceptSounds: function() {
@@ -1120,7 +1122,8 @@ export const Network = {
             if (!original) return;
             soundManager[methodName] = function(...args) {
                 original.apply(this, args);
-                if (self.mode === 'HOST') {
+                // Do NOT broadcast playShoot over WebSocket (each client already plays sounds when bullets fire)
+                if (self.mode === 'HOST' && methodName !== 'playShoot') {
                     self.pendingEvents.push({ type: 'sound', name: methodName, args });
                 }
             };
@@ -1128,10 +1131,8 @@ export const Network = {
 
         wrap('playPlace');
         wrap('playUpgrade');
-        wrap('playShoot');
         wrap('playCrateDrop');
         wrap('playCrateReveal');
-        wrap('playTick');
         wrap('playVictory');
         wrap('playDefeat');
     }

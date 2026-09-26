@@ -226,6 +226,15 @@ class SoundManager {
       gain.gain.exponentialRampToValueAtTime(Math.max(gainEnd * this.masterVolume, 0.0001), now + duration);
       osc.connect(gain);
       gain.connect(ctx.destination);
+      
+      // Clean up nodes from audio engine graph when playback finishes
+      osc.onended = () => {
+        try {
+          osc.disconnect();
+          gain.disconnect();
+        } catch (err) {}
+      };
+
       osc.start(now);
       osc.stop(now + duration + 0.01);
     } catch (e) {

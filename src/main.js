@@ -697,7 +697,7 @@ class Game {
       this.updateFullscreenClass();
     });
 
-    // Background Web Worker ticker keeps host ticking when tab is switched
+    // Background Web Worker ticker keeps host ticking when tab is switched (SIMULATION ONLY, NO DUPLICATE RAF)
     try {
       const tickerBlob = new Blob([
         `let timer = null;
@@ -712,7 +712,10 @@ class Game {
       this._bgWorker = new Worker(URL.createObjectURL(tickerBlob));
       this._bgWorker.onmessage = () => {
         if (document.hidden && this.state === 'playing') {
-          this.loop(performance.now());
+          const now = performance.now();
+          const dt = Math.min(0.1, (now - (this.lastTime || now)) / 1000.0) * this.speedMultiplier;
+          this.lastTime = now;
+          this.update(dt);
         }
       };
     } catch (e) {
@@ -1031,6 +1034,11 @@ class Game {
   }
 
   loop(timestamp) {
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+    }
+
     if (!this.lastTime) this.lastTime = timestamp;
     const dt = Math.min(0.1, (timestamp - this.lastTime) / 1000.0) * this.speedMultiplier;
     this.lastTime = timestamp;
@@ -1041,7 +1049,7 @@ class Game {
         this.fpsAccumulator = 0;
       }
       this.fpsTicks++;
-      this.fpsAccumulator += dt;
+      this.fpsAccumulator += (dt / (this.speedMultiplier || 1));
 
       if (this.fpsAccumulator >= 5.0) { 
         const avgFps = Math.round(this.fpsTicks / this.fpsAccumulator);
@@ -1061,7 +1069,7 @@ class Game {
       this.draw(); 
     }
 
-    requestAnimationFrame((t) => this.loop(t));
+    this._rafId = requestAnimationFrame((t) => this.loop(t));
   }
 
   update(dt) {
