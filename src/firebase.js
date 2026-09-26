@@ -243,15 +243,18 @@ export async function fetchTopRecords(mapId) {
           return localRecords;
         }
       } else {
-        const raw = localStorage.getItem('tds_leaderboard') || '{}';
-        const lb = JSON.parse(raw);
+        const raw = localStorage.getItem('tds_leaderboard');
+        let lb = {};
+        if (raw && raw !== 'undefined' && raw !== 'null') {
+          try { lb = JSON.parse(raw); } catch (err) { lb = {}; }
+        }
         lb[mapId] = records;
         localStorage.setItem('tds_leaderboard', JSON.stringify(lb));
       }
 
       return records;
     } catch (e) {
-      console.error('[Firebase] Fetch failed, reading locally:', e);
+      console.warn('[Firebase] Fetch failed, reading locally:', e);
       return _localLoad(mapId);
     }
   } else {
@@ -261,8 +264,11 @@ export async function fetchTopRecords(mapId) {
 
 function _localSave(mapId, entry) {
   try {
-    const raw = localStorage.getItem('tds_leaderboard') || '{}';
-    const lb = JSON.parse(raw);
+    const raw = localStorage.getItem('tds_leaderboard');
+    let lb = {};
+    if (raw && raw !== 'undefined' && raw !== 'null') {
+      try { lb = JSON.parse(raw); } catch (err) { lb = {}; }
+    }
     if (!Array.isArray(lb[mapId])) lb[mapId] = [];
     
     const exists = lb[mapId].some(item => item.timeRaw === entry.timeRaw && item.date === entry.date);
@@ -279,7 +285,8 @@ function _localSave(mapId, entry) {
 
 function _localLoad(mapId) {
   try {
-    const raw = localStorage.getItem('tds_leaderboard') || '{}';
+    const raw = localStorage.getItem('tds_leaderboard');
+    if (!raw || raw === 'undefined' || raw === 'null') return [];
     const lb = JSON.parse(raw);
     return Array.isArray(lb[mapId]) ? lb[mapId] : [];
   } catch (e) {

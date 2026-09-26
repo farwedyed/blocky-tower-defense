@@ -16,6 +16,11 @@ export const CrazyGamesManager = {
   /**
    * Initializes the CrazyGames SDK and hooks up real-time authentication listeners.
    */
+  // Helper to verify SDK is active and not disabled by domain restrictions
+  isAvailable: function() {
+    return this.isInitialized && this.sdk && this.sdk.environment !== 'disabled';
+  },
+
   init: async function() {
     if (this.isInitialized) return this.initPromise;
 
@@ -31,8 +36,17 @@ export const CrazyGamesManager = {
         
         // Asynchronously initialize the SDK
         await this.sdk.init();
+
+        // Check if domain is disabled (e.g. GitHub Pages)
+        if (this.sdk.environment === 'disabled') {
+          console.warn('[CrazyGames] SDK disabled on this domain (GitHub Pages/external). Running in standalone mode.');
+          this.isInitialized = false;
+          this._resolveInit();
+          return this.initPromise;
+        }
+
         this.isInitialized = true;
-        console.log('[CrazyGames] SDK successfully initialized!');
+        console.log('[CrazyGames] SDK successfully initialized in', this.sdk.environment, 'environment!');
 
         // Dynamic Auth Listener
         if (this.sdk.user) {
@@ -178,7 +192,7 @@ export const CrazyGamesManager = {
    * Notifies the platform that the game loading process has started.
    */
   gameLoadingStart: function() {
-    if (this.sdk && this.isInitialized) {
+    if (this.isAvailable()) {
       try {
         this.sdk.game.loadingStart();
         console.log('[CrazyGames] loadingStart triggered.');
@@ -192,7 +206,7 @@ export const CrazyGamesManager = {
    * Notifies the platform that the game loading process has finished.
    */
   gameLoadingStop: function() {
-    if (this.sdk && this.isInitialized) {
+    if (this.isAvailable()) {
       try {
         this.sdk.game.loadingStop();
         console.log('[CrazyGames] loadingStop triggered.');

@@ -18,14 +18,19 @@ import {
  * falling back gracefully to traditional window.localStorage.
  */
 function getStorageItem(key) {
-  if (CrazyGamesManager.isInitialized && typeof window !== 'undefined' && window.CrazyGames && window.CrazyGames.SDK && window.CrazyGames.SDK.data) {
+  if (CrazyGamesManager.isAvailable() && window.CrazyGames?.SDK?.data) {
     try {
       return window.CrazyGames.SDK.data.getItem(key);
     } catch (e) {
-      console.warn("[CrazyGames Data] getItem failed, falling back to localStorage", e);
+      // Fallback silently without throwing errors
     }
   }
-  return localStorage.getItem(key);
+  try {
+    const val = localStorage.getItem(key);
+    return val === 'undefined' ? null : val;
+  } catch (e) {
+    return null;
+  }
 }
 
 /**
@@ -33,18 +38,14 @@ function getStorageItem(key) {
  * falling back gracefully to traditional window.localStorage.
  */
 function setStorageItem(key, value) {
-  // Always save to localStorage first so Guest players never lose progress
   try {
     localStorage.setItem(key, value);
   } catch(e) {}
 
-  // Also sync to CrazyGames cloud if available
-  if (CrazyGamesManager.isInitialized && typeof window !== 'undefined' && window.CrazyGames && window.CrazyGames.SDK && window.CrazyGames.SDK.data) {
+  if (CrazyGamesManager.isAvailable() && window.CrazyGames?.SDK?.data) {
     try {
       window.CrazyGames.SDK.data.setItem(key, value);
-    } catch (e) {
-      console.warn("[CrazyGames Data] setItem failed, falling back to localStorage", e);
-    }
+    } catch (e) {}
   }
 }
 
