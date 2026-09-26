@@ -214,6 +214,111 @@ export class LobbyUI {
       });
     });
 
+    // ─── REDIRECT TO AGENT SHOP BUTTON (FROM LEVEL 5 LOCK) ───
+    const btnGoToShop = document.getElementById('btn-go-to-agent-shop');
+    if (btnGoToShop) {
+      btnGoToShop.addEventListener('click', () => {
+        soundManager.playTick();
+        const shopTab = document.querySelector('.tab-btn[data-target="panel-shop"]');
+        if (shopTab) {
+          shopTab.click();
+        }
+      });
+    }
+
+    // ─── FREE COINS TAB & REWARDED AD CONTROLLERS ───
+    const btnAddCoins = document.getElementById('btn-add-coins');
+    const btnTabWatchAd = document.getElementById('btn-tab-watch-ad-coins');
+    const tabCoinsRemaining = document.getElementById('tab-coins-remaining');
+
+    const getDailyAdCount = () => {
+      const todayStr = new Date().toLocaleDateString();
+      const stored = localStorage.getItem('tds_daily_coin_ads');
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.date === todayStr) {
+          return parsed.count;
+        }
+      } catch (e) {}
+      return 0;
+    };
+
+    const incrementDailyAdCount = () => {
+      const todayStr = new Date().toLocaleDateString();
+      const current = getDailyAdCount();
+      localStorage.setItem('tds_daily_coin_ads', JSON.stringify({ date: todayStr, count: current + 1 }));
+    };
+
+    const updateCoinsTabState = () => {
+      const count = getDailyAdCount();
+      const remaining = Math.max(0, 5 - count);
+      if (tabCoinsRemaining) {
+        tabCoinsRemaining.textContent = `${remaining} / 5 AVAILABLE TODAY`;
+      }
+      if (btnTabWatchAd) {
+        if (remaining <= 0) {
+          btnTabWatchAd.disabled = true;
+          btnTabWatchAd.textContent = "DAILY LIMIT REACHED (COME BACK TOMORROW)";
+          btnTabWatchAd.style.background = "#7f8c8d";
+          btnTabWatchAd.style.opacity = "0.6";
+          btnTabWatchAd.style.boxShadow = "none";
+        } else {
+          btnTabWatchAd.disabled = false;
+          btnTabWatchAd.innerHTML = `<span class="ad-play-icon">▶</span> WATCH AD (+150 COINS)`;
+          btnTabWatchAd.style.background = "var(--primary-green)";
+          btnTabWatchAd.style.opacity = "1.0";
+          btnTabWatchAd.style.boxShadow = "0 5px 0 var(--primary-green-dark), 0 5px 0 var(--border-color)";
+        }
+      }
+    };
+
+    // Clicking "+" in the header immediately opens the FREE COINS tab
+    if (btnAddCoins) {
+      btnAddCoins.addEventListener('click', () => {
+        soundManager.playTick();
+        const coinsTab = document.querySelector('.tab-btn[data-target="panel-coins"]');
+        if (coinsTab) {
+          coinsTab.click();
+        }
+      });
+    }
+
+    // Refresh state whenever tab is clicked
+    const coinsTabBtn = document.querySelector('.tab-btn[data-target="panel-coins"]');
+    if (coinsTabBtn) {
+      coinsTabBtn.addEventListener('click', () => {
+        updateCoinsTabState();
+      });
+    }
+
+    if (btnTabWatchAd) {
+      btnTabWatchAd.addEventListener('click', () => {
+        const count = getDailyAdCount();
+        if (count >= 5) return;
+
+        btnTabWatchAd.disabled = true;
+        btnTabWatchAd.textContent = "LOADING AD...";
+
+        CrazyGamesManager.requestRewardedAd(
+          () => {
+            // Reward earned: +150 Coins!
+            this.game.playerCoins += 150;
+            this.game.saveStatsToStorage();
+            incrementDailyAdCount();
+            this.updateLobbyMeta(this.game.playerLevel, this.game.playerXp, this.game.playerCoins);
+            soundManager.playVictory();
+            this.game.effectManager.spawnText(400, 260, "+150 COINS!", "#f1c40f");
+            updateCoinsTabState();
+          },
+          () => {
+            // Error or closed early
+            btnTabWatchAd.disabled = false;
+            updateCoinsTabState();
+          }
+        );
+      });
+    }
+
     if (this.btnDeploy) {
       this.btnDeploy.addEventListener('click', () => {
         this.game.deployToMatch();
@@ -284,23 +389,205 @@ export class LobbyUI {
     this.coop.updateCoopPlayerList();
   }
 
+  animateCoinIncrease(startVal, targetVal) {
+    const valEl = this.playerCoinsVal || document.getElementById('player-coins-val');
+    const badgeEl = this.playerCoins || document.getElementById('player-coins');
+    if (!valEl) return;
+
+    if (this._coinAnimInterval) {
+      clearInterval(this._coinAnimInterval);
+      this._coinAnimInterval = null;
+    }
+
+    if (badgeEl) {
+      badgeEl.classList.remove('coin-badge-animate');
+      void badgeEl.offsetWidth;
+      badgeEl.classList.add('coin-badge-animate');
+      setTimeout(() => {
+        if (badgeEl) badgeEl.classList.remove('coin-badge-animate');
+      }, 1100);
+    }
+
+    const duration = 850;
+    const startTime = performance.now();
+    const diff = targetVal - startVal;
+
+    this._coinAnimInterval = setInterval(() => {
+      const now = performance.now();
+      const progress = Math.min(1, (now - startTime) / duration);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const current = Math.floor(startVal + diff * ease);
+
+      valEl.textContent = current.toLocaleString();
+
+      if (soundManager && typeof soundManager.playTick === 'function') {
+        soundManager.playTick();
+      }
+
+      if (progress >= 1) {
+        clearInterval(this._coinAnimInterval);
+        this._coinAnimInterval = null;
+        valEl.textContent = targetVal.toLocaleString();
+        this._lastDisplayedCoins = targetVal;
+      }
+    }, 45);
+  }
+
+  animateXpIncrease(startVal, targetVal, level) {
+    const fillEl = this.playerXpFill || document.getElementById('player-xp-fill');
+    const textEl = this.playerXpText || document.getElementById('player-xp-text');
+    const containerEl = document.querySelector('.xp-bar-container');
+    if (!fillEl) return;
+
+    const maxVal = level * 100;
+    if (containerEl) containerEl.classList.add('xp-bar-glowing');
+
+    const duration = 650;
+    const startTime = performance.now();
+    const diff = targetVal - startVal;
+
+    const interval = setInterval(() => {
+      const now = performance.now();
+      const progress = Math.min(1, (now - startTime) / duration);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const current = Math.floor(startVal + diff * ease);
+      const pct = Math.min(100, (current / maxVal) * 100);
+
+      fillEl.style.width = `${pct}%`;
+      if (textEl) textEl.textContent = `${current} / ${maxVal}`;
+
+      if (progress >= 1) {
+        clearInterval(interval);
+        fillEl.style.width = `${Math.min(100, (targetVal / maxVal) * 100)}%`;
+        if (textEl) textEl.textContent = `${targetVal} / ${maxVal}`;
+        if (containerEl) {
+          setTimeout(() => containerEl.classList.remove('xp-bar-glowing'), 300);
+        }
+      }
+    }, 40);
+  }
+
+  animateLevelUp(prevLevel, prevXp, targetLevel, targetXp) {
+    const levelEl = this.playerLevel || document.getElementById('player-level');
+    const fillEl = this.playerXpFill || document.getElementById('player-xp-fill');
+    const textEl = this.playerXpText || document.getElementById('player-xp-text');
+    const containerEl = document.querySelector('.xp-bar-container');
+
+    const prevMax = prevLevel * 100;
+    const targetMax = targetLevel * 100;
+
+    // Step 1: Fill XP bar to 100% of previous level
+    if (containerEl) containerEl.classList.add('xp-bar-glowing');
+    if (fillEl) fillEl.style.width = '100%';
+    if (textEl) textEl.textContent = `${prevMax} / ${prevMax}`;
+
+    setTimeout(() => {
+      // Step 2: Trigger CELEBRATORY LEVEL UP ZOOM & NEON GLOW on level badge
+      if (levelEl) {
+        levelEl.classList.remove('level-badge-animate');
+        void levelEl.offsetWidth;
+        levelEl.classList.add('level-badge-animate');
+        levelEl.textContent = targetLevel;
+      }
+
+      soundManager.playUpgrade();
+      if (typeof CrazyGamesManager !== 'undefined' && CrazyGamesManager.happytime) {
+        CrazyGamesManager.happytime();
+      }
+
+      // Step 3: Reset XP bar to 0% and animate to remainder XP of new level
+      if (fillEl) fillEl.style.transition = 'none';
+      if (fillEl) fillEl.style.width = '0%';
+      if (textEl) textEl.textContent = `0 / ${targetMax}`;
+
+      setTimeout(() => {
+        if (fillEl) fillEl.style.transition = 'width 0.3s ease';
+        this.animateXpIncrease(0, targetXp, targetLevel);
+      }, 100);
+
+      setTimeout(() => {
+        if (levelEl) levelEl.classList.remove('level-badge-animate');
+      }, 1250);
+    }, 400);
+  }
+
   updateLobbyMeta(level, xp, coins) {
-    if (this.playerLevel) this.playerLevel.textContent = level;
-    if (this.playerCoinsVal) {
-      this.playerCoinsVal.textContent = coins;
-    } else if (this.playerCoins) {
-      const valEl = document.getElementById('player-coins-val');
-      if (valEl) {
-        valEl.textContent = coins;
-      } else {
-        this.playerCoins.textContent = `🪙 ${coins}`;
+    const isLobbyVisible = this.lobbyView && !this.lobbyView.classList.contains('hidden');
+
+    // ─── COINS ANIMATION ───
+    if (this._lastDisplayedCoins === undefined) {
+      this._lastDisplayedCoins = coins;
+      if (this.playerCoinsVal) this.playerCoinsVal.textContent = coins.toLocaleString();
+    } else if (coins > this._lastDisplayedCoins && isLobbyVisible) {
+      const prev = this._lastDisplayedCoins;
+      this._lastDisplayedCoins = coins;
+      this.animateCoinIncrease(prev, coins);
+    } else {
+      if (isLobbyVisible) this._lastDisplayedCoins = coins;
+      if (this.playerCoinsVal) {
+        this.playerCoinsVal.textContent = coins.toLocaleString();
+      } else if (this.playerCoins) {
+        const valEl = document.getElementById('player-coins-val');
+        if (valEl) valEl.textContent = coins.toLocaleString();
+        else this.playerCoins.textContent = `🪙 ${coins}`;
       }
     }
 
+    // ─── LEVEL & XP ANIMATION ───
+    if (this._lastDisplayedLevel === undefined) {
+      this._lastDisplayedLevel = level;
+      this._lastDisplayedXp = xp;
+
+      if (this.playerLevel) this.playerLevel.textContent = level;
+      const nextLevelXp = level * 100;
+      const percent = Math.min(100, (xp / nextLevelXp) * 100);
+      if (this.playerXpFill) this.playerXpFill.style.width = `${percent}%`;
+      if (this.playerXpText) this.playerXpText.textContent = `${xp} / ${nextLevelXp}`;
+    } else if (isLobbyVisible) {
+      if (level > this._lastDisplayedLevel) {
+        // Player Leveled Up!
+        const pLevel = this._lastDisplayedLevel;
+        const pXp = this._lastDisplayedXp;
+        this._lastDisplayedLevel = level;
+        this._lastDisplayedXp = xp;
+        this.animateLevelUp(pLevel, pXp, level, xp);
+      } else if (xp > this._lastDisplayedXp) {
+        // Gained XP within same level
+        const pXp = this._lastDisplayedXp;
+        this._lastDisplayedXp = xp;
+        this.animateXpIncrease(pXp, xp, level);
+      } else {
+        this._lastDisplayedLevel = level;
+        this._lastDisplayedXp = xp;
+        if (this.playerLevel) this.playerLevel.textContent = level;
+        const nextLevelXp = level * 100;
+        const percent = Math.min(100, (xp / nextLevelXp) * 100);
+        if (this.playerXpFill) this.playerXpFill.style.width = `${percent}%`;
+        if (this.playerXpText) this.playerXpText.textContent = `${xp} / ${nextLevelXp}`;
+      }
+    } else {
+      // Lobby hidden: update DOM quietly without advancing animation state
+      if (this.playerLevel) this.playerLevel.textContent = level;
+      const nextLevelXp = level * 100;
+      const percent = Math.min(100, (xp / nextLevelXp) * 100);
+      if (this.playerXpFill) this.playerXpFill.style.width = `${percent}%`;
+      if (this.playerXpText) this.playerXpText.textContent = `${xp} / ${nextLevelXp}`;
+    }
+
     const nextLevelXp = level * 100;
-    const percent = Math.min(100, (xp / nextLevelXp) * 100);
-    if (this.playerXpFill) this.playerXpFill.style.width = `${percent}%`;
-    if (this.playerXpText) this.playerXpText.textContent = `${xp} / ${nextLevelXp}`;
+
+    // Toggle Level 5 Cosmetic Shop (Crates) view
+    const cratesLockedView = document.getElementById('crates-locked-view');
+    const cratesUnlockedView = document.getElementById('crates-unlocked-view');
+    if (cratesLockedView && cratesUnlockedView) {
+      if (level < 5) {
+        cratesLockedView.classList.remove('hidden');
+        cratesUnlockedView.classList.add('hidden');
+      } else {
+        cratesLockedView.classList.add('hidden');
+        cratesUnlockedView.classList.remove('hidden');
+      }
+    }
 
     const cyberCard = document.querySelector('[data-map-id="cyber_city"]');
     if (cyberCard) {

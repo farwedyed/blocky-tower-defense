@@ -68,10 +68,13 @@
           </div>
           <div class="meta-item">
             <span class="label">COINS</span>
-            <span id="player-coins" class="badge coin-badge">
-              <img src="https://img.icons8.com/color/48/coins.png" class="header-icon" /> 
-              <span id="player-coins-val">150</span>
-            </span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span id="player-coins" class="badge coin-badge">
+                <img src="https://img.icons8.com/color/48/coins.png" class="header-icon" /> 
+                <span id="player-coins-val">150</span>
+              </span>
+              <button id="btn-add-coins" class="btn-coin-plus" title="Get Free Coins">+</button>
+            </div>
           </div>
         </div>
       </header>
@@ -82,6 +85,7 @@
           <button class="tab-btn" data-target="panel-shop"><img src="https://img.icons8.com/color/48/shopping-cart.png" class="tab-icon" /> AGENT SHOP</button>
           <button class="tab-btn" data-target="panel-loadout"><img src="https://img.icons8.com/color/48/backpack.png" class="tab-icon" /> LOADOUT</button>
           <button class="tab-btn" data-target="panel-crates"><img src="https://img.icons8.com/color/48/gift.png" class="tab-icon" /> CRATES</button>
+          <button class="tab-btn tab-btn-coins" data-target="panel-coins"><img src="https://img.icons8.com/color/48/coins.png" class="tab-icon" /> FREE COINS</button>
         </nav>
 
         <div id="lobby-panels">
@@ -585,40 +589,51 @@
 
           <!-- CRATES UNBOXING PANEL -->
           <div id="panel-crates" class="lobby-panel">
-            <h2>🎁 BUY & OPEN TOY CRATES</h2>
-            <p class="subtitle">Open crates to unlock rare, visual blocky character skins with custom stat bonuses!</p>
-            <div class="shop-grid">
-              <div class="shop-card" data-crate-type="basic">
-                <img src="https://img.icons8.com/color/48/box.png" class="crate-icon" />
-                <div class="agent-info">
-                  <span class="name">Basic Toy Crate</span>
-                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 150 Coins</span>
-                  <div class="crate-unlocks" style="font-size: 0.72rem; color: #7f8c8d; font-weight: 800; margin-top: 4px;">Unlocks: <span style="color:#2ecc71">Golden Skins</span>, <span style="color:#3498db">Cyber Skins</span>, <span style="color:#e67e22">Hazmat Skins</span></div>
-                  <span style="font-size: 0.8rem; color: #7f8c8d; display: block; margin-top: 4px;">Common (80%), Rare (20%)</span>
-                </div>
-                <button class="btn btn-shop-action btn-buy-crate" data-crate="basic">UNBOX</button>
+            
+            <!-- LOCKED STATE (LEVEL < 5) -->
+            <div id="crates-locked-view" class="crates-lock-screen">
+              <div class="lock-graphic-container">
+                <span class="lock-sparkle sp-1">✦</span>
+                <span class="lock-sparkle sp-2">✦</span>
+                <img src="https://img.icons8.com/color/96/lock--v1.png" class="lock-big-img" alt="Locked" />
               </div>
- 
-              <div class="shop-card" data-crate-type="elite">
-                <img src="https://img.icons8.com/color/48/toolbox.png" class="crate-icon" />
-                <div class="agent-info">
-                  <span class="name">Commander Elite Crate</span>
-                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 350 Coins</span>
-                  <div class="crate-unlocks" style="font-size: 0.72rem; color: #7f8c8d; font-weight: 800; margin-top: 4px;">Unlocks Elite / Premium Class agent skins</div>
-                  <span style="font-size: 0.8rem; color: #7f8c8d; display: block; margin-top: 4px;">Rare (60%), Epic (40%)</span>
+              <h2 class="lock-title">COSMETIC SHOP <span class="lock-highlight">LOCKED</span></h2>
+              <div class="lock-pill">Unlocks at <strong>LEVEL 5</strong></div>
+              <p class="lock-subtext">Want to buy troops? Go to Agent Shop</p>
+              <button id="btn-go-to-agent-shop" class="btn btn-redirect-shop">
+                <img src="https://img.icons8.com/color/48/shopping-cart.png" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 6px;" /> GO TO AGENT SHOP
+              </button>
+            </div>
+
+            <!-- UNLOCKED STATE (LEVEL >= 5) -->
+            <!-- UNLOCKED STATE (LEVEL >= 5) -->
+            <div id="crates-unlocked-view" class="hidden">
+              ...
+            </div>
+
+          </div>
+
+          <!-- FREE COINS AD REWARD PANEL -->
+          <div id="panel-coins" class="lobby-panel">
+            <div class="coins-panel-header">
+              <h2><img src="https://img.icons8.com/color/48/coins.png" class="title-icon" /> GET FREE COINS</h2>
+              <p class="subtitle">Watch a quick sponsor video to earn free match coins! (Up to 5 ads per day)</p>
+            </div>
+
+            <div class="coins-reward-showcase">
+              <div class="coins-reward-card">
+                <div class="coins-icon-wrapper">
+                  <img src="https://img.icons8.com/color/96/money-bag.png" class="coins-pouch-img" alt="Coins" />
+                  <span class="coins-sparkle cs-1">✦</span>
+                  <span class="coins-sparkle cs-2">✦</span>
                 </div>
-                <button class="btn btn-shop-action btn-buy-crate" data-crate="elite">UNBOX</button>
-              </div>
- 
-              <div class="shop-card" data-crate-type="deluxe">
-                <img src="https://img.icons8.com/color/48/diamond.png" class="crate-icon" />
-                <div class="agent-info">
-                  <span class="name">Deluxe DJ Crate</span>
-                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 500 Coins</span>
-                  <div class="crate-unlocks" style="font-size: 0.72rem; color: #7f8c8d; font-weight: 800; margin-top: 4px;">Unlocks Deluxe Legendary DJ and advanced skins</div>
-                  <span style="font-size: 0.8rem; color: #7f8c8d; display: block; margin-top: 4px;">Epic (50%), Legendary (50%)</span>
-                </div>
-                <button class="btn btn-shop-action btn-buy-crate" data-crate="deluxe">UNBOX</button>
+                <h3 class="coins-reward-amount">+150 COINS</h3>
+                <span id="tab-coins-remaining" class="coins-remaining-badge">5 / 5 AVAILABLE TODAY</span>
+
+                <button id="btn-tab-watch-ad-coins" class="btn btn-watch-ad-large">
+                  <span class="ad-play-icon">▶</span> WATCH AD (+150 COINS)
+                </button>
+                <span class="coins-daily-reset-notice">Daily allowance resets every midnight.</span>
               </div>
             </div>
           </div>
@@ -770,6 +785,39 @@
           <button id="btn-equip-revealed" class="btn" style="width: 100%; margin-top: 5px;">EQUIP</button>
           <button id="btn-close-reveal" class="btn btn-primary" style="width: 100%; margin-top: 5px;">CLOSE</button>
         </div>
+      </div>
+    </div>
+
+    <!-- FREE COINS REWARDED AD MODAL -->
+    <div id="free-coins-modal" class="hidden" style="
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(10, 15, 26, 0.75);
+      z-index: 2000;
+      display: flex; align-items: center; justify-content: center;
+    ">
+      <div style="
+        background: #ffffff;
+        border: 4px solid var(--border-color);
+        border-radius: 18px;
+        padding: 24px;
+        width: 320px;
+        text-align: center;
+        box-shadow: 0 10px 0 var(--border-color);
+        display: flex; flex-direction: column; align-items: center; gap: 10px;
+      ">
+        <img src="https://img.icons8.com/color/96/coins.png" style="width: 64px; height: 64px;" />
+        <h3 style="font-family: var(--font-title); font-size: 1.5rem; color: var(--text-dark); margin: 0;">GET FREE COINS</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); font-weight: 800; line-height: 1.4; margin: 0;">
+          Watch a quick video to earn <strong style="color: #b8860b;">+150 Coins</strong>!
+        </p>
+        <span id="free-coins-limit-text" style="font-size: 0.75rem; font-weight: 900; color: var(--primary-blue-dark); background: #e3f2fd; padding: 3px 8px; border-radius: 6px;">
+          Available Today: 5 / 5
+        </span>
+        <button id="btn-watch-ad-coins" class="btn" style="
+          width: 100%; background: var(--primary-green); color: #fff; font-size: 1rem; padding: 12px; margin-top: 6px; box-shadow: 0 4px 0 var(--primary-green-dark), 0 4px 0 var(--border-color);
+        "><span style="display:inline-block; border: 2px solid #fff; border-radius: 3px; padding: 1px 5px; font-size: 0.8em; margin-right: 4px;">▶</span> WATCH AD (+150 COINS)</button>
+        <button id="btn-close-coins-modal" class="btn btn-secondary" style="width: 100%; font-size: 0.85rem; padding: 8px;">CLOSE</button>
       </div>
     </div>
 

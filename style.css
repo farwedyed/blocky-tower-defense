@@ -413,11 +413,116 @@ body {
   border-radius: 8px;
   border: 2px solid var(--border-color);
   box-shadow: 0 2px 0 var(--border-color);
+  transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform-origin: center center;
+}
+
+/* ─── LEVEL UP CELEBRATORY ZOOM & NEON GLOW ─── */
+@keyframes levelUpPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 2px 0 var(--border-color);
+  }
+  20% {
+    transform: scale(1.42) rotate(-5deg);
+    box-shadow: 0 0 22px #00ffe0, 0 0 40px #f1c40f, inset 0 0 10px #ffffff;
+    background: linear-gradient(135deg, #00d2ff, #f1c40f);
+    color: #000000;
+  }
+  45% {
+    transform: scale(1.36) rotate(5deg);
+    box-shadow: 0 0 32px #ff007f, 0 0 50px #00ffe0;
+    background: linear-gradient(135deg, #ff007f, #00d2ff);
+    color: #ffffff;
+  }
+  70% {
+    transform: scale(1.22) rotate(-2deg);
+    box-shadow: 0 0 25px #f1c40f, 0 0 35px #2ecc71;
+    background: linear-gradient(135deg, #f1c40f, #2ecc71);
+    color: #000000;
+  }
+  85% {
+    transform: scale(1.10);
+    box-shadow: 0 0 14px #00d2ff;
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 2px 0 var(--border-color);
+    background: var(--primary-blue);
+    color: #ffffff;
+  }
+}
+
+.level-badge-animate {
+  animation: levelUpPulse 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+  z-index: 100;
+  position: relative;
+}
+
+/* ─── XP PROGRESS BAR GLOWING SHIMMER ─── */
+@keyframes xpShimmer {
+  0%, 100% {
+    box-shadow: 0 0 6px rgba(46, 204, 113, 0.4);
+    border-color: var(--border-color);
+  }
+  50% {
+    box-shadow: 0 0 18px #2ecc71, 0 0 28px #00ffe0;
+    border-color: #2ecc71;
+  }
+}
+
+.xp-bar-glowing {
+  animation: xpShimmer 0.75s infinite ease-in-out !important;
+  border-color: #2ecc71 !important;
 }
 
 .coin-badge {
   background: var(--primary-yellow);
   color: #000;
+  transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform-origin: center center;
+}
+
+/* ─── COLORFUL COIN ZOOM & SHINE KEYFRAMES ─── */
+@keyframes coinRainbowPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 2px 0 var(--border-color);
+  }
+  20% {
+    transform: scale(1.28) rotate(-2deg);
+    box-shadow: 0 0 16px #f1c40f, 0 0 30px #ff007f;
+    background: linear-gradient(135deg, #f1c40f, #ff007f);
+    color: #ffffff;
+  }
+  45% {
+    transform: scale(1.24) rotate(2deg);
+    box-shadow: 0 0 22px #00d2ff, 0 0 35px #2ecc71;
+    background: linear-gradient(135deg, #00d2ff, #2ecc71);
+    color: #000000;
+  }
+  70% {
+    transform: scale(1.20) rotate(-1deg);
+    box-shadow: 0 0 18px #ffe600, 0 0 26px #ff7b00;
+    background: linear-gradient(135deg, #ffe600, #ff7b00);
+    color: #000000;
+  }
+  85% {
+    transform: scale(1.10);
+    box-shadow: 0 0 12px #2ecc71;
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 2px 0 var(--border-color);
+    background: var(--primary-yellow);
+    color: #000000;
+  }
+}
+
+.coin-badge-animate {
+  animation: coinRainbowPulse 1.05s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+  z-index: 100;
+  position: relative;
 }
 
 /* XP Bar */
@@ -485,6 +590,26 @@ body {
   transition: all 0.15s ease;
   box-shadow: 0 4px 0 var(--border-color);
 }
+/* Mobile adaptation for Lock & Coins Tab */
+  .crates-lock-screen {
+    padding: 15px 10px !important;
+    min-height: unset !important;
+    gap: 8px !important;
+  }
+  .lock-big-img {
+    width: 54px !important;
+    height: 54px !important;
+  }
+  .lock-title {
+    font-size: 1.3rem !important;
+  }
+  .coins-reward-card {
+    padding: 16px !important;
+    max-width: 300px !important;
+  }
+  .coins-reward-amount {
+    font-size: 1.6rem !important;
+  }
 
 .tab-btn:hover {
   transform: translateY(-2px);
@@ -2362,4 +2487,247 @@ body {
   font-size: 1.15rem !important;
   padding: 10px 16px !important;
   margin-top: 10px !important;
+}
+
+/* ─── COIN PLUS BUTTON ─── */
+.btn-coin-plus {
+  width: 26px;
+  height: 26px;
+  background: var(--primary-green);
+  color: #fff;
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  font-family: var(--font-title);
+  font-size: 1.1rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 0 var(--primary-green-dark);
+  transition: transform 0.1s ease;
+  line-height: 1;
+}
+
+.btn-coin-plus:hover {
+  transform: scale(1.1);
+  background: #27ae60;
+}
+
+.btn-coin-plus:active {
+  transform: translateY(2px);
+}
+
+/* ─── LEVEL 5 COSMETIC SHOP LOCK SCREEN ─── */
+.crates-lock-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 20px;
+  gap: 12px;
+  background: #fdfefe;
+  border-radius: 12px;
+  height: 100%;
+  min-height: 380px;
+}
+
+.lock-graphic-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.lock-big-img {
+  width: 84px;
+  height: 84px;
+  animation: lockFloat 3s infinite ease-in-out;
+}
+
+@keyframes lockFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.lock-sparkle {
+  position: absolute;
+  color: #f1c40f;
+  font-size: 1.5rem;
+  animation: sparkleTwinkle 2s infinite ease-in-out;
+}
+
+.sp-1 { top: 0; left: -16px; animation-delay: 0.3s; }
+.sp-2 { bottom: 8px; right: -16px; animation-delay: 0.8s; }
+
+@keyframes sparkleTwinkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+.lock-title {
+  font-family: var(--font-title);
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--text-dark);
+  letter-spacing: 0.5px;
+  margin: 0;
+  border: none !important;
+  padding: 0 !important;
+}
+
+.lock-highlight {
+  color: var(--primary-blue);
+  text-shadow: 1px 1px 0 var(--border-color);
+}
+
+.lock-pill {
+  background: #eef2f7;
+  border: 2px solid #cbd5e1;
+  border-radius: 20px;
+  padding: 6px 20px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #475569;
+}
+
+.lock-pill strong {
+  color: var(--primary-blue);
+}
+
+.lock-subtext {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #7f8c8d;
+  margin: 4px 0 10px 0;
+}
+
+.btn-redirect-shop {
+  background: var(--primary-blue);
+  color: #ffffff;
+  font-size: 1.05rem;
+  padding: 12px 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 0 var(--primary-blue-dark), 0 4px 0 var(--border-color);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-redirect-shop:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 var(--primary-blue-dark), 0 6px 0 var(--border-color);
+}
+/* ─── COINS TAB & PANEL STYLING ─── */
+.tab-btn-coins {
+  border-color: var(--primary-yellow-dark) !important;
+}
+
+.tab-btn-coins.active {
+  background: var(--primary-yellow) !important;
+  color: #000 !important;
+  box-shadow: 0 2px 0 var(--primary-yellow-dark) !important;
+}
+
+.coins-reward-showcase {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 15px;
+  width: 100%;
+}
+
+.coins-reward-card {
+  background: #fdfefe;
+  border: 3.5px solid var(--border-color);
+  border-radius: 18px;
+  padding: 30px 24px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 8px 0 var(--border-color), 0 12px 24px rgba(0,0,0,0.06);
+}
+
+.coins-icon-wrapper {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 5px;
+}
+
+.coins-pouch-img {
+  width: 86px;
+  height: 86px;
+  filter: drop-shadow(0 6px 12px rgba(241, 196, 15, 0.4));
+  animation: lockFloat 2.6s infinite ease-in-out;
+}
+
+.coins-sparkle {
+  position: absolute;
+  color: #f1c40f;
+  font-size: 1.6rem;
+  font-weight: 900;
+  animation: sparkleTwinkle 2s infinite ease-in-out;
+}
+.cs-1 { top: -6px; left: -14px; animation-delay: 0.2s; }
+.cs-2 { bottom: 2px; right: -12px; animation-delay: 0.9s; }
+
+.coins-reward-amount {
+  font-family: var(--font-title);
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: var(--primary-yellow-dark);
+  text-shadow: 2px 2px 0 #222;
+  margin: 0;
+  letter-spacing: 1px;
+}
+
+.coins-remaining-badge {
+  background: #e3f2fd;
+  color: var(--primary-blue-dark);
+  border: 2px solid var(--primary-blue);
+  font-size: 0.8rem;
+  font-weight: 900;
+  padding: 3px 12px;
+  border-radius: 8px;
+}
+
+.btn-watch-ad-large {
+  width: 100%;
+  font-size: 1.15rem;
+  padding: 14px;
+  background: var(--primary-green);
+  color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 5px 0 var(--primary-green-dark), 0 5px 0 var(--border-color);
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-watch-ad-large:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 7px 0 var(--primary-green-dark), 0 7px 0 var(--border-color);
+}
+
+.ad-play-icon {
+  display: inline-block;
+  border: 2px solid #fff;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.85em;
+  line-height: 1;
+}
+
+.coins-daily-reset-notice {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
 }
