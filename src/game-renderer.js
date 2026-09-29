@@ -961,7 +961,8 @@ export function drawTutorialCanvasHighlight(game, ctx) {
   const cellSize = game.grid.cellSize;
   const targetX = 2 * cellSize + cellSize / 2;
   const targetY = 2 * cellSize + cellSize / 2; 
-  
+
+  // Only draw placement guide tile & arrow (NO second ghost - only the mouse ghost will render)
   const bounce = Math.sin(Date.now() / 150) * 8;
   
   ctx.save();

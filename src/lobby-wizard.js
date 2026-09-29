@@ -30,23 +30,50 @@ export class LobbyWizard {
     if (this.btnNextMaps) {
       this.btnNextMaps.addEventListener('click', () => {
         soundManager.playTick();
-        if (this.stepMaps) this.stepMaps.classList.add('hidden');
+        if (this.stepMaps) {
+          this.stepMaps.classList.add('hidden');
+          this.stepMaps.classList.remove('active');
+          this.stepMaps.style.display = '';
+        }
         if (this.stepDiff) {
           this.stepDiff.classList.remove('hidden');
           this.stepDiff.classList.add('active');
+          this.stepDiff.style.display = '';
         }
         this.drawAllBossPreviews();
       });
     }
 
-    // Step 2: Back to Maps
+    const btnSoloBack = document.getElementById('btn-solo-top-back');
+    if (btnSoloBack) {
+      btnSoloBack.addEventListener('click', () => {
+        soundManager.playTick();
+        this.lobbyUI.showSplashState();
+      });
+    }
+    // Step 2: Back to Maps / Co-op Room
     if (this.btnBackDiff) {
       this.btnBackDiff.addEventListener('click', () => {
         soundManager.playTick();
-        if (this.stepDiff) this.stepDiff.classList.add('hidden');
-        if (this.stepMaps) {
-          this.stepMaps.classList.remove('hidden');
-          this.stepMaps.classList.add('active');
+        
+        // Hide Difficulty Step
+        if (this.stepDiff) {
+          this.stepDiff.classList.add('hidden');
+          this.stepDiff.classList.remove('active');
+          this.stepDiff.style.setProperty('display', 'none', 'important');
+        }
+
+        if (Network.mode !== 'OFFLINE') {
+          // In Co-op: Return to Co-op Squad Room
+          this.lobbyUI.coop.showCoopLobbyState();
+          Network.broadcastToAll({ type: 'COOP_STEP_CHANGE', step: 'room' });
+        } else {
+          // In Solo: Return to Solo Maps
+          if (this.stepMaps) {
+            this.stepMaps.classList.remove('hidden');
+            this.stepMaps.classList.add('active');
+            this.stepMaps.style.setProperty('display', 'flex', 'important');
+          }
         }
       });
     }
@@ -55,11 +82,30 @@ export class LobbyWizard {
     if (this.btnNextDiff) {
       this.btnNextDiff.addEventListener('click', () => {
         soundManager.playTick();
-        if (this.stepDiff) this.stepDiff.classList.add('hidden');
+        
+        // Hide Difficulty Step
+        if (this.stepDiff) {
+          this.stepDiff.classList.add('hidden');
+          this.stepDiff.classList.remove('active');
+          this.stepDiff.style.setProperty('display', 'none', 'important');
+        }
+
+        // Show Prep Step
         if (this.stepPrep) {
           this.stepPrep.classList.remove('hidden');
           this.stepPrep.classList.add('active');
+          this.stepPrep.style.setProperty('display', 'flex', 'important');
         }
+
+        // Update button text for Co-op
+        const deployBtn = document.getElementById('btn-deploy');
+        if (deployBtn) {
+          deployBtn.innerHTML = Network.mode !== 'OFFLINE' 
+            ? '<span>DEPLOY SQUAD TO MATCH</span><img src="assets/ui/solo/sprite_02.png" class="prep-deploy-swords" alt="" />'
+            : '<span>DEPLOY TO MATCH</span><img src="assets/ui/solo/sprite_02.png" class="prep-deploy-swords" alt="" />';
+        }
+
+        // Clients stay in squad room waiting for Host to deploy
       });
     }
 
@@ -67,23 +113,36 @@ export class LobbyWizard {
     if (this.btnBackPrep) {
       this.btnBackPrep.addEventListener('click', () => {
         soundManager.playTick();
-        if (this.stepPrep) this.stepPrep.classList.add('hidden');
+        if (this.stepPrep) {
+          this.stepPrep.classList.add('hidden');
+          this.stepPrep.classList.remove('active');
+          this.stepPrep.style.display = '';
+        }
         if (this.stepDiff) {
           this.stepDiff.classList.remove('hidden');
           this.stepDiff.classList.add('active');
+          this.stepDiff.style.display = '';
         }
       });
     }
 
-    // Difficulty selection cards
+    // Difficulty selection cards (Synced across squad)
     this.diffWizardCards.forEach(card => {
       card.addEventListener('click', () => {
+        if (Network.mode === 'CLIENT') return; // Only host chooses difficulty
         this.diffWizardCards.forEach(c => c.classList.remove('active'));
         card.classList.add('active');
         
         const diff = card.getAttribute('data-difficulty');
         this.game.selectedDifficulty = diff;
         soundManager.playTick();
+
+        if (Network.mode === 'HOST') {
+          Network.broadcastToAll({
+            type: 'COOP_DIFF_SELECTED',
+            difficulty: diff
+          });
+        }
       });
     });
 
@@ -95,6 +154,12 @@ export class LobbyWizard {
         const mapId = card.getAttribute('data-map-id');
         this.game.setSelectedMap(mapId);
         this.renderLeaderboard(mapId);
+        if (typeof Network !== 'undefined' && Network.mode === 'HOST') {
+          Network.broadcastToAll({
+            type: 'COOP_MAP_SELECTED',
+            selectedMap: mapId
+          });
+        }
       });
     });
   }
@@ -247,64 +312,53 @@ export class LobbyWizard {
     if (!listEl) return;
 
     const { questProgress, questGoals, questRewarded } = this.game;
-
     const availableQuests = [];
 
-    // 1. Basic Slay Zombies (Starter-friendly)
     availableQuests.push({
       key: 'kills',
-      label: '<img src="https://img.icons8.com/color/48/skull.png" class="quest-icon" /> Slay Zombies',
+      icon: 'https://img.icons8.com/color/48/skull.png',
+      label: 'Slay Zombies',
       current: questProgress.kills || 0,
       goal: questGoals.kills,
       reward: 75,
       rewarded: questRewarded.kills
     });
 
-    // 2. Spend cash in-game (Starter-friendly)
     availableQuests.push({
       key: 'cashSpent',
-      label: '<img src="https://img.icons8.com/color/48/stack-of-money.png" class="quest-icon" /> Spend $2,000 Cash',
+      icon: 'https://img.icons8.com/color/48/stack-of-money.png',
+      label: 'Spend $2,000 Cash',
       current: questProgress.cashSpent || 0,
       goal: questGoals.cashSpent,
       reward: 100,
       rewarded: questRewarded.cashSpent
     });
 
-    // 3. Survive waves (Starter-friendly)
     availableQuests.push({
       key: 'wavesSurvived',
-      label: '<img src="https://img.icons8.com/color/48/tsunami.png" class="quest-icon" /> Survive 25 Waves',
+      icon: 'https://img.icons8.com/color/48/tsunami.png',
+      label: 'Survive 25 Waves',
       current: questProgress.wavesSurvived || 0,
       goal: questGoals.wavesSurvived,
       reward: 75,
       rewarded: questRewarded.wavesSurvived
     });
 
-    // 4. Place Scouts (Starter-friendly - Scout is unlocked by default)
     availableQuests.push({
       key: 'scoutsPlaced',
-      label: '<img src="https://img.icons8.com/color/48/detective.png" class="quest-icon" /> Deploy 15 Scouts',
+      icon: 'https://img.icons8.com/color/48/detective.png',
+      label: 'Deploy 15 Scouts',
       current: questProgress.scoutsPlaced || 0,
       goal: questGoals.scoutsPlaced,
       reward: 50,
       rewarded: questRewarded.scoutsPlaced
     });
 
-    // 5. Place Snipers (Starter-friendly - Sniper is unlocked by default)
-    availableQuests.push({
-      key: 'snipersPlaced',
-      label: '<img src="https://img.icons8.com/color/48/target--v1.png" class="quest-icon" /> Deploy 10 Snipers',
-      current: questProgress.snipersPlaced || 0,
-      goal: questGoals.snipersPlaced,
-      reward: 50,
-      rewarded: questRewarded.snipersPlaced
-    });
-
-    // 6. Farms Placed (PROGRESS GATED: Only show if Farm is unlocked!)
     if (this.game.unlockedAgents.includes('farm')) {
       availableQuests.push({
         key: 'farmsPlaced',
-        label: '<img src="https://img.icons8.com/color/48/wheat.png" class="quest-icon" /> Place 5 Farms',
+        icon: 'https://img.icons8.com/color/48/wheat.png',
+        label: 'Place 5 Farms',
         current: questProgress.farmsPlaced || 0,
         goal: questGoals.farmsPlaced,
         reward: 60,
@@ -312,33 +366,29 @@ export class LobbyWizard {
       });
     }
 
-    // Limit visible quests to the top 4 active tasks to maintain a clean layout
     const displayQuests = availableQuests.slice(0, 4);
 
     listEl.innerHTML = displayQuests.map(q => {
       const pct = Math.min(100, Math.round((q.current / q.goal) * 100));
       const done = q.rewarded || q.current >= q.goal;
-      const barColor = done ? '#27ae60' : '#3498db';
       return `
-        <div class="quest-item" style="
-          background: ${done ? 'rgba(39,174,96,0.08)' : 'rgba(52,152,219,0.06)'};
-          border: 2px solid ${done ? '#27ae60' : '#3498db'};
-          border-radius: 10px;
-          padding: 8px 10px;
-          position: relative;
-          overflow: hidden;
-        ">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-weight:900;font-size:0.82rem;display:flex;align-items:center;gap:6px;">${q.label}</span>
-            <span style="font-weight:800;font-size:0.78rem;color:${done ? '#27ae60' : '#f39c12'};">
-              ${done ? '✅ DONE' : `${Math.min(q.current, q.goal)} / ${q.goal}`}
-            </span>
+        <div class="prep-quest-row ${done ? 'quest-done' : ''}">
+          <div class="quest-row-left">
+            <img src="${q.icon}" class="quest-row-icon" alt="" />
+            <div class="quest-row-info">
+              <div class="quest-title-line">
+                <span class="quest-name">${q.label}</span>
+                <span class="quest-counter">${Math.min(q.current, q.goal)} / ${q.goal}</span>
+              </div>
+              <div class="quest-track">
+                <div class="quest-fill" style="width: ${pct}%;"></div>
+              </div>
+            </div>
           </div>
-          <div style="margin-top:5px;height:7px;background:#e0e0e0;border-radius:6px;overflow:hidden;">
-            <div style="width:${pct}%;height:100%;background:${barColor};border-radius:6px;transition:width 0.4s;"></div>
-          </div>
-          <div style="margin-top:4px;font-size:0.7rem;color:#7f8c8d;text-align:right;">
-            Reward: <img src="https://img.icons8.com/color/48/coins.png" class="quest-icon" /> ${q.reward} Coins
+          <div class="quest-reward-pill">
+            <span class="quest-reward-label">Reward:</span>
+            <img src="assets/ui/solo/selectdifficulty/sprite_20.png" class="quest-coin-img" alt="" />
+            <span class="quest-reward-val">${q.reward} Coins</span>
           </div>
         </div>
       `;
@@ -365,33 +415,29 @@ export class LobbyWizard {
 
   _renderLeaderboardRows(listEl, mapLabel, records) {
     const safeRecords = Array.isArray(records) ? records : [];
-    if (safeRecords.length === 0) {
-      listEl.innerHTML = `<div style="color:#7f8c8d;font-size:0.82rem;">
-        No records yet for <strong>${mapLabel}</strong>.<br>Complete the map to set one!
-      </div>`;
-      return;
+    
+    // Fill up to 5 rows matching reference image exactly
+    const rows = [];
+    for (let i = 0; i < 5; i++) {
+      rows.push(safeRecords[i] || { name: 'Guest', time: '06:05' });
     }
 
-    const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
-    listEl.innerHTML = `
-      <div style="font-size:0.72rem;color:#7f8c8d;margin-bottom:4px;">📍 ${mapLabel}</div>
-      ${safeRecords.map((entry, i) => `
-        <div style="
-          display:flex;justify-content:space-between;align-items:center;
-          padding:5px 8px;
-          border-radius:8px;
-          background:${i === 0 ? 'rgba(241,196,15,0.12)' : 'transparent'};
-          border-bottom:1px dashed #e0e0e0;
-          font-weight:800;
-          font-size:0.82rem;
-        ">
-          <span style="display:flex; align-items:center; gap:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:180px;">
-            <span>${medals[i] || `#${i + 1}`}</span>
-            <strong style="color:var(--text-dark);">${entry.name || 'Guest'}</strong>
-          </span>
-          <span style="color:var(--primary-blue-dark); font-family:var(--font-title); font-size:0.9rem;">${entry.time}</span>
+    const medalIcons = [
+      '🥇', // 1st - Gold
+      '🥈', // 2nd - Silver
+      '🥉', // 3rd - Bronze
+      '<span class="rank-blue-badge">4</span>',
+      '<span class="rank-blue-badge">5</span>'
+    ];
+
+    listEl.innerHTML = rows.map((entry, i) => `
+      <div class="prep-leaderboard-row ${i === 0 ? 'first-place-row' : ''}">
+        <div class="rank-name-cluster">
+          <span class="rank-icon-slot">${medalIcons[i]}</span>
+          <span class="rank-player-name">${entry.name || 'Guest'}</span>
         </div>
-      `).join('')}
-    `;
+        <span class="rank-time-text">${entry.time || '06:05'}</span>
+      </div>
+    `).join('');
   }
 }

@@ -34,8 +34,11 @@ export const CrazyGamesManager = {
       if (typeof window.CrazyGames !== 'undefined' && window.CrazyGames.SDK) {
         this.sdk = window.CrazyGames.SDK;
         
-        // Asynchronously initialize the SDK
-        await this.sdk.init();
+        // Asynchronously initialize the SDK with an 800ms timeout guard for local dev
+        await Promise.race([
+          this.sdk.init(),
+          new Promise((resolve) => setTimeout(resolve, 800))
+        ]);
 
         // If hosted on GitHub Pages or custom domain, CrazyGames disables itself
         if (this.sdk.environment === 'disabled') {

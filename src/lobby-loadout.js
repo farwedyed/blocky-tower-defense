@@ -15,6 +15,14 @@ export class LobbyLoadout {
     if (!this.loadoutGrid) return;
     this.loadoutGrid.innerHTML = '';
 
+    // Update capacity counter
+    const countBadge = document.getElementById('loadout-count-badge');
+    const equippedCount = this.game.equippedAgents.length;
+    if (countBadge) {
+      countBadge.textContent = `EQUIPPED: ${equippedCount} / 5`;
+      countBadge.style.color = equippedCount === 5 ? '#f1c40f' : '#00ffe0';
+    }
+
     const allAgentTypes = [
       'scout', 'soldier', 'sniper', 'demoman',
       'farm', 'medic', 'pyromancer', 'rocketeer', 'freezer', 'shotgunner', 'crook_boss', 'military_base',
@@ -28,7 +36,7 @@ export class LobbyLoadout {
 
       const isEquipped = this.game.equippedAgents.includes(type);
       const card = document.createElement('div');
-      card.className = `loadout-card ${isEquipped ? 'equipped' : ''}`;
+      card.className = `loadout-card-v2 ${isEquipped ? 'is-equipped' : ''}`;
 
       const prefix = type + '_';
       const skins = this.game.ownedSkins.filter(s => s.startsWith(prefix));
@@ -38,17 +46,15 @@ export class LobbyLoadout {
       if (skins.length > 0) {
         const activeSkinName = currentEquippedSkin === 'default' ? 'DEFAULT' : currentEquippedSkin.split('_')[1].toUpperCase();
         selectHtml = `
-          <div class="skin-select-container" style="margin-top: 8px; position: relative;">
-            <span style="font-size: 0.7rem; color: #7f8c8d;">SKIN: </span>
-            <div class="custom-skin-dropdown" style="display: inline-block; min-width: 80px; cursor: pointer; user-select: none;">
-              <div class="skin-dropdown-selected" style="font-size: 0.72rem; font-weight: 900; color: var(--primary-blue-dark); border: 2px solid var(--border-color); border-radius: 4px; padding: 2px 6px; background: #fff; text-align: center;">${activeSkinName} ▾</div>
-              <div class="skin-dropdown-options hidden" style="position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); width: 95px; background: #fff; border: 2px solid var(--border-color); border-radius: 6px; z-index: 1000; margin-bottom: 4px; overflow: hidden; box-shadow: 0 -3px 8px rgba(0,0,0,0.15);">
-                <div class="skin-option ${currentEquippedSkin === 'default' ? 'active' : ''}" data-value="default" style="padding: 4px 6px; font-size: 0.72rem; font-weight: 800; border-bottom: 1.5px dashed #eee; text-align: center; ${currentEquippedSkin === 'default' ? 'background: var(--primary-blue); color: #fff;' : ''}">DEFAULT</div>
+          <div class="loadout-skin-container">
+            <span class="loadout-skin-label">SKIN:</span>
+            <div class="custom-skin-dropdown">
+              <div class="skin-dropdown-selected">${activeSkinName} ▾</div>
+              <div class="skin-dropdown-options hidden">
+                <div class="skin-option ${currentEquippedSkin === 'default' ? 'active' : ''}" data-value="default">DEFAULT</div>
                 ${skins.map(s => {
                   const isActive = currentEquippedSkin === s;
-                  return `
-                    <div class="skin-option ${isActive ? 'active' : ''}" data-value="${s}" style="padding: 4px 6px; font-size: 0.72rem; font-weight: 800; border-bottom: 1.5px dashed #eee; text-align: center; ${isActive ? 'background: var(--primary-blue); color: #fff;' : ''}">${s.split('_')[1].toUpperCase()}</div>
-                  `;
+                  return `<div class="skin-option ${isActive ? 'active' : ''}" data-value="${s}">${s.split('_')[1].toUpperCase()}</div>`;
                 }).join('')}
               </div>
             </div>
@@ -56,24 +62,60 @@ export class LobbyLoadout {
         `;
       }
 
+      const formattedName = type.replace('_', ' ').toUpperCase();
+
+      const STATS_MAP = {
+        scout: { dmg: '1', rng: '90px', rate: '1.0/s' },
+        soldier: { dmg: '2', rng: '90px', rate: '2.0/s' },
+        sniper: { dmg: '4', rng: '180px', rate: '0.25/s' },
+        demoman: { dmg: '6', rng: '110px', rate: '0.45/s' },
+        farm: { dmg: '0', rng: '0px', rate: '0/s' },
+        medic: { dmg: '1', rng: '100px', rate: '0.8/s' },
+        pyromancer: { dmg: '1', rng: '90px', rate: '2.0/s' },
+        rocketeer: { dmg: '8', rng: '110px', rate: '0.35/s' },
+        freezer: { dmg: '1', rng: '100px', rate: '0.65/s' },
+        shotgunner: { dmg: '2', rng: '90px', rate: '0.55/s' },
+        crook_boss: { dmg: '2', rng: '120px', rate: '1.8/s' },
+        military_base: { dmg: '0', rng: '0px', rate: '0/s' },
+        minigunner: { dmg: '1', rng: '130px', rate: '4.5/s' },
+        commander: { dmg: '0', rng: '110px', rate: '0/s' },
+        dj: { dmg: '0', rng: '120px', rate: '0/s' },
+        ranger: { dmg: '20', rng: '220px', rate: '0.16/s' },
+        turret: { dmg: '2', rng: '150px', rate: '6.0/s' },
+        gladiator: { dmg: '2', rng: '55px', rate: '1.1/s' }
+      };
+
+      const stats = STATS_MAP[type] || { dmg: '-', rng: '-', rate: '-' };
+
       card.innerHTML = `
-        <div class="icon"><canvas width="55" height="55" data-agent-type="${type}"></canvas></div>
-        <div class="agent-info" style="margin-top:6px; text-align:center;">
-          <span class="name" style="font-size:0.85rem; font-weight:900;">${type.toUpperCase()}</span>
+        <div class="loadout-card-top-tag">
+          ${isEquipped ? '<span class="tag-equipped-badge">✓ EQUIPPED</span>' : '<span class="tag-ready-badge">READY</span>'}
         </div>
-        ${isEquipped ? '<span class="equipped-indicator">EQUIPPED</span>' : ''}
+        <div class="loadout-disc-avatar">
+          <canvas width="55" height="55" data-agent-type="${type}"></canvas>
+        </div>
+        <div class="loadout-info-cluster">
+          <span class="loadout-agent-name">${formattedName}</span>
+          <div class="loadout-stat-line">
+            <span>🎯 ${stats.dmg}</span>
+            <span class="stat-sep">|</span>
+            <span>📍 ${stats.rng}</span>
+            <span class="stat-sep">|</span>
+            <span>⚡ ${stats.rate}</span>
+          </div>
+        </div>
         ${selectHtml}
+        <button class="btn ${isEquipped ? 'btn-loadout-unequip' : 'btn-loadout-equip'}">
+          ${isEquipped ? '✕ UNEQUIP' : '+ EQUIP'}
+        </button>
       `;
 
       const cvs = card.querySelector('canvas');
-      
-      // Draw crisp preloaded texture inside the selector grid canvas card
       drawAgentPreviewOnCanvas(cvs, type);
 
       card.addEventListener('click', (e) => {
-        // Stop equipment toggle if they are interacting with the custom skin dropdown
         if (e.target.closest('.custom-skin-dropdown')) return;
-
+        soundManager.playTick();
         this.game.toggleLoadoutAgent(type);
         this.renderLoadoutConfig();
       });
@@ -86,7 +128,6 @@ export class LobbyLoadout {
 
         selected.addEventListener('click', (e) => {
           e.stopPropagation();
-          // Hide all other open dropdowns to keep UI clean
           document.querySelectorAll('.skin-dropdown-options').forEach(el => {
             if (el !== optionsContainer) el.classList.add('hidden');
           });
@@ -101,8 +142,6 @@ export class LobbyLoadout {
             this.game.equippedSkins[type] = val;
             this.game.saveStatsToStorage();
             optionsContainer.classList.add('hidden');
-            
-            // Re-render to apply the skin immediately
             this.renderLoadoutConfig();
             soundManager.playTick();
           });
@@ -112,7 +151,6 @@ export class LobbyLoadout {
       this.loadoutGrid.appendChild(card);
     });
 
-    // Close any open skin dropdowns when clicking outside
     const documentClickClose = () => {
       document.querySelectorAll('.skin-dropdown-options').forEach(el => {
         el.classList.add('hidden');

@@ -208,18 +208,37 @@ export function awardMatchRewards(game) {
   }
   game._rewardsClaimed = true;
 
-  const finalWave = game.wave || 0;
+  // 1. NEVER give cash or XP from tutorial matches
+  if (game.isTutorialMatch || game.tutorialActive) {
+    return { coinsEarned: 0, xpEarned: 0 };
+  }
+
+  // 2. Effort Guard: Must have completed/survived at least 1 full wave
+  const completedWaves = game.completedWaves || 0;
+  if (completedWaves < 1) {
+    return { coinsEarned: 0, xpEarned: 0 };
+  }
+
   const mapMult = game.selectedMap === 'tundra' ? 1.5 : game.selectedMap === 'desert' ? 1.25 : 1.0;
   const diffConfig = game.difficultySettings[game.selectedDifficulty] || { coinMultiplier: 1.0, xpMultiplier: 1.0 };
   const isHc = game.isHardcore;
 
-  // Base rewards scaled by waves defended and difficulty
-  let coinsEarned = Math.round((10 + finalWave * 5) * mapMult * diffConfig.coinMultiplier);
-  let xpEarned = Math.round((15 + finalWave * 4) * mapMult * diffConfig.xpMultiplier);
+  // 3. Rewards scaled strictly by waves completed (no free handout at wave 0)
+  let coinsEarned = Math.round((completedWaves * 8) * mapMult * diffConfig.coinMultiplier);
+  let xpEarned = Math.round((completedWaves * 6) * mapMult * diffConfig.xpMultiplier);
 
-  if (game.state === 'victory' && isHc) {
-    coinsEarned *= 3;
-    xpEarned *= 3;
+  // Victory bonus for finishing all waves
+  if (game.state === 'victory') {
+    coinsEarned += Math.round(50 * mapMult * diffConfig.coinMultiplier);
+    xpEarned += Math.round(60 * mapMult * diffConfig.xpMultiplier);
+    if (isHc) {
+      coinsEarned *= 3;
+      xpEarned *= 3;
+    }
+  }
+
+  if (coinsEarned <= 0 && xpEarned <= 0) {
+    return { coinsEarned: 0, xpEarned: 0 };
   }
 
   game.playerCoins += coinsEarned;
@@ -227,7 +246,7 @@ export function awardMatchRewards(game) {
 
   // Level up check
   const nextLevelXp = game.playerLevel * 100;
-  if (game.playerXp >= nextLevelXp) {
+  while (game.playerXp >= nextLevelXp) {
     game.playerXp -= nextLevelXp;
     game.playerLevel++;
     soundManager.playUpgrade();

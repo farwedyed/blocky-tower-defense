@@ -366,6 +366,15 @@ export const Network = {
                         this.game.playerWallets[slot] = this.game.isHardcore ? 250 : 400;
                     }
                 }
+                // Immediately synchronize the chosen map and difficulty to all connected squad members
+                this.broadcastToAll({
+                    type: 'COOP_MAP_SELECTED',
+                    selectedMap: this.game.selectedMap
+                });
+                this.broadcastToAll({
+                    type: 'COOP_DIFF_SELECTED',
+                    difficulty: this.game.selectedDifficulty
+                });
             }
             if (this.game && this.game.ui) this.game.ui.updateCoopPlayerList();
         }
@@ -385,26 +394,32 @@ export const Network = {
             window.myPlayerId = 'p1';
             if (data.roomId) this.roomId = data.roomId;
             if (data.lobbyPlayers) window.lobbyPlayers = data.lobbyPlayers;
+            if (data.selectedMap) this.game.selectedMap = data.selectedMap;
+            if (data.selectedDifficulty) this.game.selectedDifficulty = data.selectedDifficulty;
 
             this.syncRoomPresence();
 
             // Unhide privacy toggle and copy link icon for newly promoted host
             const hostPrivacyBox = document.getElementById('host-privacy-container');
-            if (hostPrivacyBox) hostPrivacyBox.classList.remove('hidden');
+            if (hostPrivacyBox) {
+                hostPrivacyBox.classList.remove('hidden');
+                hostPrivacyBox.style.display = 'flex';
+            }
             const copyCodeBtn = document.getElementById('btn-copy-code');
             if (copyCodeBtn) copyCodeBtn.classList.remove('hidden');
 
             const labelStatus = document.getElementById('label-lobby-status');
             if (labelStatus) {
-                labelStatus.textContent = "HOSTING SQUAD LOBBY";
-                labelStatus.style.color = "var(--primary-green-dark)";
+                labelStatus.textContent = "HOST (SQUAD LEADER)";
+                labelStatus.style.color = "#00ffe0";
             }
 
             if (this.game && this.game.ui) {
-                // Unlock Map Selection & Deploy controls in the Lobby for the new host
-                if (this.game.ui.lobby) {
-                    this.game.ui.lobby.toggleSoloElements(true);
-                    this.game.ui.lobby.updateCoopPlayerList();
+                // If in Lobby, switch UI to host squad state so map choices & difficulty launch are unlocked
+                if (this.game.state === 'lobby') {
+                    if (this.game.ui.lobby && this.game.ui.lobby.coop) {
+                        this.game.ui.lobby.coop.showCoopLobbyState();
+                    }
                 }
 
                 // Unlock In-Game Match Controls if a game is currently playing
@@ -413,6 +428,14 @@ export const Network = {
                     this.game.ui.updateAutoWaveButton(this.game.autoMode);
                     this.game.ui.updateSpeedButton(this.game.speedMultiplier);
                     this.game.ui.updateHUD(this.game.lives, this.game.gold, this.game.wave, this.game.maxWaves);
+
+                    // Ensure playerWallets has an entry for all active slots
+                    if (!this.game.playerWallets) this.game.playerWallets = {};
+                    for (const slot of ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8']) {
+                        if (this.game.playerWallets[slot] === undefined) {
+                            this.game.playerWallets[slot] = this.game.gold;
+                        }
+                    }
 
                     // Resume spawners if leader disconnected mid-wave
                     if (this.game.waveInProgress && this.game.activeSpawners.length === 0) {
@@ -436,6 +459,62 @@ export const Network = {
                             });
                         }
                     }
+                }
+            }
+        }
+
+        // ─── REAL-TIME CO-OP SQUAD SYNC ───
+        else if (data.type === 'COOP_MAP_SELECTED') {
+            if (this.game) {
+                this.game.setSelectedMap(data.selectedMap);
+                
+                // Update selection cards visually
+                document.querySelectorAll('.coop-map-card, .map-card').forEach(card => {
+                    if (card.getAttribute('data-map-id') === data.selectedMap) {
+                        card.classList.add('active');
+                    } else {
+                        card.classList.remove('active');
+                    }
+                });
+
+                // Update Client's Live Map Card in real time
+                if (this.game.ui && this.game.ui.lobby && this.game.ui.lobby.coop) {
+                    this.game.ui.lobby.coop.renderClientLiveMapCard(data.selectedMap);
+                }
+            }
+        }
+        else if (data.type === 'COOP_DIFF_SELECTED') {
+            if (this.game) {
+                this.game.selectedDifficulty = data.difficulty;
+                document.querySelectorAll('.diff-wizard-card').forEach(card => {
+                    if (card.getAttribute('data-difficulty') === data.difficulty) {
+                        card.classList.add('active');
+                    } else {
+                        card.classList.remove('active');
+                    }
+                });
+
+                // Update Client's Live Difficulty Card in real time
+                if (this.game.ui && this.game.ui.lobby && this.game.ui.lobby.coop) {
+                    this.game.ui.lobby.coop.renderClientLiveDiffCard(data.difficulty);
+                }
+            }
+        }
+        else if (data.type === 'COOP_STEP_CHANGE') {
+            // Non-hosts always remain in the Squad Room viewing live cards
+            if (this.mode === 'CLIENT' && this.game && this.game.ui && this.game.ui.lobby) {
+                const diffStep = document.getElementById('wizard-step-diff');
+                const prepStep = document.getElementById('wizard-step-prep');
+                if (diffStep) {
+                    diffStep.classList.add('hidden');
+                    diffStep.style.setProperty('display', 'none', 'important');
+                }
+                if (prepStep) {
+                    prepStep.classList.add('hidden');
+                    prepStep.style.setProperty('display', 'none', 'important');
+                }
+                if (this.game.ui.lobby.coop) {
+                    this.game.ui.lobby.coop.showCoopLobbyState();
                 }
             }
         }
@@ -780,8 +859,13 @@ export const Network = {
             }
         }
 
-        if (data.playerWallets && data.playerWallets[window.myPlayerId] !== undefined) {
-            this.game.gold = data.playerWallets[window.myPlayerId];
+        if (data.playerWallets) {
+            this.game.playerWallets = data.playerWallets;
+            if (data.playerWallets[window.myPlayerId] !== undefined) {
+                this.game.gold = data.playerWallets[window.myPlayerId];
+            } else {
+                this.game.gold = data.gold;
+            }
         } else {
             this.game.gold = data.gold;
         }

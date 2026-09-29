@@ -184,24 +184,18 @@ class Game {
         if (percentText) percentText.textContent = `${rounded}%`;
       };
 
-      // Continuous loop: creeps forward on slow net, surges forward when assets download
+      // Fast progress loop for local & online speed
       const progressLoop = (now) => {
         const dt = Math.min(0.1, (now - lastFrameTime) / 1000);
         lastFrameTime = now;
 
         if (!isFullyLoaded) {
-          // Creep forward slowly (min 2.5% per sec) so it never completely stops
-          targetPercent = Math.min(92, targetPercent + 2.5 * dt);
-
-          // Fast smooth interpolation toward the target
-          const catchUpSpeed = displayedPercent < targetPercent ? 10.0 : 3.0;
-          displayedPercent += (targetPercent - displayedPercent) * Math.min(1.0, dt * catchUpSpeed);
+          targetPercent = Math.min(95, targetPercent + 60 * dt);
+          displayedPercent += (targetPercent - displayedPercent) * Math.min(1.0, dt * 14.0);
           updateProgressVisuals(displayedPercent);
-
           requestAnimationFrame(progressLoop);
         } else {
-          // Final surge to 100%
-          displayedPercent += (100 - displayedPercent) * Math.min(1.0, dt * 18.0);
+          displayedPercent += (100 - displayedPercent) * Math.min(1.0, dt * 35.0);
           updateProgressVisuals(displayedPercent);
 
           if (displayedPercent < 99.5) {
@@ -213,81 +207,71 @@ class Game {
       };
       requestAnimationFrame(progressLoop);
 
-      if (statusText) statusText.textContent = "Loading Interface Assets...";
+      if (statusText) statusText.textContent = "Loading Tactical Assets...";
 
-      // Step 1: Preload UI folder
-      preloadUIAssets(() => {
-        targetPercent = Math.max(targetPercent, 18);
-        if (statusText) statusText.textContent = "Deploying Combat Units...";
+      // Preload UI assets and game sprites in parallel for instant local boot
+      preloadUIAssets(() => {});
+      preloadAllAssets(
+        (percent, loaded, total) => {
+          targetPercent = Math.max(targetPercent, percent);
+          if (statusText) statusText.textContent = `Deploying Assets: ${loaded} / ${total}`;
+        },
+        () => {
+          isFullyLoaded = true;
+          if (statusText) statusText.textContent = "Operational Ready!";
 
-        // Step 2: Preload game sprites
-        preloadAllAssets(
-          (percent, loaded, total) => {
-            // Map real download progress from 18% to 92%
-            const realMapped = 18 + (percent * 0.74);
-            if (realMapped > targetPercent) {
-              targetPercent = realMapped; // Instant surge forward when batch finishes!
+          setTimeout(() => {
+            const loader = document.getElementById('loading-screen');
+            if (loader) loader.classList.add('fade-out');
+
+            CrazyGamesManager.gameLoadingStop();
+
+            const params = new URLSearchParams(window.location.search);
+            const startupRoomId = params.get('roomId');
+
+            let isInstantMulti = false;
+            try {
+              isInstantMulti = CrazyGamesManager.isInstantMultiplayer();
+            } catch (e) {
+              isInstantMulti = false;
             }
-            if (statusText) statusText.textContent = `Deploying Assets: ${loaded} / ${total}`;
-          },
-          () => {
-            // All assets finished downloading!
-            isFullyLoaded = true;
-            if (statusText) statusText.textContent = "Operational Ready!";
 
-            setTimeout(() => {
-              const loader = document.getElementById('loading-screen');
-              if (loader) loader.classList.add('fade-out');
+            if (isInstantMulti || startupRoomId) {
+              console.log('[CrazyGames] Multiplayer join/host triggered on launch. Bypassing onboarding.');
+              this.tutorialCompleted = true;
+              this.tutorialActive = false;
+              this.saveStatsToStorage();
 
-              CrazyGamesManager.gameLoadingStop();
-
-              const params = new URLSearchParams(window.location.search);
-              const startupRoomId = params.get('roomId');
-
-              let isInstantMulti = false;
-              try {
-                isInstantMulti = CrazyGamesManager.isInstantMultiplayer();
-              } catch (e) {
-                isInstantMulti = false;
-              }
-
-              if (isInstantMulti || startupRoomId) {
-                console.log('[CrazyGames] Multiplayer join/host triggered on launch. Bypassing onboarding.');
-                this.tutorialCompleted = true;
-                this.tutorialActive = false;
-                this.saveStatsToStorage();
-
-                if (startupRoomId) {
-                  this.handleCrazyGamesInvite(startupRoomId);
-                } else {
-                  this.autoHostMultiplayerLobby();
-                }
-                return;
-              }
-
-              if (!this.tutorialCompleted) {
-                console.log('[Onboarding] First-time player detected! Deploying directly to tutorial match.');
-                this.selectedMap = 'grassland';
-                this.selectedDifficulty = 'easy';
-                this.tutorialActive = true;
-                this.tutorialCompleted = true; // Permanently saved so it never appears again
-                this.saveStatsToStorage();
-                this.deployToMatch(true);
+              if (startupRoomId) {
+                this.handleCrazyGamesInvite(startupRoomId);
               } else {
-                if (this.ui && this.ui.lobby) {
-                  this.ui.lobby.showSplashState();
-                }
+                this.autoHostMultiplayerLobby();
               }
+              return;
+            }
 
+            if (!this.tutorialCompleted) {
+              console.log('[Onboarding] First-time player detected! Deploying directly to tutorial match.');
+              this.selectedMap = 'grassland';
+              this.selectedDifficulty = 'easy';
+              this.tutorialActive = true;
+              this.tutorialCompleted = true;
+              this.saveStatsToStorage();
+              this.deployToMatch(true);
+            } else {
               if (this.ui && this.ui.lobby) {
-                this.ui.lobby.drawAllStaticPreviews();
-                this.ui.lobby.renderDailyQuests();
-                this.ui.lobby.renderLeaderboard(this.selectedMap);
+                this.ui.lobby.showSplashState();
               }
-            }, 450);
-          }
-        );
-      });
+            }
+
+            if (this.ui && this.ui.lobby) {
+              this.ui.lobby.drawAllStaticPreviews();
+              this.ui.lobby.renderDailyQuests();
+              this.ui.lobby.renderLeaderboard(this.selectedMap);
+            }
+          }, 150);
+        }
+      );
     });
 
     requestAnimationFrame((t) => this.loop(t));
@@ -623,32 +607,9 @@ class Game {
   }
 
   updateFullscreenClass() {
-    const container = document.getElementById('app-container');
-    if (!container) return;
-
-    const isCrazyGames = window.location.hostname.includes('crazygames') || window.location.hostname.includes('game-files');
-    if (isCrazyGames) {
-      container.classList.add('fullscreen-active');
-      return;
-    }
-
-    const dpr = window.devicePixelRatio || 1;
-    const screenWidthLogical = window.screen.width / dpr;
-    const screenHeightLogical = window.screen.height / dpr;
-
-    const isNativeFull = !!(document.fullscreenElement || 
-                            document.webkitFullscreenElement || 
-                            document.mozFullScreenElement || 
-                            document.msFullscreenElement ||
-                            window.matchMedia('(display-mode: fullscreen)').matches);
-
-    const matchesScreenSize = (window.innerWidth >= screenWidthLogical - 150) && 
-                              (window.innerHeight >= screenHeightLogical - 250);
-
-    if (isNativeFull || matchesScreenSize) {
-      container.classList.add('fullscreen-active');
-    } else {
-      container.classList.remove('fullscreen-active');
+    // Keep container at fixed 2122x1188 and let autoScaleGame handle perfect scaling
+    if (typeof window.autoScaleGame === 'function') {
+      window.autoScaleGame();
     }
   }
 
@@ -861,6 +822,11 @@ class Game {
   }
 
   deployToMatch(isTutorial = false) {
+    // Only Host can trigger match deployment in multiplayer
+    if (typeof Network !== 'undefined' && Network.mode === 'CLIENT') {
+      return;
+    }
+
     // Avoid calling midgame ads for first-time players entering the tutorial match
     if (Network.mode === 'OFFLINE' && !isTutorial) {
       CrazyGamesManager.requestMidgameAd(() => {
@@ -874,6 +840,8 @@ class Game {
   continueDeployment(isTutorial = false) {
     try {
       this._rewardsClaimed = false; // Reset rewards claim flag for new match
+      this.completedWaves = 0;      // Track waves survived with effort
+      this.isTutorialMatch = isTutorial || (this.tutorialActive && (typeof Network === 'undefined' || Network.mode === 'OFFLINE'));
       this.state = 'playing';
       this.showMapDirections = true;
       this.autoStartTimer = 0; 
@@ -1288,6 +1256,7 @@ class Game {
 
     if (this.waveInProgress && this.enemies.length === 0 && this.activeSpawners.length === 0) {
       this.waveInProgress = false;
+      this.completedWaves = (this.completedWaves || 0) + 1;
 
       for (const agent of this.grid.towers.values()) {
         if (agent.type === 'farm') {
@@ -1461,7 +1430,9 @@ class Game {
     return '#e0e7ff';                  // Silver
   }
 }
-
+window.addEventListener('DOMContentLoaded', () => {
+  new Game();
+});
 window.addEventListener('DOMContentLoaded', () => {
   new Game();
 });

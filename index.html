@@ -36,44 +36,53 @@
   </div>
 
   <div id="app-container">
+    <!-- Live Reference Overlay for the Visual Editor -->
+    <img id="ui-editor-ref-overlay" src="assets/ui/refrence.png" alt="Mockup Reference" />
 
     <!-- 1. LOBBY / MAIN MENU VIEW -->
     <div id="lobby-view" class="">
       <header id="lobby-header">
-        <div class="logo-area">
-          <h1 class="blocky-title">BTD 2D</h1>
-          <span class="tagline">SQUAD TACTICAL DEFENSE TERMINAL</span>
+        <div class="header-left-cluster">
+          <button id="btn-lobby-back" class="btn-img-back" title="Back" style="display: none;"></button>
+          <img id="main-lobby-logo" class="header-logo-badge" src="assets/ui/btd2dlogo.png" alt="Blocky Tower Defense 2D" />
         </div>
         
-        <!-- CrazyGames User Profile Display Widget -->
-        <div id="cg-profile-widget" style="display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.05); padding: 6px 12px; border-radius: 10px; border: 2px solid var(--border-color); font-weight: 800; font-size: 0.9rem;">
-          <img id="cg-avatar" src="https://img.icons8.com/color/48/user-male-circle.png" style="width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid var(--border-color);" />
-          <div style="display: flex; flex-direction: column; align-items: flex-start;">
-            <span id="cg-username" style="color: var(--text-dark);">Guest Player</span>
-            <button id="btn-cg-auth" class="btn" style="font-size: 0.65rem; padding: 2px 6px; margin-top: 2px; background: var(--primary-blue); color: #fff; border-width: 2px; margin: 0; display: none;">LOG IN</button>
+        <!-- Profile Widget with Avatar Overlay Slot -->
+        <div id="cg-profile-widget" class="hud-profile-container">
+          <div class="profile-avatar-wrapper">
+            <img id="avatar-fallback" src="assets/ui/menu/sprite_23.png" class="avatar-base-img" />
+            <img id="cg-avatar" src="assets/ui/menu/sprite_23.png" class="avatar-user-img" />
+          </div>
+          <div class="profile-name-cluster">
+            <span id="cg-username" class="profile-name-text">Guest Player</span>
+            <button id="btn-cg-auth" class="btn btn-login-mini" style="display: none;">LOG IN</button>
           </div>
         </div>
 
+        <!-- Level, XP and Coin HUD items -->
         <div class="player-meta-box">
-          <div class="meta-item">
-            <span class="label">LEVEL</span>
-            <span id="player-level" class="badge">1</span>
-          </div>
-          <div class="meta-item xp-item">
-            <span class="label">XP PROGRESS</span>
-            <div class="xp-bar-container">
-              <div id="player-xp-fill" class="xp-bar-fill" style="width: 0%"></div>
-              <span id="player-xp-text" class="xp-text">0 / 100</span>
+          <div class="hud-level-wrapper">
+            <span id="label-level" class="hud-label">LEVEL</span>
+            <div class="hud-level-badge">
+              <span id="player-level">1</span>
             </div>
           </div>
-          <div class="meta-item">
-            <span class="label">COINS</span>
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span id="player-coins" class="badge coin-badge">
-                <img src="https://img.icons8.com/color/48/coins.png" class="header-icon" /> 
+
+          <div class="hud-xp-wrapper">
+            <span id="label-xp" class="hud-label">XP PROGRESS</span>
+            <div class="hud-xp-track">
+              <div id="player-xp-fill" class="hud-xp-fill-img" style="width: 0%;"></div>
+              <span id="player-xp-text" class="hud-xp-counter">0 / 100</span>
+            </div>
+          </div>
+
+          <div class="hud-coins-wrapper">
+            <span id="label-coins" class="hud-label">COINS</span>
+            <div class="hud-coins-cluster">
+              <div class="hud-coins-pill" id="player-coins">
                 <span id="player-coins-val">150</span>
-              </span>
-              <button id="btn-add-coins" class="btn-coin-plus" title="Get Free Coins">+</button>
+              </div>
+              <button id="btn-add-coins" class="btn-img-plus" title="Get Free Coins"></button>
             </div>
           </div>
         </div>
@@ -81,205 +90,291 @@
 
       <main id="lobby-content">
         <nav id="lobby-tabs">
-          <button class="tab-btn active" data-target="panel-maps"><img src="https://img.icons8.com/color/48/map.png" class="tab-icon" /> MAP SELECT</button>
-          <button class="tab-btn" data-target="panel-shop"><img src="https://img.icons8.com/color/48/shopping-cart.png" class="tab-icon" /> AGENT SHOP</button>
-          <button class="tab-btn" data-target="panel-loadout"><img src="https://img.icons8.com/color/48/backpack.png" class="tab-icon" /> LOADOUT</button>
-          <button class="tab-btn" data-target="panel-crates"><img src="https://img.icons8.com/color/48/gift.png" class="tab-icon" /> CRATES</button>
-          <button class="tab-btn tab-btn-coins" data-target="panel-coins"><img src="https://img.icons8.com/color/48/coins.png" class="tab-icon" /> FREE COINS</button>
+          <button class="tab-btn active" data-target="panel-maps">
+            <img src="assets/ui/menu/sprite_15.png" class="tab-icon" />
+            <span class="tab-label">MAP SELECT</span>
+            <span class="tab-arrow-slot"></span>
+          </button>
+          <button class="tab-btn" data-target="panel-shop">
+            <img src="assets/ui/menu/sprite_18.png" class="tab-icon" />
+            <span class="tab-label">AGENT SHOP</span>
+            <span class="tab-arrow-slot"></span>
+          </button>
+          <button class="tab-btn" data-target="panel-loadout">
+            <img src="assets/ui/menu/sprite_21.png" class="tab-icon" />
+            <span class="tab-label">LOADOUT</span>
+            <span class="tab-arrow-slot"></span>
+          </button>
+          <button class="tab-btn" data-target="panel-crates">
+            <img src="assets/ui/menu/sprite_22.png" class="tab-icon" />
+            <span class="tab-label">CRATES</span>
+            <span class="tab-arrow-slot"></span>
+          </button>
+          <button class="tab-btn tab-btn-coins" data-target="panel-coins">
+            <img src="assets/ui/menu/sprite_17.png" class="tab-icon" />
+            <span class="tab-label">FREE COINS</span>
+            <span class="tab-arrow-slot"></span>
+          </button>
         </nav>
 
         <div id="lobby-panels">
           <!-- MAP SELECTION & SELECTION WIZARD PANEL -->
           <div id="panel-maps" class="lobby-panel active">
             
-            <!-- STEP 1: CHOOSE BATTLEGROUND -->
-            <div id="wizard-step-maps" class="wizard-step-content active">
-              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed #ddd; padding-bottom: 8px; margin-bottom: 10px;">
-                <h2 style="border: none; padding: 0; margin: 0;">SELECT BATTLEGROUND</h2>
-                <button id="btn-back-to-modes-solo" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 10px; margin: 0;">⇠ CHANGE MODE</button>
-              </div>
-              <div class="map-grid">
-                <button class="map-card active" data-map-id="grassland">
-                  <canvas class="map-preview-canvas" width="120" height="90"></canvas>
-                  <div class="map-info">
-                    <span class="name">Grassland</span>
-                    <span class="difficulty easy">x1.0 Coins / XP</span>
+            <!-- STEP 1: CHOOSE BATTLEGROUND (SOLO MENU) -->
+            <div id="wizard-step-maps" class="wizard-step-content solo-menu-view active">
+              
+              <!-- 1. Header Bar: SOLO Badge with sprite_19.png, Tagline & Top-Right Back Button -->
+              <div class="solo-top-bar">
+                <div class="solo-pill-badge">
+                  <img src="assets/ui/menu/sprite_19.png" class="solo-user-img-icon" alt="" />
+                  <span class="solo-pill-title">SOLO</span>
+                </div>
+                <div class="solo-top-right-group">
+                  <div class="solo-tagline-cluster">
+                    <span class="solo-tagline-icon">✈</span>
+                    <span class="solo-tagline-text">Take on the battle alone!</span>
+                    <span class="solo-tagline-icon">⇦</span>
                   </div>
-                </button>
-                <button class="map-card" data-map-id="desert">
-                  <canvas class="map-preview-canvas" width="120" height="90"></canvas>
-                  <div class="map-info">
-                    <span class="name">Desert Outpost</span>
-                    <span class="difficulty medium">x1.25 Coins / XP</span>
-                  </div>
-                </button>
-                <button class="map-card" data-map-id="tundra">
-                  <canvas class="map-preview-canvas" width="120" height="90"></canvas>
-                  <div class="map-info">
-                    <span class="name">Frost Tundra</span>
-                    <span class="difficulty hard">x1.5 Coins / XP</span>
-                  </div>
-                </button>
-                <button class="map-card" data-map-id="cyber_city">
-                  <canvas class="map-preview-canvas" width="120" height="90"></canvas>
-                  <div class="map-info">
-                    <span class="name">Cyber City</span>
-                    <span class="difficulty hard" style="background: #9b59b6;">x1.5 Coins / XP</span>
-                  </div>
-                </button>
-                <button class="map-card" data-map-id="fallen_outpost">
-                  <canvas class="map-preview-canvas" width="120" height="90"></canvas>
-                  <div class="map-info">
-                    <span class="name">Fallen Outpost</span>
-                    <span class="difficulty extreme" style="background: #962d2d; color:#fff;">x1.8 Coins / XP</span>
-                  </div>
-                </button>
-              </div>
-              <button id="btn-wizard-next-maps" class="btn btn-deploy" style="margin-top: 20px;">CHOOSE DIFFICULTY ➔</button>
-            </div>
-
-            <!-- STEP 2: CHOOSE DIFFICULTY -->
-            <div id="wizard-step-diff" class="wizard-step-content hidden">
-              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed #ddd; padding-bottom: 8px; margin-bottom: 10px;">
-                <h2 style="border: none; padding: 0; margin: 0;">CHOOSE DIFFICULTY</h2>
-                <div style="display: flex; gap: 8px;">
-                  <button id="btn-wizard-back-diff" class="btn btn-secondary" style="font-size: 0.75rem; padding: 6px 12px; margin: 0;">⇠ BACK</button>
-                  <button id="btn-wizard-next-diff" class="btn btn-wizard-next" style="font-size: 0.8rem; padding: 6px 12px; margin: 0; box-shadow: 0 3px 0 var(--primary-blue-dark), 0 3px 0 var(--border-color);">PREPARATION ➔</button>
+                  <button id="btn-solo-top-back" class="btn-solo-back-action">&lt;- BACK</button>
                 </div>
               </div>
+
+              <!-- 2. Hero Banner: Large Artwork & Play Solo Overlay -->
+              <div class="solo-hero-card">
+                <div class="solo-hero-overlay">
+                  <div class="solo-hero-title-row">
+                    <img src="assets/ui/solo/sprite_02.png" class="solo-hero-swords" alt="" />
+                    <span class="solo-hero-title">PLAY SOLO</span>
+                  </div>
+                  <p class="solo-hero-desc">Defend your base against waves of enemies and see how far you can go!</p>
+                </div>
+                <img src="assets/ui/solo/solomap.png" class="solo-hero-artwork" alt="Solo Campaign" />
+              </div>
+
+              <!-- 3. Difficulty / Battleground Section with Divider Line -->
+              <div class="solo-selection-section">
+                <div class="solo-section-tab-bar">
+                  <div class="solo-section-tab">
+                    <span>DIFFICULTY</span>
+                  </div>
+                  <div class="solo-section-line"></div>
+                </div>
+
+                <div class="solo-map-row">
+                  <button class="map-card active" data-map-id="grassland">
+                    <canvas class="map-preview-canvas" width="120" height="90"></canvas>
+                    <div class="map-info">
+                      <span class="name">Grassland</span>
+                      <span class="difficulty easy">x1.0 Coins / XP</span>
+                    </div>
+                  </button>
+                  <button class="map-card" data-map-id="desert">
+                    <canvas class="map-preview-canvas" width="120" height="90"></canvas>
+                    <div class="map-info">
+                      <span class="name">Desert Outpost</span>
+                      <span class="difficulty medium">x1.25 Coins / XP</span>
+                    </div>
+                  </button>
+                  <button class="map-card" data-map-id="tundra">
+                    <canvas class="map-preview-canvas" width="120" height="90"></canvas>
+                    <div class="map-info">
+                      <span class="name">Frost Tundra</span>
+                      <span class="difficulty hard">x1.5 Coins / XP</span>
+                    </div>
+                  </button>
+                  <button class="map-card" data-map-id="cyber_city">
+                    <canvas class="map-preview-canvas" width="120" height="90"></canvas>
+                    <div class="map-info">
+                      <span class="name">Cyber City</span>
+                      <span class="difficulty locked-badge">LOCKED (REQ. LVL 5)</span>
+                    </div>
+                  </button>
+                  <button class="map-card" data-map-id="fallen_outpost">
+                    <canvas class="map-preview-canvas" width="120" height="90"></canvas>
+                    <div class="map-info">
+                      <span class="name">Fallen Outpost</span>
+                      <span class="difficulty locked-badge">LOCKED (REQ. LVL 10)</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 4. Bottom Action Footer: Big PLAY Button with Corner Accents -->
+              <div class="solo-footer-action">
+                <img src="assets/ui/solo/sprite_04.png" class="solo-corner-deco-left" alt="" />
+                <button id="btn-wizard-next-maps" class="btn-solo-green-play">
+                  <img src="assets/ui/solo/sprite_02.png" class="btn-solo-play-swords" alt="" />
+                  <span>CHOOSE DIFFICULTY ➔</span>
+                </button>
+                <img src="assets/ui/solo/sprite_01.png" class="solo-corner-deco-right" alt="" />
+              </div>
+
+              <!-- Preserved for backwards compatibility -->
+              <button id="btn-back-to-modes-solo" style="display:none;"></button>
+            </div>
+            <!-- STEP 2: CHOOSE DIFFICULTY (1:1 MOCKUP DESIGN) -->
+            <div id="wizard-step-diff" class="wizard-step-content diff-menu-view hidden">
+              
+              <!-- 1. Top Banner Strip (sprite_01.png) -->
+              <div class="diff-banner-strip">
+                <!-- Slanted Badge (sprite_02.png) + Map Icon (assets/ui/menu/sprite_15.png) -->
+                <div class="diff-badge-container">
+                  <img src="assets/ui/menu/sprite_15.png" class="diff-map-icon" alt="" />
+                  <span class="diff-badge-title">CHOOSE DIFFICULTY</span>
+                </div>
+
+                <!-- Back & Preparation Buttons (sprite_03.png & sprite_04.png) -->
+                <div class="diff-nav-buttons">
+                  <button id="btn-wizard-back-diff" class="btn-diff-back">&lt;- BACK</button>
+                  <button id="btn-wizard-next-diff" class="btn-diff-prep">PREPARATION -&gt;</button>
+                </div>
+              </div>
+
+              <!-- 2. The 5 Custom Frame Cards (sprite_05 to sprite_09) -->
               <div class="difficulty-wizard-deck">
                 
-                <!-- EASY -->
-                <button class="diff-wizard-card active" data-difficulty="easy">
-                  <div class="diff-card-header diff-bg-easy">
-                    <span class="diff-title">Easy</span>
-                    <span class="diff-sub">For new users</span>
+                <!-- 1. EASY (sprite_05.png) -->
+                <button class="diff-wizard-card diff-card-easy active" data-difficulty="easy">
+                  <div class="diff-card-header">
+                    <span class="diff-title">EASY</span>
+                    <span class="diff-sub">For new learners</span>
                   </div>
                   <div class="diff-card-body">
-                    <canvas class="diff-boss-preview" width="80" height="80" data-boss="brute"></canvas>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/skull.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text font-title text-boss">BRUTE</span>
-                    </div>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/star--v1.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text">50 XP</span>
-                    </div>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/coins.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text text-coins">250 - 300</span>
-                    </div>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/hourglass.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text">11:00 Mins</span>
+                    <canvas class="diff-boss-preview" width="90" height="90" data-boss="brute"></canvas>
+                    <div class="diff-metrics-list">
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_10.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text text-boss-easy">BRUTE</span>
+                      </div>
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_10.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text">50 XP</span>
+                      </div>
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_20.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text text-coins">250 - 300</span>
+                      </div>
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_16.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text">11:00 Mins</span>
+                      </div>
                     </div>
                   </div>
                 </button>
 
-                <!-- CASUAL -->
-                <button class="diff-wizard-card" data-difficulty="casual">
-                  <div class="diff-card-header diff-bg-casual">
-                    <span class="diff-title">Casual</span>
-                    <span class="diff-sub">For the casual user</span>
+                <!-- 2. CASUAL (sprite_06.png) -->
+                <button class="diff-wizard-card diff-card-casual" data-difficulty="casual">
+                  <div class="diff-card-header">
+                    <span class="diff-title">CASUAL</span>
+                    <span class="diff-sub">For the casual lover</span>
                   </div>
                   <div class="diff-card-body">
-                    <canvas class="diff-boss-preview" width="80" height="80" data-boss="grave_digger"></canvas>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/skull.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text font-title text-boss">GRAVE DIGGER</span>
-                    </div>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/star--v1.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text">100 XP</span>
-                    </div>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/coins.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text text-coins">400 - 500</span>
-                    </div>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/hourglass.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text">15:00 Mins</span>
+                    <canvas class="diff-boss-preview" width="90" height="90" data-boss="grave_digger"></canvas>
+                    <div class="diff-metrics-list">
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_11.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text text-boss-casual">GRAVE DIGGER</span>
+                      </div>
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_11.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text">100 XP</span>
+                      </div>
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_21.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text text-coins">400 - 500</span>
+                      </div>
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_15.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text">15:00 Mins</span>
+                      </div>
                     </div>
                   </div>
                 </button>
 
-                <!-- INTERMEDIATE -->
-                <button class="diff-wizard-card" data-difficulty="intermediate">
-                  <div class="diff-card-header diff-bg-intermediate">
-                    <span class="diff-title">Intermediate</span>
+                <!-- 3. INTERMEDIATE (sprite_07.png) -->
+                <button class="diff-wizard-card diff-card-intermediate" data-difficulty="intermediate">
+                  <div class="diff-card-header">
+                    <span class="diff-title">INTERMEDIATE</span>
                     <span class="diff-sub">A balanced experience</span>
                   </div>
                   <div class="diff-card-body">
-                    <canvas class="diff-boss-preview" width="80" height="80" data-boss="hazard_giant"></canvas>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/skull.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text font-title text-boss">HAZARD GIANT</span>
-                    </div>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/star--v1.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text">150 XP</span>
-                    </div>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/coins.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text text-coins">600 - 750</span>
-                    </div>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/hourglass.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text">18:00 Mins</span>
+                    <canvas class="diff-boss-preview" width="90" height="90" data-boss="hazard_giant"></canvas>
+                    <div class="diff-metrics-list">
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_13.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text text-boss-intermediate">HAZARD GIANT</span>
+                      </div>
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_13.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text">150 XP</span>
+                      </div>
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_22.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text text-coins">600 - 750</span>
+                      </div>
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_17.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text">18:00 Mins</span>
+                      </div>
                     </div>
                   </div>
                 </button>
 
-                <!-- MOLTEN -->
-                <button class="diff-wizard-card" data-difficulty="molten">
-                  <div class="diff-card-header diff-bg-molten">
-                    <span class="diff-title">Molten</span>
+                <!-- 4. MOLTEN (sprite_08.png) -->
+                <button class="diff-wizard-card diff-card-molten" data-difficulty="molten">
+                  <div class="diff-card-header">
+                    <span class="diff-title">MOLTEN</span>
                     <span class="diff-sub">For a molten experience</span>
                   </div>
                   <div class="diff-card-body">
-                    <canvas class="diff-boss-preview" width="80" height="80" data-boss="molten_titan"></canvas>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/skull.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text font-title text-boss">MOLTEN TITAN</span>
-                    </div>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/star--v1.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text">250 XP</span>
-                    </div>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/coins.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text text-coins">1000 - 1200</span>
-                    </div>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/hourglass.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text">20:00 Mins</span>
+                    <canvas class="diff-boss-preview" width="90" height="90" data-boss="molten_titan"></canvas>
+                    <div class="diff-metrics-list">
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_12.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text text-boss-molten">MOLTEN TITAN</span>
+                      </div>
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_12.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text">250 XP</span>
+                      </div>
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_23.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text text-coins">1000 - 1200</span>
+                      </div>
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_18.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text">20:00 Mins</span>
+                      </div>
                     </div>
                   </div>
                 </button>
 
-                <!-- FALLEN -->
-                <button class="diff-wizard-card" data-difficulty="fallen">
-                  <div class="diff-card-header diff-bg-fallen">
-                    <span class="diff-title">Fallen</span>
-                    <span class="diff-sub">For the experienced user</span>
+                <!-- 5. FALLEN (sprite_09.png) -->
+                <button class="diff-wizard-card diff-card-fallen" data-difficulty="fallen">
+                  <div class="diff-card-header">
+                    <span class="diff-title">FALLEN</span>
+                    <span class="diff-sub">For the experience!</span>
                   </div>
                   <div class="diff-card-body">
-                    <canvas class="diff-boss-preview" width="80" height="80" data-boss="fallen_king"></canvas>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/skull.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text font-title text-boss">FALLEN KING</span>
-                    </div>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/star--v1.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text">400 XP</span>
-                    </div>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/coins.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text text-coins">1500 - 1800</span>
-                    </div>
-                    <div class="diff-metric">
-                      <img src="https://img.icons8.com/color/48/hourglass.png" class="diff-metric-icon" />
-                      <span class="diff-metric-text">22:00 Mins</span>
+                    <canvas class="diff-boss-preview" width="90" height="90" data-boss="fallen_king"></canvas>
+                    <div class="diff-metrics-list">
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_14.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text text-boss-fallen">FALLEN KING</span>
+                      </div>
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_14.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text">400 XP</span>
+                      </div>
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_24.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text text-coins">1800 - 2000</span>
+                      </div>
+                      <div class="diff-metric">
+                        <img src="assets/ui/solo/selectdifficulty/sprite_19.png" class="diff-metric-icon" alt="" />
+                        <span class="diff-metric-text">22:00 Mins</span>
+                      </div>
                     </div>
                   </div>
                 </button>
@@ -287,299 +382,425 @@
               </div>
             </div>
 
-            <!-- STEP 3: PREPARATION & GAME MODIFIERS -->
-            <div id="wizard-step-prep" class="wizard-step-content hidden">
-              <h2>TACTICAL SQUAD PREPARATION</h2>
+            <!-- STEP 3: PREPARATION & GAME MODIFIERS (MOCKUP ACCURATE) -->
+            <div id="wizard-step-prep" class="wizard-step-content prep-menu-view hidden">
               
-              <!-- Hardcore Mode Toggle -->
-              <div id="hardcore-toggle-container" style="margin: 10px 0; display: flex; align-items: center; justify-content: center; gap: 10px; background: rgba(0,0,0,0.05); padding: 10px; border-radius: 8px; border: 2px dashed #95a5a6;">
-                <input type="checkbox" id="hardcore-toggle" style="width: 20px; height: 20px; cursor: pointer;" />
-                <label for="hardcore-toggle" style="font-family: var(--font-title); font-size: 1.1rem; color: #e74c3c; font-weight: 900; cursor: pointer; user-select: none;">
-                  🔥 ACTIVATE HARDCORE MODE (10 Lives, $250 Cash, +20% Cost, 3x Victory Coins/XP)
-                </label>
+              <!-- 1. Top Banner Strip -->
+              <div class="prep-top-banner">
+                <div class="prep-badge-container">
+                  <img src="assets/ui/solo/sprite_02.png" class="prep-swords-icon" alt="" />
+                  <span class="prep-badge-title">TACTICAL SQUAD PREPARATION</span>
+                </div>
               </div>
 
-              <div class="wizard-nav-buttons" style="margin-bottom: 15px;">
-                <button id="btn-wizard-back-prep" class="btn btn-wizard-back">⇠ BACK TO DIFFICULTY</button>
-                <button id="btn-deploy" class="btn btn-deploy" style="flex: 1.5; margin: 0;">DEPLOY TO MATCH ⚔️</button>
+              <!-- 2. Hero Card with Hardcore Mode Pill Toggle -->
+              <div class="prep-hero-card">
+                <img src="assets/ui/solo/solomap.png" class="prep-hero-artwork" alt="" />
+                <div id="hardcore-toggle-container" class="prep-hardcore-pill">
+                  <input type="checkbox" id="hardcore-toggle" class="prep-hc-checkbox" />
+                  <label for="hardcore-toggle" class="prep-hc-label">
+                    <span class="prep-hc-flame">🔥</span> HARDCORE MODE (LOCKED - REQ. LVL 15)
+                  </label>
+                </div>
               </div>
 
-              <div id="prep-details-layout" style="display: flex; gap: 20px;">
-                <div id="leaderboard-box" style="flex: 1; background: #fff; border: 3px solid var(--border-color); border-radius: 12px; padding: 12px; box-shadow: 0 4px 0 var(--border-color);">
-                  <h3 style="font-family: var(--font-title); font-size: 1.1rem; border-bottom: 2px dashed #ccc; padding-bottom: 6px; margin-bottom: 8px;"><img src="https://img.icons8.com/color/48/trophy.png" class="title-icon" /> SPEEDRUN LEADERBOARD</h3>
-                  <div id="leaderboard-list" style="font-size: 0.85rem; font-weight: 800; display: flex; flex-direction: column; gap: 4px;">
-                    <div style="color: #7f8c8d;">Select a map to view best records.</div>
+              <!-- 3. Navigation & Deploy Buttons -->
+              <div class="prep-action-row">
+                <button id="btn-wizard-back-prep" class="btn-prep-back">
+                  <span class="prep-back-arrow">⇠</span> BACK TO DIFFICULTY
+                </button>
+                <button id="btn-deploy" class="btn-prep-deploy">
+                  <span>DEPLOY TO MATCH</span>
+                  <img src="assets/ui/solo/sprite_02.png" class="prep-deploy-swords" alt="" />
+                </button>
+              </div>
+
+              <!-- 4. Lower Dual Decks: Speedrun Leaderboard & Daily Quests -->
+              <div id="prep-details-layout" class="prep-decks-container">
+                <!-- SPEEDRUN LEADERBOARD CARD -->
+                <div id="leaderboard-box" class="prep-deck-card prep-leaderboard-card">
+                  <div class="prep-deck-header">
+                    <img src="https://img.icons8.com/color/48/trophy.png" class="prep-header-icon" alt="" />
+                    <span class="prep-deck-title">SPEEDRUN LEADERBOARD</span>
+                  </div>
+                  <div id="leaderboard-list" class="prep-records-list">
+                    <!-- Populated dynamically via renderLeaderboard() -->
                   </div>
                 </div>
 
-                <div id="quests-box" style="flex: 1.5; background: #fff; border: 3px solid var(--border-color); border-radius: 12px; padding: 12px; box-shadow: 0 4px 0 var(--border-color);">
-                  <h3 style="font-family: var(--font-title); font-size: 1.15rem; border-bottom: 2px dashed #ccc; padding-bottom: 6px; margin-bottom: 8px;"><img src="https://img.icons8.com/color/48/todo-list.png" class="title-icon" /> DAILY QUESTS</h3>
-                  <div id="quests-list" style="display: flex; flex-direction: column; gap: 10px;">
-                    <!-- Dynamically populated -->
+                <!-- DAILY QUESTS CARD -->
+                <div id="quests-box" class="prep-deck-card prep-quests-card">
+                  <div class="prep-deck-header">
+                    <img src="assets/ui/menu/sprite_21.png" class="prep-header-icon" alt="" />
+                    <span class="prep-deck-title">DAILY QUESTS</span>
+                  </div>
+                  <div id="quests-list" class="prep-quests-list">
+                    <!-- Populated dynamically via renderDailyQuests() -->
                   </div>
                 </div>
               </div>
+
             </div>
 
           </div>
 
           <!-- AGENT SHOP PANEL -->
           <div id="panel-shop" class="lobby-panel" style="overflow-y: auto;">
-            <h2>RECRUIT SQUAD AGENTS</h2>
-            <p class="subtitle" style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 12px;">Purchase agents directly using earned match coins. Buy and equip up to 5 agents for battle.</p>
+            <!-- 1. TOP MAIN HEADER BAR -->
+            <div class="shop-header-banner">
+              <div class="shop-header-left">
+                <div class="shop-header-icon-disc">
+                  <img src="assets/ui/menu/sprite_20.png" class="shop-header-icon" alt="" />
+                </div>
+                <div class="shop-header-text">
+                  <div class="shop-header-title">RECRUIT SQUAD AGENTS</div>
+                  <p class="shop-header-subtitle">Build your squad with powerful agents! Each agent brings unique abilities to help you defend your base.</p>
+                </div>
+              </div>
+              <div class="shop-header-tagline">
+                <span>STRONGER SQUADS, BIGGER WINS 👑</span>
+              </div>
+            </div>
 
-            <!-- STARTER CATEGORY -->
-            <div class="shop-category" style="margin-bottom: 24px;">
-              <h3 style="font-family: var(--font-title); font-size: 1.2rem; color: var(--primary-green); margin-bottom: 10px; border-bottom: 2px solid var(--primary-green); padding-bottom: 4px;">STARTER AGENTS</h3>
-              <div class="shop-grid">
-                <div class="shop-card purchased" data-agent-type="scout">
-                  <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="scout"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Scout</span>
-                    <span class="cost-text">STARTER</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 1 | Rng: 90px | Rate: 1.0/s<br/>
-                      <span style="color: var(--primary-blue)">Pistol: Fast physical single-target shots.</span>
+            <!-- 2. STARTER AGENTS CATEGORY -->
+            <div class="shop-category-wrapper">
+              <div class="cat-banner-strip cat-banner-green">
+                <div class="cat-pill-badge cat-pill-green">
+                  <span class="cat-star-icon">⭐</span>
+                  <span class="cat-title-text">STARTER AGENTS</span>
+                </div>
+                <span class="cat-middle-desc text-green-dark">Great for beginners. Balanced and reliable!</span>
+                <div class="cat-slanted-badge cat-slanted-green">
+                  <span>★ EASY TO GET &bull; ✓ GREAT VALUE</span>
+                </div>
+              </div>
+
+              <!-- 4 WIDE HORIZONTAL CARDS -->
+              <div class="starter-wide-grid">
+                <!-- Scout -->
+                <div class="shop-wide-card shop-card purchased" data-agent-type="scout">
+                  <div class="wide-card-left">
+                    <div class="troop-disc-avatar">
+                      <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="scout"></canvas>
                     </div>
                   </div>
-                  <button class="btn btn-shop-action" disabled>UNLOCKED</button>
+                  <div class="wide-card-right">
+                    <div class="wide-name-row">
+                      <span class="wide-troop-name">Scout</span>
+                      <span class="wide-tag-starter">STARTER</span>
+                    </div>
+                    <div class="wide-stat-row">
+                      <span class="stat-unit"><img src="assets/ui/agentshop/sprite_05.png" class="stat-icon" /> Dmg: 1</span>
+                      <span class="stat-divider">|</span>
+                      <span class="stat-unit"><img src="assets/ui/agentshop/sprite_06.png" class="stat-icon" /> Rng: 90px</span>
+                      <span class="stat-divider">|</span>
+                      <span class="stat-unit"><img src="assets/ui/agentshop/sprite_07.png" class="stat-icon" /> Rate: 1.0/s</span>
+                    </div>
+                    <div class="wide-desc-row desc-blue">
+                      <img src="assets/ui/agentshop/sprite_08.png" class="ability-icon" />
+                      <span>Pistol: Fast physical single-target shots.</span>
+                    </div>
+                    <button class="btn btn-unlocked-pill" disabled>✓ UNLOCKED</button>
+                  </div>
                 </div>
 
-                <div class="shop-card" data-agent-type="soldier">
-                  <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="soldier"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Soldier</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 450</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 2 | Rng: 90px | Rate: 2.0/s<br/>
-                      <span style="color: var(--primary-green-dark)">Assault Rifle: Rapid burst-fire configurations.</span>
+                <!-- Soldier -->
+                <div class="shop-wide-card shop-card purchased" data-agent-type="soldier">
+                  <div class="wide-card-left">
+                    <div class="troop-disc-avatar">
+                      <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="soldier"></canvas>
                     </div>
                   </div>
-                  <button class="btn btn-shop-action" data-cost="450">BUY</button>
+                  <div class="wide-card-right">
+                    <div class="wide-name-row">
+                      <span class="wide-troop-name">Soldier</span>
+                      <span class="wide-tag-starter">STARTER</span>
+                    </div>
+                    <div class="wide-stat-row">
+                      <span class="stat-unit"><img src="assets/ui/agentshop/sprite_05.png" class="stat-icon" /> Dmg: 2</span>
+                      <span class="stat-divider">|</span>
+                      <span class="stat-unit"><img src="assets/ui/agentshop/sprite_06.png" class="stat-icon" /> Rng: 90px</span>
+                      <span class="stat-divider">|</span>
+                      <span class="stat-unit"><img src="assets/ui/agentshop/sprite_07.png" class="stat-icon" /> Rate: 2.0/s</span>
+                    </div>
+                    <div class="wide-desc-row desc-green">
+                      <img src="assets/ui/agentshop/sprite_09.png" class="ability-icon" />
+                      <span>Assault Rifle: Rapid burst-fire configurations.</span>
+                    </div>
+                    <button class="btn btn-unlocked-pill" disabled>✓ UNLOCKED</button>
+                  </div>
                 </div>
 
-                <div class="shop-card" data-agent-type="sniper">
-                  <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="sniper"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Sniper</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 250</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 4 | Rng: 180px | Rate: 0.25/s<br/>
-                      <span style="color: var(--primary-orange)">Sniper Scope: Heavy slow long-range armor-piercing bullets.</span>
+                <!-- Sniper -->
+                <div class="shop-wide-card shop-card purchased" data-agent-type="sniper">
+                  <div class="wide-card-left">
+                    <div class="troop-disc-avatar">
+                      <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="sniper"></canvas>
                     </div>
                   </div>
-                  <button class="btn btn-shop-action" data-cost="250">BUY</button>
+                  <div class="wide-card-right">
+                    <div class="wide-name-row">
+                      <span class="wide-troop-name">Sniper</span>
+                      <span class="wide-tag-starter">STARTER</span>
+                    </div>
+                    <div class="wide-stat-row">
+                      <span class="stat-unit"><img src="assets/ui/agentshop/sprite_05.png" class="stat-icon" /> Dmg: 4</span>
+                      <span class="stat-divider">|</span>
+                      <span class="stat-unit"><img src="assets/ui/agentshop/sprite_06.png" class="stat-icon" /> Rng: 180px</span>
+                      <span class="stat-divider">|</span>
+                      <span class="stat-unit"><img src="assets/ui/agentshop/sprite_07.png" class="stat-icon" /> Rate: 0.25/s</span>
+                    </div>
+                    <div class="wide-desc-row desc-orange">
+                      <img src="assets/ui/agentshop/sprite_10.png" class="ability-icon" />
+                      <span>Sniper Scope: Heavy slow long-range armor-piercing bullets.</span>
+                    </div>
+                    <button class="btn btn-unlocked-pill" disabled>✓ UNLOCKED</button>
+                  </div>
                 </div>
 
-                <div class="shop-card" data-agent-type="demoman">
-                  <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="demoman"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Demoman</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 350</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 6 | Rng: 110px | Rate: 0.45/s<br/>
-                      <span style="color: #c0392b">Grenades: Heavy area splash explosions.</span>
+                <!-- Demoman -->
+                <div class="shop-wide-card shop-card purchased" data-agent-type="demoman">
+                  <div class="wide-card-left">
+                    <div class="troop-disc-avatar">
+                      <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="demoman"></canvas>
                     </div>
                   </div>
-                  <button class="btn btn-shop-action" data-cost="350">BUY</button>
+                  <div class="wide-card-right">
+                    <div class="wide-name-row">
+                      <span class="wide-troop-name">Demoman</span>
+                      <span class="wide-tag-starter">STARTER</span>
+                    </div>
+                    <div class="wide-stat-row">
+                      <span class="stat-unit"><img src="assets/ui/agentshop/sprite_05.png" class="stat-icon" /> Dmg: 6</span>
+                      <span class="stat-divider">|</span>
+                      <span class="stat-unit"><img src="assets/ui/agentshop/sprite_06.png" class="stat-icon" /> Rng: 170px</span>
+                      <span class="stat-divider">|</span>
+                      <span class="stat-unit"><img src="assets/ui/agentshop/sprite_07.png" class="stat-icon" /> Rate: 0.45/s</span>
+                    </div>
+                    <div class="wide-desc-row desc-red">
+                      <img src="assets/ui/agentshop/sprite_11.png" class="ability-icon" />
+                      <span>Grenades: Heavy area splash explosions.</span>
+                    </div>
+                    <button class="btn btn-unlocked-pill" disabled>✓ UNLOCKED</button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <!-- INTERMEDIATE CATEGORY -->
-            <div class="shop-category" style="margin-bottom: 24px;">
-              <h3 style="font-family: var(--font-title); font-size: 1.2rem; color: var(--primary-blue); margin-bottom: 10px; border-bottom: 2px solid var(--primary-blue); padding-bottom: 4px;">INTERMEDIATE AGENTS</h3>
-              <div class="shop-grid">
-                <div class="shop-card" data-agent-type="farm">
+            <!-- 3. INTERMEDIATE AGENTS CATEGORY -->
+            <div class="shop-category-wrapper">
+              <div class="cat-banner-strip cat-banner-blue">
+                <div class="cat-pill-badge cat-pill-blue">
+                  <img src="assets/ui/menu/sprite_20.png" class="cat-icon-small" alt="" />
+                  <span class="cat-title-text">INTERMEDIATE AGENTS</span>
+                </div>
+                <span class="cat-middle-desc text-blue-dark">More firepower. More strategy. More options.</span>
+                <div class="cat-slanted-badge cat-slanted-blue">
+                  <span>👑 HIGHER DAMAGE &bull; ⚡ ADVANCED ABILITIES</span>
+                </div>
+              </div>
+
+              <!-- 7 VERTICAL PORTRAIT CARDS -->
+              <div class="intermediate-vertical-grid">
+                <!-- Farm -->
+                <div class="shop-vert-card card-glow-green" data-agent-type="farm">
                   <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="farm"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Farm</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 2,500</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 0 | Rng: 0px | Rate: 0/s<br/>
-                      <span style="color: var(--primary-green-dark)">Economy: Yields valuable cash dividends every wave.</span>
-                    </div>
+                  <span class="vert-name">Farm</span>
+                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" class="coin-icon-mini" /> 2,500</span>
+                  <span class="vert-stats">Dmg: 0 | Rng: 0px | Rate: 0/s</span>
+                  <div class="vert-desc desc-green">
+                    <img src="assets/ui/agentshop/sprite_12.png" class="vert-ability-icon" />
+                    <span>Economy: Yields valuable cash dividends every wave.</span>
                   </div>
                   <button class="btn btn-shop-action" data-cost="2500">BUY</button>
                 </div>
 
-                <div class="shop-card" data-agent-type="medic">
+                <!-- Medic -->
+                <div class="shop-vert-card" data-agent-type="medic">
                   <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="medic"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Medic</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 2,500</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 1 | Rng: 100px | Rate: 0.8/s<br/>
-                      <span style="color: var(--primary-red)">Medkit: Restores base health and removes active stun locks.</span>
-                    </div>
+                  <span class="vert-name">Medic</span>
+                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" class="coin-icon-mini" /> 2,500</span>
+                  <span class="vert-stats">Dmg: 1 | Rng: 100px | Rate: 0.8/s</span>
+                  <div class="vert-desc desc-red">
+                    <img src="assets/ui/agentshop/sprite_13.png" class="vert-ability-icon" />
+                    <span>Medic: Restores base health and removes active stun locks.</span>
                   </div>
                   <button class="btn btn-shop-action" data-cost="2500">BUY</button>
                 </div>
 
-                <div class="shop-card" data-agent-type="pyromancer">
+                <!-- Pyromancer -->
+                <div class="shop-vert-card" data-agent-type="pyromancer">
                   <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="pyromancer"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Pyromancer</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 2,000</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 1 | Rng: 90px | Rate: 2.0/s<br/>
-                      <span style="color: var(--primary-orange)">Flamethrower: Melts lead armors and applies fire DoT.</span>
-                    </div>
+                  <span class="vert-name">Pyromancer</span>
+                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" class="coin-icon-mini" /> 2,000</span>
+                  <span class="vert-stats">Dmg: 1 | Rng: 90px | Rate: 2.0/s</span>
+                  <div class="vert-desc desc-orange">
+                    <img src="assets/ui/agentshop/sprite_14.png" class="vert-ability-icon" />
+                    <span>Flamethrower: Melts lead armor and applies fire DoT.</span>
                   </div>
                   <button class="btn btn-shop-action" data-cost="2000">BUY</button>
                 </div>
 
-                <div class="shop-card" data-agent-type="rocketeer">
+                <!-- Rocketeer -->
+                <div class="shop-vert-card" data-agent-type="rocketeer">
                   <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="rocketeer"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Rocketeer</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 2,500</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 8 | Rng: 110px | Rate: 0.35/s<br/>
-                      <span style="color: #1a1a2e">Bazooka: High single-target rocket explosion damage.</span>
-                    </div>
+                  <span class="vert-name">Rocketeer</span>
+                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" class="coin-icon-mini" /> 2,500</span>
+                  <span class="vert-stats">Dmg: 8 | Rng: 110px | Rate: 0.65/s</span>
+                  <div class="vert-desc desc-blue">
+                    <img src="assets/ui/agentshop/sprite_15.png" class="vert-ability-icon" />
+                    <span>Bazooka: High single-target rocket explosion damage.</span>
                   </div>
                   <button class="btn btn-shop-action" data-cost="2500">BUY</button>
                 </div>
 
-                <div class="shop-card" data-agent-type="freezer">
+                <!-- Freezer -->
+                <div class="shop-vert-card" data-agent-type="freezer">
                   <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="freezer"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Freezer</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 2,500</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 1 | Rng: 100px | Rate: 0.65/s<br/>
-                      <span style="color: #3498db">Cryo beam: Slows down and freezes targets.</span>
-                    </div>
+                  <span class="vert-name">Freezer</span>
+                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" class="coin-icon-mini" /> 2,500</span>
+                  <span class="vert-stats">Dmg: 2 | Rng: 90px | Rate: 0.5/s</span>
+                  <div class="vert-desc desc-cyan">
+                    <img src="assets/ui/agentshop/sprite_16.png" class="vert-ability-icon" />
+                    <span>Cryo beam: Slows down and freezes targets.</span>
                   </div>
                   <button class="btn btn-shop-action" data-cost="2500">BUY</button>
                 </div>
 
-                <div class="shop-card" data-agent-type="shotgunner">
-                  <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="shotgunner"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Shotgunner</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 2,500</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 2 | Rng: 90px | Rate: 0.55/s<br/>
-                      <span style="color: #2c3e50">Shotgun: Radial multi-pellet close range blasts.</span>
-                    </div>
-                  </div>
-                  <button class="btn btn-shop-action" data-cost="2500">BUY</button>
-                </div>
-
-                <div class="shop-card" data-agent-type="crook_boss">
+                <!-- Crook Boss -->
+                <div class="shop-vert-card" data-agent-type="crook_boss">
                   <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="crook_boss"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Crook Boss</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 3,500</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 2 | Rng: 120px | Rate: 1.8/s<br/>
-                      <span style="color: #d4ac0d">Reinforcements: Calls in AI guard units to block path.</span>
-                    </div>
+                  <span class="vert-name">Crook Boss</span>
+                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" class="coin-icon-mini" /> 3,500</span>
+                  <span class="vert-stats">Dmg: 2 | Rng: 120px | Rate: 1.25/s</span>
+                  <div class="vert-desc desc-gold">
+                    <img src="https://img.icons8.com/color/48/gold-bars.png" class="vert-ability-icon" />
+                    <span>Reinforcements: Calls in all squad units to block path.</span>
                   </div>
                   <button class="btn btn-shop-action" data-cost="3500">BUY</button>
                 </div>
 
-                <div class="shop-card" data-agent-type="military_base">
+                <!-- Military Base -->
+                <div class="shop-vert-card" data-agent-type="military_base">
                   <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="military_base"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Military Base</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 3,000</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 0 | Rng: 0px | Rate: 0/s<br/>
-                      <span style="color: var(--primary-green-dark)">Motorpool: Periodically deploys humvees and tanks.</span>
-                    </div>
+                  <span class="vert-name">Military Base</span>
+                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" class="coin-icon-mini" /> 3,000</span>
+                  <span class="vert-stats">Dmg: 0 | Rng: 0px | Rate: 0/s</span>
+                  <div class="vert-desc desc-green">
+                    <img src="assets/ui/agentshop/sprite_17.png" class="vert-ability-icon" />
+                    <span>Motor pool: Periodically deploys hummers and tanks.</span>
                   </div>
                   <button class="btn btn-shop-action" data-cost="3000">BUY</button>
                 </div>
               </div>
             </div>
 
-            <!-- ADVANCED CATEGORY -->
-            <div class="shop-category" style="margin-bottom: 24px;">
-              <h3 style="font-family: var(--font-title); font-size: 1.2rem; color: var(--primary-orange); margin-bottom: 10px; border-bottom: 2px solid var(--primary-orange); padding-bottom: 4px;">ADVANCED AGENTS</h3>
-              <div class="shop-grid">
-                <div class="shop-card" data-agent-type="minigunner">
+            <!-- 4. ADVANCED AGENTS CATEGORY -->
+            <div class="shop-category-wrapper">
+              <div class="cat-banner-strip cat-banner-orange">
+                <div class="cat-pill-badge cat-pill-orange">
+                  <span class="cat-star-icon">🔥</span>
+                  <span class="cat-title-text">ADVANCED AGENTS</span>
+                </div>
+                <span class="cat-middle-desc text-orange-dark">Heavy firepower. Elite defenses. High-tier supremacy.</span>
+                <div class="cat-slanted-badge cat-slanted-orange">
+                  <span>★ MAXIMUM FIREPOWER &bull; ⚡ ENDGAME DEFENSE</span>
+                </div>
+              </div>
+
+              <!-- 5 VERTICAL PORTRAIT CARDS -->
+              <div class="intermediate-vertical-grid">
+                <!-- Minigunner -->
+                <div class="shop-vert-card shop-card" data-agent-type="minigunner">
                   <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="minigunner"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Minigunner</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 5,000</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 1 | Rng: 130px | Rate: 4.5/s<br/>
-                      <span style="color: var(--primary-orange)">Gatling Gun: Extremely high rapid fire-rate.</span>
-                    </div>
+                  <span class="vert-name">Minigunner</span>
+                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" class="coin-icon-mini" /> 5,000</span>
+                  <span class="vert-stats">Dmg: 1 | Rng: 130px | Rate: 4.5/s</span>
+                  <div class="vert-desc desc-orange">
+                    <img src="assets/ui/agentshop/sprite_09.png" class="vert-ability-icon" />
+                    <span>Gatling gun: Extremely high rapid fire-rate stream.</span>
                   </div>
                   <button class="btn btn-shop-action" data-cost="5000">BUY</button>
                 </div>
 
-                <div class="shop-card" data-agent-type="commander">
+                <!-- Commander -->
+                <div class="shop-vert-card shop-card" data-agent-type="commander">
                   <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="commander"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Commander</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 3,500</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 0 | Rng: 110px | Rate: 0/s<br/>
-                      <span style="color: #c0392b">Rally call: Broad speed boost buffs for nearby units.</span>
-                    </div>
+                  <span class="vert-name">Commander</span>
+                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" class="coin-icon-mini" /> 3,500</span>
+                  <span class="vert-stats">Dmg: 0 | Rng: 110px | Rate: 0/s</span>
+                  <div class="vert-desc desc-red">
+                    <img src="assets/ui/menu/sprite_20.png" class="vert-ability-icon" />
+                    <span>Rally call: Broad attack speed buffs for nearby units.</span>
                   </div>
                   <button class="btn btn-shop-action" data-cost="3500">BUY</button>
                 </div>
 
-                <div class="shop-card" data-agent-type="dj">
+                <!-- DJ Booth -->
+                <div class="shop-vert-card shop-card" data-agent-type="dj">
                   <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="dj"></canvas>
-                  <div class="agent-info">
-                    <span class="name">DJ Booth</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 4,000</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 0 | Rng: 120px | Rate: 0/s<br/>
-                      <span style="color: var(--primary-blue-dark)">Music: Expands ranges and lowers upgrade costs map-wide.</span>
-                    </div>
+                  <span class="vert-name">DJ Booth</span>
+                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" class="coin-icon-mini" /> 4,000</span>
+                  <span class="vert-stats">Dmg: 0 | Rng: 120px | Rate: 0/s</span>
+                  <div class="vert-desc desc-cyan">
+                    <img src="assets/ui/agentshop/sprite_16.png" class="vert-ability-icon" />
+                    <span>Music: Expands ranges and lowers upgrade costs map-wide.</span>
                   </div>
                   <button class="btn btn-shop-action" data-cost="4000">BUY</button>
                 </div>
 
-                <div class="shop-card" data-agent-type="ranger">
+                <!-- Ranger -->
+                <div class="shop-vert-card shop-card" data-agent-type="ranger">
                   <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="ranger"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Ranger</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 6,000</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 20 | Rng: 220px | Rate: 0.16/s<br/>
-                      <span style="color: #ff0055">Railgun: Massive sniper damage, but cannot detect Camo.</span>
-                    </div>
+                  <span class="vert-name">Ranger</span>
+                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" class="coin-icon-mini" /> 6,000</span>
+                  <span class="vert-stats">Dmg: 20 | Rng: 220px | Rate: 0.16/s</span>
+                  <div class="vert-desc desc-orange">
+                    <img src="assets/ui/agentshop/sprite_10.png" class="vert-ability-icon" />
+                    <span>Railgun: Massive sniper damage, cannot detect Camo.</span>
                   </div>
                   <button class="btn btn-shop-action" data-cost="6000">BUY</button>
                 </div>
 
-                <div class="shop-card" data-agent-type="turret">
+                <!-- Turret -->
+                <div class="shop-vert-card shop-card" data-agent-type="turret">
                   <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="turret"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Turret</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 5,000</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 2 | Rng: 150px | Rate: 6.0/s<br/>
-                      <span style="color: #00ffe0">Laser gatling: Extreme fire-rate and heavy long range defense.</span>
-                    </div>
+                  <span class="vert-name">Turret</span>
+                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" class="coin-icon-mini" /> 5,000</span>
+                  <span class="vert-stats">Dmg: 2 | Rng: 150px | Rate: 6.0/s</span>
+                  <div class="vert-desc desc-cyan">
+                    <img src="assets/ui/agentshop/sprite_15.png" class="vert-ability-icon" />
+                    <span>Laser gatling: Extreme fire-rate & heavy range defense.</span>
                   </div>
                   <button class="btn btn-shop-action" data-cost="5000">BUY</button>
                 </div>
               </div>
             </div>
 
-            <!-- SPECIAL EVENT CATEGORY -->
-            <div class="shop-category" style="margin-bottom: 16px;">
-              <h3 style="font-family: var(--font-title); font-size: 1.2rem; color: #9b59b6; margin-bottom: 10px; border-bottom: 2px solid #9b59b6; padding-bottom: 4px;">SPECIAL EVENT AGENTS</h3>
-              <div class="shop-grid">
-                <div class="shop-card" data-agent-type="gladiator">
+            <!-- 5. SPECIAL EVENT AGENTS CATEGORY -->
+            <div class="shop-category-wrapper">
+              <div class="cat-banner-strip cat-banner-purple">
+                <div class="cat-pill-badge cat-pill-purple">
+                  <span class="cat-star-icon">⚔️</span>
+                  <span class="cat-title-text">SPECIAL EVENT AGENTS</span>
+                </div>
+                <span class="cat-middle-desc text-purple-dark">Exclusive seasonal agents with legendary battlefield powers.</span>
+                <div class="cat-slanted-badge cat-slanted-purple">
+                  <span>👑 LEGENDARY RARITY &bull; ⚔ EXCLUSIVE POWERS</span>
+                </div>
+              </div>
+
+              <!-- 1 VERTICAL PORTRAIT CARD -->
+              <div class="intermediate-vertical-grid">
+                <!-- Gladiator -->
+                <div class="shop-vert-card shop-card" data-agent-type="gladiator">
                   <canvas class="agent-preview-canvas" width="60" height="60" data-agent-type="gladiator"></canvas>
-                  <div class="agent-info">
-                    <span class="name">Gladiator</span>
-                    <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> 5,000</span>
-                    <div class="shop-agent-details" style="font-size: 0.65rem; color: #7f8c8d; font-weight: 800; margin-top: 3px; line-height: 1.2;">
-                      Dmg: 2 | Rng: 55px | Rate: 1.1/s<br/>
-                      <span style="color: #7f8c8d">Broadsword: Fast-cleaving melee sweeps and war cries.</span>
-                    </div>
+                  <span class="vert-name">Gladiator</span>
+                  <span class="cost-text"><img src="https://img.icons8.com/color/48/coins.png" class="coin-icon-mini" /> 5,000</span>
+                  <span class="vert-stats">Dmg: 2 | Rng: 55px | Rate: 1.1/s</span>
+                  <div class="vert-desc desc-gold">
+                    <img src="assets/ui/solo/sprite_02.png" class="vert-ability-icon" />
+                    <span>Broadsword: Fast-cleaving melee sweeps and war cries.</span>
                   </div>
                   <button class="btn btn-shop-action" data-cost="5000">BUY</button>
                 </div>
@@ -591,57 +812,145 @@
           <div id="panel-crates" class="lobby-panel">
             
             <!-- LOCKED STATE (LEVEL < 5) -->
-            <div id="crates-locked-view" class="crates-lock-screen">
-              <div class="lock-graphic-container">
-                <span class="lock-sparkle sp-1">✦</span>
-                <span class="lock-sparkle sp-2">✦</span>
-                <img src="https://img.icons8.com/color/96/lock--v1.png" class="lock-big-img" alt="Locked" />
+            <div id="crates-locked-view" class="crates-stage">
+              <img src="assets/ui/menu/crates.png" class="crates-backdrop" alt="Locked Crate" />
+
+              <div class="crates-content">
+                <div class="crates-info-panel">
+                  <div class="crates-lock-icon-wrap">
+                    <span class="crates-lock-badge">🔒</span>
+                  </div>
+                  <div class="crates-locked-title">CRATE IS <span class="cyan-highlight">LOCKED</span></div>
+                  <div class="crates-locked-pill">Unlock at <strong class="cyan-highlight">LEVEL 5</strong></div>
+                  <div class="crates-locked-subtexts">
+                    <p>Want to get more crates?</p>
+                    <p>Go to the Agent Shop!</p>
+                  </div>
+                  <button id="btn-go-to-agent-shop" class="btn-crates-shop">
+                    <img src="assets/ui/menu/sprite_18.png" class="btn-shop-cart-icon" alt="" />
+                    <span>GO TO AGENT SHOP &gt;</span>
+                  </button>
+                </div>
               </div>
-              <h2 class="lock-title">COSMETIC SHOP <span class="lock-highlight">LOCKED</span></h2>
-              <div class="lock-pill">Unlocks at <strong>LEVEL 5</strong></div>
-              <p class="lock-subtext">Want to buy troops? Go to Agent Shop</p>
-              <button id="btn-go-to-agent-shop" class="btn btn-redirect-shop">
-                <img src="https://img.icons8.com/color/48/shopping-cart.png" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 6px;" /> GO TO AGENT SHOP
-              </button>
             </div>
 
             <!-- UNLOCKED STATE (LEVEL >= 5) -->
             <!-- UNLOCKED STATE (LEVEL >= 5) -->
             <div id="crates-unlocked-view" class="hidden">
-              ...
+              <!-- Header Bar -->
+              <div class="shop-header-banner">
+                <div class="shop-header-left">
+                  <div class="shop-header-icon-disc">
+                    <img src="assets/ui/menu/sprite_22.png" class="shop-header-icon" alt="" />
+                  </div>
+                  <div class="shop-header-text">
+                    <div class="shop-header-title">COSMETIC SKIN CRATES</div>
+                    <p class="shop-header-subtitle">Unbox crates to collect exclusive skins and customize your squad agents!</p>
+                  </div>
+                </div>
+                <div class="shop-header-tagline">
+                  <span>UNBOX RARE &amp; LEGENDARY SKINS 🎁</span>
+                </div>
+              </div>
+
+              <!-- 3 Crates Deck -->
+              <div class="crates-unlocked-deck">
+                <!-- Basic Crate -->
+                <div class="crate-shop-card">
+                  <span class="crate-rarity-pill pill-basic">COMMON / RARE</span>
+                  <img src="assets/ui/menu/sprite_22.png" class="crate-img-preview" alt="Basic Crate" />
+                  <div class="crate-card-title">BASIC CRATE</div>
+                  <p class="crate-card-desc">Contains starter skins for Scout, Soldier, Sniper, Demoman, and Gladiator.</p>
+                  <button class="btn btn-shop-action btn-buy-crate" data-crate="basic" data-cost="150" style="width: 100%;">
+                    BUY (🪙 150)
+                  </button>
+                </div>
+
+                <!-- Elite Crate -->
+                <div class="crate-shop-card card-elite">
+                  <span class="crate-rarity-pill pill-elite">RARE / EPIC</span>
+                  <img src="assets/ui/menu/sprite_22.png" class="crate-img-preview" alt="Elite Crate" />
+                  <div class="crate-card-title">ELITE CRATE</div>
+                  <p class="crate-card-desc">Contains upgraded skins for Farm, Medic, Pyromancer, Rocketeer, and Commander.</p>
+                  <button class="btn btn-shop-action btn-buy-crate" data-crate="elite" data-cost="350" style="width: 100%;">
+                    BUY (🪙 350)
+                  </button>
+                </div>
+
+                <!-- Deluxe Crate -->
+                <div class="crate-shop-card card-deluxe">
+                  <span class="crate-rarity-pill pill-deluxe">EPIC / LEGENDARY</span>
+                  <img src="assets/ui/menu/sprite_22.png" class="crate-img-preview" alt="Deluxe Crate" />
+                  <div class="crate-card-title">DELUXE CRATE</div>
+                  <p class="crate-card-desc">Contains exclusive golden &amp; cyber skins for Minigunner, DJ Booth, Ranger, and Turret.</p>
+                  <button class="btn btn-shop-action btn-buy-crate" data-crate="deluxe" data-cost="500" style="width: 100%;">
+                    BUY (🪙 500)
+                  </button>
+                </div>
+              </div>
             </div>
 
           </div>
 
           <!-- FREE COINS AD REWARD PANEL -->
-          <div id="panel-coins" class="lobby-panel">
-            <div class="coins-panel-header">
-              <h2><img src="https://img.icons8.com/color/48/coins.png" class="title-icon" /> GET FREE COINS</h2>
-              <p class="subtitle">Watch a quick sponsor video to earn free match coins! (Up to 5 ads per day)</p>
-            </div>
+          <div id="panel-coins" class="lobby-panel coins-ad-panel">
+            <div class="coins-ad-stage">
+              <img src="assets/ui/ads/banner.png" class="coins-ad-backdrop" alt="Free Coins Showcase" />
 
-            <div class="coins-reward-showcase">
-              <div class="coins-reward-card">
-                <div class="coins-icon-wrapper">
-                  <img src="https://img.icons8.com/color/96/money-bag.png" class="coins-pouch-img" alt="Coins" />
-                  <span class="coins-sparkle cs-1">✦</span>
-                  <span class="coins-sparkle cs-2">✦</span>
+              <div class="coins-ad-content">
+                <!-- Titles & Tagline -->
+                <div class="coins-ad-headers">
+                  <div class="coins-ad-title-row">
+                    <img src="assets/ui/ads/sprite_01.png" class="coins-title-watch" alt="WATCH AD" />
+                    <img src="assets/ui/ads/sprite_02.png" class="coins-title-play-badge" alt="" />
+                  </div>
+                  <img src="assets/ui/ads/sprite_03.png" class="coins-title-get-coins" alt="GET FREE COINS!" />
+                  <p class="coins-ad-subtext">
+                    Watch a short ad and get <span class="highlight-coins">amazing coins</span> to upgrade your squad!
+                  </p>
                 </div>
-                <h3 class="coins-reward-amount">+150 COINS</h3>
-                <span id="tab-coins-remaining" class="coins-remaining-badge">5 / 5 AVAILABLE TODAY</span>
 
-                <button id="btn-tab-watch-ad-coins" class="btn btn-watch-ad-large">
-                  <span class="ad-play-icon">▶</span> WATCH AD (+150 COINS)
-                </button>
-                <span class="coins-daily-reset-notice">Daily allowance resets every midnight.</span>
+                <!-- Action Bar -->
+                <div class="coins-ad-bottom-bar">
+                  <button id="btn-tab-watch-ad-coins" class="btn-ad-green-pill">
+                    <img src="assets/ui/ads/sprite_02.png" class="btn-ad-play-icon" alt="" />
+                    <div class="btn-ad-text-group">
+                      <span class="btn-ad-heading">WATCH AD</span>
+                      <span class="btn-ad-reward">+150 COINS</span>
+                    </div>
+                  </button>
+
+                  <div class="ad-daily-limit-badge">
+                    <img src="assets/ui/ads/sprite_04.png" class="ad-limit-clapper-icon" alt="" />
+                    <div class="ad-limit-text-group">
+                      <span class="ad-limit-label">DAILY LIMIT</span>
+                      <span id="tab-coins-remaining" class="ad-limit-count">5 / 5 ADS</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
           <!-- LOADOUT MANAGEMENT PANEL -->
-          <div id="panel-loadout" class="lobby-panel">
-            <h2>EQUIP LOADOUT (MAX 5)</h2>
-            <p class="subtitle">Select agents below to equip/unequip them for the match.</p>
+          <div id="panel-loadout" class="lobby-panel loadout-main-panel">
+            <!-- Header Bar -->
+            <div class="loadout-header-banner">
+              <div class="loadout-header-left">
+                <div class="loadout-header-icon-disc">
+                  <img src="assets/ui/menu/sprite_21.png" class="loadout-header-icon" alt="" />
+                </div>
+                <div class="loadout-header-text">
+                  <div class="loadout-header-title">TACTICAL SQUAD LOADOUT</div>
+                  <p class="loadout-header-subtitle">Select up to 5 agents for deployment. Click an agent card to equip or unequip.</p>
+                </div>
+              </div>
+              <div class="loadout-counter-pill">
+                <span id="loadout-count-badge">EQUIPPED: 2 / 5</span>
+              </div>
+            </div>
+
+            <!-- Selection Grid -->
             <div id="loadout-selection-grid" class="loadout-grid"></div>
           </div>
         </div>
@@ -1061,5 +1370,24 @@
   </script>
 
   <script type="module" src="src/main.js"></script>
+  <script type="module" src="src/editor.js"></script>
+  
+  <!-- Responsive Resolution Scaler: Maintains 100% identical layout down to 100px -->
+  <script>
+    function autoScaleGame() {
+      const app = document.getElementById('app-container');
+      if (!app) return;
+
+      const baseW = 2122;
+      const baseH = 1188;
+      // Proportional scale factor calculated identically across lobby and match
+      const scale = Math.min(window.innerWidth / baseW, window.innerHeight / baseH);
+      app.style.setProperty('--app-scale', scale);
+      app.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    }
+    window.addEventListener('resize', autoScaleGame);
+    window.addEventListener('DOMContentLoaded', autoScaleGame);
+    autoScaleGame();
+  </script>
 </body>
 </html>

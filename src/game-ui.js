@@ -487,7 +487,20 @@ export class GameUI {
       let curX = endCoords.x;
       let curY = endCoords.y;
 
-      if (progress < 0.45) {
+      const isStationary = !this.activeHandStart || Math.hypot(effectiveStart.x - endCoords.x, effectiveStart.y - endCoords.y) < 2;
+
+      if (isStationary) {
+        guideEl.classList.add('hand-pulsing');
+        curX = endCoords.x;
+        curY = endCoords.y;
+        guideEl.style.opacity = '1';
+      } else {
+        guideEl.classList.remove('hand-pulsing');
+      }
+
+      if (isStationary) {
+        // Position pinned while CSS animation handles the smooth zoom in/out
+      } else if (progress < 0.45) {
         // Phase 1: Gliding smoothly from Start to Target
         const p = progress / 0.45;
         const ease = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
@@ -547,7 +560,10 @@ export class GameUI {
       this.handAnimFrame = null;
     }
     const guideEl = document.getElementById('tutorial-hand-guide');
-    if (guideEl) guideEl.classList.add('hidden');
+    if (guideEl) {
+      guideEl.classList.remove('hand-pulsing');
+      guideEl.classList.add('hidden');
+    }
   }
 
   getTargetScreenCoords(target) {
@@ -638,6 +654,12 @@ export class GameUI {
         btn.addEventListener('click', () => {
           soundManager.playTick();
           if (this.game.tutorialActive) {
+            // During placement step, keep Scout permanently equipped so the ghost never disappears
+            if (this.game.tutorialStep === 1.5 && type === 'scout') {
+              this.game.setSelectedShopTower('scout');
+              btn.classList.add('active');
+              return;
+            }
             if (this.game.tutorialStep !== 1 || type !== 'scout') return;
           }
           if (btn.classList.contains('active')) {
@@ -978,6 +1000,11 @@ export class GameUI {
   }
 
   showGameLayout(mapName) {
+    // ─── ADD THIS LINE TO FILL 100% SCREEN ───
+    const app = document.getElementById('app-container');
+    if (app) app.classList.add('in-game-match');
+    if (typeof window.autoScaleGame === 'function') window.autoScaleGame();
+
     if (this.parentUI.lobby) {
       this.parentUI.lobby.lobbyView.classList.add('hidden');
     }
@@ -997,6 +1024,10 @@ export class GameUI {
   }
 
   showLobbyLayout() {
+    const app = document.getElementById('app-container');
+    if (app) app.classList.remove('in-game-match');
+    if (typeof window.autoScaleGame === 'function') window.autoScaleGame();
+
     this.parentUI.gameView.classList.add('hidden');
     this.parentUI.lobbyView.classList.remove('hidden');
     this.dismissCommanderDialog(); 
@@ -1126,9 +1157,9 @@ export class GameUI {
       }
     } 
     else if (step === 1.5) {
-      const scoutBtn = this.equippedAgentsList.querySelector('.placement-btn[data-type="scout"]');
       this.setSpotlightCutout({ col: 2, row: 2 });
-      this.showHandGuide(scoutBtn || this.commanderWrapper, { col: 2, row: 2 });
+      // Tap directly on the highlighted tile in place without gliding from the unit entry
+      this.showHandGuide({ col: 2, row: 2 }, { col: 2, row: 2 });
     } 
     else if (step === 2) {
       this.setSpotlightCutout({ col: 2, row: 2 });

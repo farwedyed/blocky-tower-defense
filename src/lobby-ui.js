@@ -102,10 +102,14 @@ export class LobbyUI {
   }
 
   updateCgProfileUI(user) {
+    const avatarFallback = document.getElementById('avatar-fallback');
+
     if (user) {
       if (this.cgUsername) this.cgUsername.textContent = user.username;
       if (this.cgAvatar && user.profilePictureUrl) {
         this.cgAvatar.src = user.profilePictureUrl;
+        this.cgAvatar.style.display = 'block';
+        if (avatarFallback) avatarFallback.style.display = 'none';
       }
       if (this.btnCgAuth) {
         this.btnCgAuth.style.display = 'none';
@@ -114,11 +118,15 @@ export class LobbyUI {
       const nameInput = document.getElementById('input-player-name');
       if (nameInput) {
         nameInput.value = user.username;
-        nameInput.disabled = true; // Disable editing on auth sync
+        nameInput.disabled = true;
       }
     } else {
       if (this.cgUsername) this.cgUsername.textContent = "Guest Player";
-      if (this.cgAvatar) this.cgAvatar.src = "https://img.icons8.com/color/48/user-male-circle.png";
+      if (this.cgAvatar) {
+        this.cgAvatar.src = 'assets/ui/menu/sprite_23.png';
+        this.cgAvatar.style.display = 'block';
+      }
+      if (avatarFallback) avatarFallback.style.display = 'block';
       if (this.btnCgAuth) {
         this.btnCgAuth.style.display = 'block';
       }
@@ -130,6 +138,8 @@ export class LobbyUI {
   }
 
   showSplashState() {
+    const btnBack = document.getElementById('btn-lobby-back');
+    if (btnBack) btnBack.style.display = 'none';
     this.coop.showSplashState();
   }
 
@@ -142,8 +152,16 @@ export class LobbyUI {
     const diffStep = document.getElementById('wizard-step-diff');
     const prepStep = document.getElementById('wizard-step-prep');
 
+    // Remove any stuck inline styles from all wizard steps
+    [mapsStep, diffStep, prepStep].forEach(step => {
+      if (step) step.style.display = '';
+    });
+
     if (!visible) {
-      if (mapsStep) mapsStep.classList.add('hidden');
+      if (mapsStep) {
+        mapsStep.classList.add('hidden');
+        mapsStep.classList.remove('active');
+      }
       if (diffStep) diffStep.classList.add('hidden');
       if (prepStep) prepStep.classList.add('hidden');
     } else {
@@ -161,9 +179,11 @@ export class LobbyUI {
   }
 
   initEventListeners() {
-    if (this.btnCgAuth) {
-      this.btnCgAuth.addEventListener('click', () => {
-        CrazyGamesManager.promptAuth();
+    const btnLobbyBack = document.getElementById('btn-lobby-back');
+    if (btnLobbyBack) {
+      btnLobbyBack.addEventListener('click', () => {
+        soundManager.playTick();
+        this.showSplashState();
       });
     }
 
@@ -175,17 +195,34 @@ export class LobbyUI {
 
     this.tabButtons.forEach(btn => {
       btn.addEventListener('click', () => {
+        const targetPanelId = btn.getAttribute('data-target');
+        const btnBack = document.getElementById('btn-lobby-back');
+
         this.tabButtons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
 
-        const targetPanelId = btn.getAttribute('data-target');
+        // Clear inline display styles so all tabs switch instantly
         this.lobbyPanels.forEach(panel => {
           panel.classList.remove('active');
+          panel.style.display = '';
           if (panel.id === targetPanelId) {
             panel.classList.add('active');
           }
         });
 
+        // Hide back button on the main splash screen; show it on other sub-menus
+        if (targetPanelId === 'panel-maps') {
+          const splash = document.getElementById('lobby-splash-container');
+          const isSplashVisible = splash && splash.style.display !== 'none' && !splash.classList.contains('hidden');
+          if (btnBack) {
+            btnBack.style.display = isSplashVisible ? 'none' : 'block';
+          }
+        } else {
+          if (btnBack) btnBack.style.display = 'block';
+        }
+
+        this.game.shouldShowSoloGuide = false;
+        this.game.soloGuided = true;
         this.parentUI.hidePointer();
         document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
 
@@ -260,21 +297,21 @@ export class LobbyUI {
       const count = getDailyAdCount();
       const remaining = Math.max(0, 5 - count);
       if (tabCoinsRemaining) {
-        tabCoinsRemaining.textContent = `${remaining} / 5 AVAILABLE TODAY`;
+        tabCoinsRemaining.textContent = `${remaining} / 5 ADS`;
       }
       if (btnTabWatchAd) {
+        const rewardSpan = btnTabWatchAd.querySelector('.btn-ad-reward');
+        const headingSpan = btnTabWatchAd.querySelector('.btn-ad-heading');
         if (remaining <= 0) {
           btnTabWatchAd.disabled = true;
-          btnTabWatchAd.textContent = "DAILY LIMIT REACHED (COME BACK TOMORROW)";
-          btnTabWatchAd.style.background = "#7f8c8d";
-          btnTabWatchAd.style.opacity = "0.6";
-          btnTabWatchAd.style.boxShadow = "none";
+          btnTabWatchAd.classList.add('disabled');
+          if (headingSpan) headingSpan.textContent = "DAILY LIMIT";
+          if (rewardSpan) rewardSpan.textContent = "REACHED";
         } else {
           btnTabWatchAd.disabled = false;
-          btnTabWatchAd.innerHTML = `<span class="ad-play-icon">▶</span> WATCH AD (+150 COINS)`;
-          btnTabWatchAd.style.background = "var(--primary-green)";
-          btnTabWatchAd.style.opacity = "1.0";
-          btnTabWatchAd.style.boxShadow = "0 5px 0 var(--primary-green-dark), 0 5px 0 var(--border-color)";
+          btnTabWatchAd.classList.remove('disabled');
+          if (headingSpan) headingSpan.textContent = "WATCH AD";
+          if (rewardSpan) rewardSpan.textContent = "+150 COINS";
         }
       }
     };
@@ -653,8 +690,8 @@ export class LobbyUI {
       }
     }
 
-    this.shopCards = document.querySelectorAll('.shop-card');
-    this.shopCards.forEach(card => {
+    const allShopCards = document.querySelectorAll('.shop-wide-card, .shop-vert-card, .shop-card');
+    allShopCards.forEach(card => {
       const type = card.getAttribute('data-agent-type');
       if (!type) return;
       
@@ -663,44 +700,31 @@ export class LobbyUI {
       const costText = card.querySelector('.cost-text');
 
       if (isUnlocked) {
-        card.classList.remove('locked');
         card.classList.add('purchased');
+        if (card.classList.contains('shop-vert-card')) {
+          card.classList.add('card-glow-green');
+        }
         if (costText) {
-          costText.textContent = (type === 'scout') ? "STARTER" : "UNLOCKED";
-          costText.style.color = "var(--primary-green-dark)";
+          costText.textContent = "UNLOCKED";
+          costText.style.color = "#27ae60";
         }
         if (btn) {
-          btn.textContent = "UNLOCKED";
+          btn.textContent = "✓ UNLOCKED";
+          btn.className = "btn btn-shop-action btn-unlocked-pill";
           btn.disabled = true;
-          btn.style.opacity = '0.6';
-          btn.style.background = '#bdc3c7';
-          btn.style.borderColor = 'var(--border-color)';
-          btn.style.boxShadow = 'none';
         }
       } else {
-        card.classList.add('locked');
-        card.classList.remove('purchased');
+        card.classList.remove('purchased', 'card-glow-green');
         const cost = parseInt(btn ? btn.getAttribute('data-cost') : '0') || 0;
         
         if (costText) {
-          costText.innerHTML = `<img src="https://img.icons8.com/color/48/coins.png" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;" /> ${cost.toLocaleString()}`;
+          costText.innerHTML = `<img src="https://img.icons8.com/color/48/coins.png" class="coin-icon-mini" /> ${cost.toLocaleString()}`;
           costText.style.color = "var(--primary-orange)";
         }
         if (btn) {
           btn.textContent = "BUY";
-          btn.disabled = false;
-          if (coins < cost) {
-            btn.disabled = true;
-            btn.style.opacity = '0.5';
-            btn.style.background = '#e74c3c';
-            btn.style.borderColor = 'var(--border-color)';
-            btn.style.boxShadow = 'none';
-          } else {
-            btn.style.opacity = '1.0';
-            btn.style.background = 'var(--primary-green)';
-            btn.style.borderColor = 'var(--border-color)';
-            btn.style.boxShadow = '0 3px 0 var(--primary-green-dark)';
-          }
+          btn.disabled = (coins < cost);
+          btn.style.opacity = (coins < cost) ? '0.5' : '1.0';
         }
       }
     });
@@ -737,7 +761,7 @@ export class LobbyUI {
       }
     });
 
-    this.shopCards = document.querySelectorAll('.shop-card');
+    this.shopCards = document.querySelectorAll('.shop-wide-card, .shop-vert-card, .shop-card');
     this.shopCards.forEach(card => {
       const canvas = card.querySelector('.agent-preview-canvas');
       const type = card.getAttribute('data-agent-type');
