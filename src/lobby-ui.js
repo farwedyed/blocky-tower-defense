@@ -234,7 +234,8 @@ export class LobbyUI {
         const btn = e.target.closest('.btn-shop-action');
         if (!btn || btn.disabled) return;
 
-        const card = btn.closest('.shop-card');
+        // Searches for any card with data-agent-type (works for wide, vert, and standard cards)
+        const card = btn.closest('[data-agent-type]');
         if (!card) return;
 
         const type = card.getAttribute('data-agent-type');
@@ -296,8 +297,22 @@ export class LobbyUI {
         tabCoinsRemaining.textContent = `${remaining} / 5 ADS`;
       }
       if (btnTabWatchAd) {
-        const rewardSpan = btnTabWatchAd.querySelector('.btn-ad-reward');
-        const headingSpan = btnTabWatchAd.querySelector('.btn-ad-heading');
+        let rewardSpan = btnTabWatchAd.querySelector('.btn-ad-reward');
+        let headingSpan = btnTabWatchAd.querySelector('.btn-ad-heading');
+
+        // Automatically rebuild the styled HTML structure if it was ever lost
+        if (!headingSpan || !rewardSpan) {
+          btnTabWatchAd.innerHTML = `
+            <img src="assets/ui/ads/sprite_02.png" class="btn-ad-play-icon" alt="" />
+            <div class="btn-ad-text-group">
+              <span class="btn-ad-heading">WATCH AD</span>
+              <span class="btn-ad-reward">+150 COINS</span>
+            </div>
+          `;
+          headingSpan = btnTabWatchAd.querySelector('.btn-ad-heading');
+          rewardSpan = btnTabWatchAd.querySelector('.btn-ad-reward');
+        }
+
         if (remaining <= 0) {
           btnTabWatchAd.disabled = true;
           btnTabWatchAd.classList.add('disabled');
@@ -337,7 +352,12 @@ export class LobbyUI {
         if (count >= 5) return;
 
         btnTabWatchAd.disabled = true;
-        btnTabWatchAd.textContent = "LOADING AD...";
+
+        // Keep the play icon, styles, and fonts intact while showing clean status
+        const headingSpan = btnTabWatchAd.querySelector('.btn-ad-heading');
+        const rewardSpan = btnTabWatchAd.querySelector('.btn-ad-reward');
+        if (headingSpan) headingSpan.textContent = "PREPARING AD...";
+        if (rewardSpan) rewardSpan.textContent = "PLEASE WAIT...";
 
         CrazyGamesManager.requestRewardedAd(
           () => {
@@ -351,8 +371,7 @@ export class LobbyUI {
             updateCoinsTabState();
           },
           () => {
-            // Error or closed early
-            btnTabWatchAd.disabled = false;
+            // Ad error, canceled, or closed early
             updateCoinsTabState();
           }
         );
@@ -413,11 +432,25 @@ export class LobbyUI {
   }
 
   buyAgentFromShopDirect(type, cost) {
-    if (this.game.playerCoins >= cost) {
-      this.game.playerCoins -= cost;
-      this.game.unlockedAgents.push(type);
+    // Sanitize coins to guarantee it is always a pure valid number (strips any commas)
+    const rawCoins = typeof this.game.playerCoins === 'string'
+      ? parseInt(this.game.playerCoins.replace(/,/g, ''), 10)
+      : Number(this.game.playerCoins);
+
+    const safeCoins = isNaN(rawCoins) ? 0 : rawCoins;
+    this.game.playerCoins = safeCoins;
+
+    if (safeCoins >= cost) {
+      this.game.playerCoins = safeCoins - cost;
+      if (!this.game.unlockedAgents.includes(type)) {
+        this.game.unlockedAgents.push(type);
+      }
+      if (this.game.equippedAgents.length < 5 && !this.game.equippedAgents.includes(type)) {
+        this.game.equippedAgents.push(type);
+      }
       this.game.saveStatsToStorage();
       this.updateLobbyMeta(this.game.playerLevel, this.game.playerXp, this.game.playerCoins);
+      this.renderLoadoutConfig();
       this.game.effectManager.spawnText(400, 260, "AGENT RECRUITED!", '#2ecc71');
       soundManager.playPlace();
     } else {

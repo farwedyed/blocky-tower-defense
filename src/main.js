@@ -1430,9 +1430,23 @@ class Game {
     return '#e0e7ff';                  // Silver
   }
 }
-window.addEventListener('DOMContentLoaded', () => {
-  new Game();
-});
+window.unlockAllAgents = function() {
+  if (window.game) {
+    window.game.unlockedAgents = [
+      'scout', 'soldier', 'sniper', 'demoman',
+      'farm', 'medic', 'pyromancer', 'rocketeer', 'freezer', 'crook_boss', 'military_base',
+      'minigunner', 'commander', 'dj', 'ranger', 'turret',
+      'gladiator'
+    ];
+    window.game.saveStatsToStorage();
+    if (window.game.ui && window.game.ui.lobby) {
+      window.game.ui.lobby.updateLobbyMeta(window.game.playerLevel, window.game.playerXp, window.game.playerCoins);
+      window.game.ui.lobby.renderLoadoutConfig();
+    }
+    console.log("👑 All Squad Agents Unlocked & Saved to Loadout!");
+  }
+};
+
 window.addEventListener('DOMContentLoaded', () => {
   new Game();
 });

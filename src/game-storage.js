@@ -74,7 +74,10 @@ export async function loadStatsFromStorage(game) {
 
     if (level) game.playerLevel = parseInt(level);
     if (xp) game.playerXp = parseInt(xp);
-    if (coins) game.playerCoins = parseInt(coins);
+    if (coins) {
+      const clean = parseInt(String(coins).replace(/,/g, ''), 10);
+      game.playerCoins = isNaN(clean) ? 150 : clean;
+    }
     
     if (unlocked) game.unlockedAgents = JSON.parse(unlocked);
     if (equipped) game.equippedAgents = JSON.parse(equipped);

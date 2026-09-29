@@ -342,17 +342,27 @@ export const CrazyGamesManager = {
    */
   requestRewardedAd: function(onRewardEarned, onAdError) {
     let finishedCalled = false;
+    let safetyTimeout = null;
+
     const safeFinish = () => {
       if (finishedCalled) return;
       finishedCalled = true;
+      if (safetyTimeout) clearTimeout(safetyTimeout);
       if (onRewardEarned) onRewardEarned();
     };
 
-    // Safety timeout
-    let safetyTimeout = setTimeout(() => {
-      console.warn('[CrazyGames] Rewarded Ad failed to start.');
+    const safeError = () => {
+      if (finishedCalled) return;
+      finishedCalled = true;
+      if (safetyTimeout) clearTimeout(safetyTimeout);
       if (onAdError) onAdError();
-    }, 2000);
+    };
+
+    // 7-second safety timeout so network latency doesn't prematurely kill the ad
+    safetyTimeout = setTimeout(() => {
+      console.warn('[CrazyGames] Rewarded Ad request timed out.');
+      safeError();
+    }, 7000);
 
     if (this.sdk && this.isInitialized && this.sdk.ad) {
       const originalSoundState = soundManager.enabled;
@@ -360,7 +370,7 @@ export const CrazyGamesManager = {
       try {
         this.sdk.ad.requestAd("rewarded", {
           adStarted: () => {
-            clearTimeout(safetyTimeout);
+            if (safetyTimeout) clearTimeout(safetyTimeout);
             soundManager.setEnabled(false); // Mute sound during ads
             if (typeof soundManager.muteMusic === 'function') {
               soundManager.muteMusic();
@@ -381,18 +391,15 @@ export const CrazyGamesManager = {
               soundManager.unmuteMusic();
             }
             console.warn('[CrazyGames] Rewarded Ad failed or skipped:', error);
-            clearTimeout(safetyTimeout);
-            if (onAdError) onAdError(); // Do not trigger reward
+            safeError();
           }
         });
       } catch (e) {
-        clearTimeout(safetyTimeout);
         console.warn('[CrazyGames] Failed to request rewarded ad:', e);
-        if (onAdError) onAdError();
+        safeError();
       }
     } else {
-      clearTimeout(safetyTimeout);
-      if (onAdError) onAdError();
+      safeError();
     }
   },
 

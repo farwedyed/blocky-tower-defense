@@ -3256,7 +3256,7 @@ button.btn-unlocked-pill,
   flex-direction: column !important;
   align-items: center !important;
   justify-content: space-between !important;
-  height: 250px !important;
+  height: 258px !important;
   box-sizing: border-box;
   text-align: center;
 }
@@ -3289,10 +3289,11 @@ button.btn-unlocked-pill,
 }
 
 .vert-stats {
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   font-weight: 900;
   color: #64748b;
   margin: 1px 0;
+  white-space: nowrap;
 }
 
 .vert-desc {
@@ -5666,8 +5667,8 @@ button.btn-unlocked-pill,
 }
 
 #player-xp-fill {
-  transform: translate(10px, 0px) scale(0.97) !important;
-  width: 79px !important;
+  transform: translate(10px, 0px) !important;
+  transform-origin: left center !important;
   height: 39px !important;
 }
 
