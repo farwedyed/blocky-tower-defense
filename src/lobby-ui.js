@@ -102,14 +102,11 @@ export class LobbyUI {
   }
 
   updateCgProfileUI(user) {
-    const avatarFallback = document.getElementById('avatar-fallback');
-
     if (user) {
       if (this.cgUsername) this.cgUsername.textContent = user.username;
-      if (this.cgAvatar && user.profilePictureUrl) {
-        this.cgAvatar.src = user.profilePictureUrl;
+      if (this.cgAvatar) {
+        this.cgAvatar.src = user.profilePictureUrl || 'assets/ui/menu/sprite_23.png';
         this.cgAvatar.style.display = 'block';
-        if (avatarFallback) avatarFallback.style.display = 'none';
       }
       if (this.btnCgAuth) {
         this.btnCgAuth.style.display = 'none';
@@ -126,9 +123,8 @@ export class LobbyUI {
         this.cgAvatar.src = 'assets/ui/menu/sprite_23.png';
         this.cgAvatar.style.display = 'block';
       }
-      if (avatarFallback) avatarFallback.style.display = 'block';
       if (this.btnCgAuth) {
-        this.btnCgAuth.style.display = 'block';
+        this.btnCgAuth.style.display = 'none';
       }
     }
   }
@@ -718,7 +714,7 @@ export class LobbyUI {
         const cost = parseInt(btn ? btn.getAttribute('data-cost') : '0') || 0;
         
         if (costText) {
-          costText.innerHTML = `<img src="https://img.icons8.com/color/48/coins.png" class="coin-icon-mini" /> ${cost.toLocaleString()}`;
+          costText.innerHTML = `<img src="assets/ui/solo/selectdifficulty/sprite_20.png" class="coin-icon-mini" /> ${cost.toLocaleString()}`;
           costText.style.color = "var(--primary-orange)";
         }
         if (btn) {

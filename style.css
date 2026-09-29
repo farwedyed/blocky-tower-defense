@@ -3280,10 +3280,12 @@ button.btn-unlocked-pill,
 }
 
 .coin-icon-mini {
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
   vertical-align: middle;
-  margin-right: 2px;
+  margin-right: 3px;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.25));
 }
 
 .vert-stats {
@@ -5702,21 +5704,21 @@ button.btn-unlocked-pill,
 }
 
 #btn-add-coins {
-  transform: translate(247px, -25px) scale(1.6) !important;
+  transform: translate(228px, -25px) scale(1.45) !important;
   transform-origin: center center !important;
   width: 48px !important;
   height: 48px !important;
 }
 
 #btn-add-coins:hover {
-  transform: translate(247px, -25px) scale(1.8) !important;
+  transform: translate(228px, -25px) scale(1.6) !important;
   scale: none !important;
   transform-origin: center center !important;
   filter: brightness(1.2) drop-shadow(0 4px 10px rgba(46, 204, 113, 0.6)) !important;
 }
 
 #btn-add-coins:active {
-  transform: translate(247px, -25px) scale(1.5) !important;
+  transform: translate(228px, -25px) scale(1.35) !important;
   scale: none !important;
   transform-origin: center center !important;
 }
@@ -5840,9 +5842,16 @@ button.btn-unlocked-pill,
 }
 
 #btn-return-lobby {
-  width: 115px !important;
-  height: 32px !important;
+  width: auto !important;
+  min-width: 120px !important;
+  height: 36px !important;
   font-size: 12px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 12px !important;
 }
 
 /* ─── DIFFICULTY SCREEN TUNING (MERGED SURGICAL EDITS) ─── */
