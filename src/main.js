@@ -6,7 +6,6 @@ import { UI } from './ui.js';
 import { EffectManager } from './particle.js';
 import { Enemy } from './enemy.js';
 import { soundManager } from './sound.js';
-import { updateSessionTelemetry } from './firebase.js';
 import { Network } from './network.js';
 import { CrazyGamesManager } from './crazygames.js';
 import { initWaveData } from './waves.js';
@@ -236,16 +235,34 @@ class Game {
               isInstantMulti = false;
             }
 
-            if (isInstantMulti || startupRoomId) {
+            // Invite opened through the CrazyGames SDK (friend invite link / "Join" button)
+            const sdkInviteRoomId = CrazyGamesManager.getStartupInviteRoomId();
+            // A join may already be running (the SDK invite can fire while the loader is still up)
+            const joinAlreadyRunning = Network.isJoining || (Network.mode !== 'OFFLINE' && !!Network.roomId);
+
+            if (isInstantMulti || startupRoomId || sdkInviteRoomId || joinAlreadyRunning) {
               console.log('[CrazyGames] Multiplayer join/host triggered on launch. Bypassing onboarding.');
               this.tutorialCompleted = true;
               this.tutorialActive = false;
               this.saveStatsToStorage();
 
-              if (startupRoomId) {
-                this.handleCrazyGamesInvite(startupRoomId);
+              if (startupRoomId || sdkInviteRoomId) {
+                // No-op if that same join is already in progress; it just re-shows the room UI
+                this.handleCrazyGamesInvite(startupRoomId || sdkInviteRoomId);
+              } else if (joinAlreadyRunning) {
+                const coop = this.ui && this.ui.lobby ? this.ui.lobby.coop : null;
+                if (coop) {
+                  if (Network.isJoining) coop.showCoopConnectingState(Network.attemptedRoomCode || null);
+                  else coop.showCoopLobbyState();
+                }
               } else {
                 this.autoHostMultiplayerLobby();
+              }
+
+              if (this.ui && this.ui.lobby) {
+                this.ui.lobby.drawAllStaticPreviews();
+                this.ui.lobby.renderDailyQuests();
+                this.ui.lobby.renderLeaderboard(this.selectedMap);
               }
               return;
             }
@@ -416,70 +433,71 @@ class Game {
     this.ui.startUnboxingAnimation(crateType, chosenAgent, chosenRarity, revealedSkinName);
   }
 
+  /**
+   * Joins a friend's squad from a CrazyGames invite (invite link, friends list
+   * "Join" button, or ?roomId= on launch) and routes the player straight to the
+   * multiplayer room UI. A "JOINING SQUAD..." card is shown while connecting;
+   * Network.handleJoinError() shows a clear message (room full / not found /
+   * timeout) and returns the player to the menu if it fails.
+   */
   handleCrazyGamesInvite(roomId) {
-    if (this.state !== 'lobby') return;
-    
-    Network.mode = 'CLIENT';
+    if (!roomId) return;
+    const code = String(roomId).trim().toLowerCase();
+    if (!code) return;
+
+    // Invite accepted mid-match: join as soon as the player is back in the lobby
+    if (this.state !== 'lobby') {
+      this.pendingInviteRoomId = code;
+      console.log('[CrazyGames] Invite received during a match. Will join room', code, 'after returning to the lobby.');
+      return;
+    }
+    this.pendingInviteRoomId = null;
+
+    const coop = this.ui && this.ui.lobby ? this.ui.lobby.coop : null;
+
+    // Already joining that exact room (e.g. SDK invite fired during loading): just show it
+    if (Network.isJoining && (Network.attemptedRoomCode || '').toLowerCase() === code) {
+      if (coop) coop.showCoopConnectingState(code.toUpperCase());
+      return;
+    }
+
+    // Already in that exact room: just show it
+    if (Network.mode !== 'OFFLINE' && Network.roomId && Network.roomId.toLowerCase() === code && !Network.isJoining) {
+      if (coop) coop.showCoopLobbyState();
+      return;
+    }
+
+    // Leave any other room cleanly before joining the new one
+    if (Network.mode !== 'OFFLINE' || Network.roomId) {
+      Network.intentionalDisconnect = true;
+      Network.disconnect();
+    }
+
     const nameInput = document.getElementById('input-player-name');
-    const name = nameInput ? nameInput.value.trim() : "";
+    const typedName = nameInput ? nameInput.value.trim() : "";
     const activeName = (CrazyGamesManager.currentUser && CrazyGamesManager.currentUser.username)
-        || name || localStorage.getItem('tds_player_username') || "Guest";
-    
-    const joinCodeInput = document.getElementById('input-join-code');
-    if (joinCodeInput) joinCodeInput.value = roomId.toUpperCase();
+        || typedName || localStorage.getItem('tds_player_username') || "Guest";
     if (nameInput && !nameInput.value) nameInput.value = activeName;
 
-    const splash = document.getElementById('lobby-splash-container');
-    if (splash) splash.style.display = 'none';
+    const joinCodeInput = document.getElementById('input-join-code');
+    if (joinCodeInput) joinCodeInput.value = code.toUpperCase();
 
-    const coopHeaderPanel = document.getElementById('coop-header-panel');
-    if (coopHeaderPanel) coopHeaderPanel.classList.remove('hidden');
-    
-    const coopControls = document.getElementById('coop-setup-controls');
-    if (coopControls) coopControls.classList.add('hidden');
-    
-    const coopLobbyStatus = document.getElementById('coop-lobby-status-container');
-    if (coopLobbyStatus) coopLobbyStatus.classList.remove('hidden');
+    // Route to the multiplayer room UI right away (connecting state)
+    if (coop) coop.showCoopConnectingState(code.toUpperCase());
 
-    const coopLobbyFooter = document.getElementById('coop-footer-panel');
-    if (coopLobbyFooter) {
-      coopLobbyFooter.classList.remove('hidden');
-      coopLobbyFooter.style.display = 'block';
-    }
-    
-    const usernameContainer = document.getElementById('username-container');
-    if (usernameContainer) usernameContainer.style.display = 'none';
-    
-    const labelStatus = document.getElementById('label-lobby-status');
-    if (labelStatus) {
-      labelStatus.textContent = "CONNECTING...";
-      labelStatus.style.color = "var(--primary-orange)";
-    }
+    Network.join(code, activeName, () => {
+      if (coop) coop.showCoopLobbyState();
 
-    Network.join(roomId.toLowerCase(), activeName, () => {
-      const labelRoomCode = document.getElementById('label-room-code');
-      if (labelRoomCode) labelRoomCode.textContent = `ROOM CODE: ${roomId.toUpperCase()}`;
-
-      // Unhide copy link button when joining through CrazyGames invite link
       const copyCodeBtn = document.getElementById('btn-copy-code');
       if (copyCodeBtn) copyCodeBtn.classList.remove('hidden');
-      
-      if (labelStatus) {
-        labelStatus.textContent = "IN SQUAD (WAITING FOR LEADER)";
-        labelStatus.style.color = "var(--primary-blue)";
-      }
-      this.ui.lobby.updateCoopPlayerList();
-      this.ui.lobby.toggleSoloElements(false);
+
       Network.syncRoomPresence();
     }, true);
   }
-  
+
   autoHostMultiplayerLobby() {
-    const splash = document.getElementById('lobby-splash-container');
-    if (splash) splash.style.display = 'none';
-    
-    const coopHeaderPanel = document.getElementById('coop-header-panel');
-    if (coopHeaderPanel) coopHeaderPanel.classList.remove('hidden');
+    const coop = this.ui && this.ui.lobby ? this.ui.lobby.coop : null;
+    if (coop) coop.showCoopConnectingState(null);
 
     const nameInput = document.getElementById('input-player-name');
     if (nameInput) {
@@ -831,7 +849,7 @@ class Game {
     if (Network.mode === 'OFFLINE' && !isTutorial) {
       CrazyGamesManager.requestMidgameAd(() => {
         this.continueDeployment(isTutorial);
-      });
+      }, 'match_start');
     } else {
       this.continueDeployment(isTutorial);
     }
@@ -843,12 +861,12 @@ class Game {
       this.completedWaves = 0;      // Track waves survived with effort
       this.isTutorialMatch = isTutorial || (this.tutorialActive && (typeof Network === 'undefined' || Network.mode === 'OFFLINE'));
       this.state = 'playing';
+      window.dispatchEvent(new CustomEvent('btd:gameplay-start'));
       this.showMapDirections = true;
       this.autoStartTimer = 0; 
       
       this.grid.selectMap(this.selectedMap);
 
-      updateSessionTelemetry({ deployed: true, selectedMap: this.selectedMap });
       
       const diffConfig = this.difficultySettings[this.selectedDifficulty];
 
@@ -951,6 +969,14 @@ class Game {
       awardMatchRewards(this);
     }
     
+    const processPendingInvite = () => {
+      if (this.pendingInviteRoomId) {
+        const pending = this.pendingInviteRoomId;
+        this.pendingInviteRoomId = null;
+        setTimeout(() => this.handleCrazyGamesInvite(pending), 0);
+      }
+    };
+
     const returnAction = () => {
       this.state = 'lobby';
       this.waveInProgress = false;
@@ -958,11 +984,13 @@ class Game {
       if (Network.mode === 'HOST' && Network.roomId) {
         Network.syncRoomPresence();
       }
+      processPendingInvite();
     };
 
     if (Network.mode !== 'OFFLINE' && !forceDisconnect) {
       this.state = 'lobby';
       this.ui.showLobbyLayout();
+      processPendingInvite();
 
       if (Network.mode === 'HOST') {
         Network.syncRoomPresence();
@@ -987,7 +1015,7 @@ class Game {
         window.lobbyPlayers = { p1: "Host Survivor", p2: "", p3: "", p4: "", p5: "", p6: "", p7: "", p8: "" };
         window.myPlayerId = "p1";
 
-        CrazyGamesManager.requestMidgameAd(returnAction);
+        CrazyGamesManager.requestMidgameAd(returnAction, 'multiplayer_quit');
       } else {
         returnAction();
       }

@@ -77,6 +77,10 @@ export async function startSessionTelemetry(username, isLoggedIn) {
   const deviceType = isMobile ? "Mobile" : "Desktop";
 
   try {
+    _retention = _computeRetention();
+    const level = parseInt(_lsGet('tds_level') || '1', 10) || 1;
+    const coins = parseInt(String(_lsGet('tds_coins') || '0').replace(/,/g, ''), 10) || 0;
+
     // 1. Create/Update the master device document
     await db.collection('devices').doc(currentDeviceId).set({
       deviceId: currentDeviceId,
@@ -85,6 +89,12 @@ export async function startSessionTelemetry(username, isLoggedIn) {
       deviceType: deviceType,
       browser: browser,
       userAgent: ua,
+      firstSeen: _retention.first,
+      lastSeen: _retention.today,
+      retentionDay: _retention.dayIndex,
+      activeDays: firebase.firestore.FieldValue.arrayUnion(_retention.dayIndex),
+      level: level,
+      coins: coins,
       lastActive: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
 
@@ -93,12 +103,15 @@ export async function startSessionTelemetry(username, isLoggedIn) {
       sessionId: currentSessionId,
       startTime: firebase.firestore.FieldValue.serverTimestamp(),
       totalSessionTime: 0,
-      deployed: false,
-      selectedMap: "none",
-      clicks: [],
-      consoleLogs: [],
+      retentionDay: _retention.dayIndex,
+      startLevel: level,
+      startCoins: coins,
+      reachedGameplay: false,
       lastActive: firebase.firestore.FieldValue.serverTimestamp()
     });
+
+    // 3. Aggregate retention / daily counters (never blocks the game)
+    _writeRetentionCounters(_retention).catch(e => console.warn('[Firebase Telemetry] Retention update failed:', e.message));
 
     console.log('[Firebase Telemetry] Device registered:', currentDeviceId, 'Session nested:', currentSessionId);
     return currentSessionId;
@@ -108,8 +121,135 @@ export async function startSessionTelemetry(username, isLoggedIn) {
   }
 }
 
+// ─── RETENTION + CONVERSION (aggregate counters, cheap to read in the console) ───
+// retention/{YYYY-MM-DD of first visit}: players, d1, d2, d7
+//   D1 retention for that day = d1 / players (same for d2, d7)
+// daily/{YYYY-MM-DD}: sessions, gameplaySessions, newPlayers, returningSessions
+//   Gameplay conversion for that day = gameplaySessions / sessions
+
+function _localDateStr(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function _daysBetween(fromStr, toStr) {
+  const [y1, m1, d1] = fromStr.split('-').map(Number);
+  const [y2, m2, d2] = toStr.split('-').map(Number);
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000);
+}
+
+function _lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function _lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
 /**
- * Appends interactive clicks and console telemetry to the active nested session document.
+ * Works out this player's retention day from their first visit date (kept in
+ * localStorage) and bumps the cohort + daily counters. Each milestone is only
+ * counted once per player. Returns info that is also stored on the device doc.
+ */
+function _computeRetention() {
+  const today = _localDateStr();
+  let first = _lsGet('tds_ret_first');
+  let isNew = false;
+  let legacy = _lsGet('tds_ret_legacy') === 'true';
+
+  if (!first) {
+    first = today;
+    _lsSet('tds_ret_first', first);
+    // Players who already had progress before retention tracking existed are not
+    // a real "day 0" — keep them out of the cohort numbers.
+    const hadProgress = _lsGet('tds_tutorial_completed') === 'true' || parseInt(_lsGet('tds_level') || '1', 10) > 1;
+    if (hadProgress) {
+      legacy = true;
+      _lsSet('tds_ret_legacy', 'true');
+    } else {
+      isNew = true;
+    }
+  }
+
+  const dayIndex = Math.max(0, _daysBetween(first, today));
+  let counted = [];
+  try { counted = JSON.parse(_lsGet('tds_ret_counted') || '[]'); } catch (e) { counted = []; }
+
+  const milestones = [];
+  if (!legacy) {
+    for (const n of [1, 2, 7]) {
+      if (dayIndex === n && !counted.includes(n)) {
+        milestones.push(n);
+        counted.push(n);
+      }
+    }
+    if (milestones.length) _lsSet('tds_ret_counted', JSON.stringify(counted));
+  }
+
+  // Count the session only once per page load
+  return { today, first, dayIndex, isNew, legacy, milestones };
+}
+
+let _retention = null;
+let _gameplayCounted = false;
+
+async function _writeRetentionCounters(info) {
+  const inc = firebase.firestore.FieldValue.increment;
+  const daily = { sessions: inc(1) };
+  if (info.isNew) daily.newPlayers = inc(1);
+  if (info.dayIndex > 0) daily.returningSessions = inc(1);
+  await db.collection('daily').doc(info.today).set(daily, { merge: true });
+
+  if (info.isNew || info.milestones.length) {
+    const cohort = {};
+    if (info.isNew) cohort.players = inc(1);
+    for (const n of info.milestones) cohort['d' + n] = inc(1);
+    await db.collection('retention').doc(info.first).set(cohort, { merge: true });
+  }
+}
+
+/**
+ * Call once when the player first enters a match this page load.
+ * Counts the session as "converted" for the daily gameplay conversion rate.
+ */
+export async function trackGameplayConversion() {
+  if (_gameplayCounted || !isUsingFirebase || !db || !currentSessionId || !_retention) return;
+  _gameplayCounted = true;
+  try {
+    await db.collection('daily').doc(_retention.today).set({
+      gameplaySessions: firebase.firestore.FieldValue.increment(1)
+    }, { merge: true });
+  } catch (e) {
+    console.warn('[Firebase Telemetry] Conversion update failed:', e.message);
+  }
+}
+
+/**
+ * Counts an ad the player actually watched.
+ * devices/{id}: rewardedAdsTotal, midgameAdsTotal, adsByDay.{date}.rewarded / .midgame,
+ *               rewardedByPlacement.{placement}
+ * daily/{date}: rewardedAds, midgameAds
+ */
+export async function trackAdWatched(kind, placement) {
+  if (!isUsingFirebase || !db || !currentSessionId || !currentDeviceId) return;
+  if (kind !== 'rewarded' && kind !== 'midgame') return;
+  const inc = firebase.firestore.FieldValue.increment;
+  const today = _localDateStr();
+  const safePlacement = String(placement || 'unknown').replace(/[^a-z0-9_]/gi, '_');
+  try {
+    const device = {
+      [kind === 'rewarded' ? 'rewardedAdsTotal' : 'midgameAdsTotal']: inc(1),
+      adsByDay: { [today]: { [kind]: inc(1) } }
+    };
+    if (kind === 'rewarded') device.rewardedByPlacement = { [safePlacement]: inc(1) };
+    await db.collection('devices').doc(currentDeviceId).set(device, { merge: true });
+    await db.collection('daily').doc(today).set({
+      [kind === 'rewarded' ? 'rewardedAds' : 'midgameAds']: inc(1)
+    }, { merge: true });
+  } catch (e) {
+    console.warn('[Firebase Telemetry] Ad tracking failed:', e.message);
+  }
+}
+
+/**
+ * Updates the active session document.
  */
 export async function updateSessionTelemetry(updates) {
   initFirebase();
@@ -119,26 +259,6 @@ export async function updateSessionTelemetry(updates) {
     const docRef = db.collection('devices').doc(currentDeviceId).collection('sessions').doc(currentSessionId);
     const formattedUpdates = { ...updates };
     formattedUpdates.lastActive = firebase.firestore.FieldValue.serverTimestamp();
-
-    // Process and unpack the raw batch array of click objects
-    if (updates.click) {
-      if (Array.isArray(updates.click)) {
-        formattedUpdates.clicks = firebase.firestore.FieldValue.arrayUnion(...updates.click);
-      } else {
-        formattedUpdates.clicks = firebase.firestore.FieldValue.arrayUnion(updates.click);
-      }
-      delete formattedUpdates.click;
-    }
-
-    // Process and unpack the raw batch array of log objects
-    if (updates.log) {
-      if (Array.isArray(updates.log)) {
-        formattedUpdates.consoleLogs = firebase.firestore.FieldValue.arrayUnion(...updates.log);
-      } else {
-        formattedUpdates.consoleLogs = firebase.firestore.FieldValue.arrayUnion(updates.log);
-      }
-      delete formattedUpdates.log;
-    }
 
     // Use set with merge: true to avoid "No document to update" errors entirely
     await docRef.set(formattedUpdates, { merge: true });
@@ -199,10 +319,32 @@ export async function uploadRecord(mapId, entry) {
   }
 }
 
+// Leaderboard reads are cached so opening the menu / switching maps doesn't hit
+// Firestore every time (each fetch costs 5 document reads; the free plan allows 50,000/day).
+const LEADERBOARD_CACHE_MS = 10 * 60 * 1000;
+const _lbCache = {};     // mapId -> { at, records }
+const _lbInFlight = {};  // mapId -> Promise
+
 /**
- * Fetches the top 5 records for a map.
+ * Fetches the top 5 records for a map (cached for 10 minutes).
+ * Pass { force: true } right after uploading a new record.
  */
-export async function fetchTopRecords(mapId) {
+export async function fetchTopRecords(mapId, opts = {}) {
+  const cached = _lbCache[mapId];
+  if (!opts.force && cached && Date.now() - cached.at < LEADERBOARD_CACHE_MS) {
+    return cached.records;
+  }
+  if (!opts.force && _lbInFlight[mapId]) return _lbInFlight[mapId];
+
+  const p = _fetchTopRecordsUncached(mapId).then(records => {
+    _lbCache[mapId] = { at: Date.now(), records };
+    return records;
+  }).finally(() => { delete _lbInFlight[mapId]; });
+  _lbInFlight[mapId] = p;
+  return p;
+}
+
+async function _fetchTopRecordsUncached(mapId) {
   initFirebase();
   if (isUsingFirebase && db) {
     try {

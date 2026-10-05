@@ -48,7 +48,7 @@ export class LobbyCoop {
 
         <div class="splash-podium-content">
           <img src="assets/ui/menu/sprite_16.png" class="splash-title-img" alt="Select Gameplay Mode" />
-          <p class="splash-subtext">Equip loadouts and enter solo battlegrounds or create<br>high-tactical co-op squad parties with friends!</p>
+          <p class="splash-subtext">Equip loadouts and enter solo battlegrounds or create high-tactical co-op squad parties with friends!</p>
           <div class="splash-action-row">
             <button id="btn-select-solo" class="btn-splash-solo">
               <img src="assets/ui/menu/sprite_19.png" class="splash-btn-icon" /> PLAY SOLO
@@ -143,6 +143,13 @@ export class LobbyCoop {
           </div>
         </div>
 
+        <!-- Connecting state (joining from an invite / auto-hosting) -->
+        <div id="coop-connecting-card" class="coop-connecting-card hidden">
+          <div class="coop-connecting-spinner"></div>
+          <div class="coop-connecting-title" id="coop-connecting-title">JOINING SQUAD...</div>
+          <div class="coop-connecting-sub" id="coop-connecting-sub">Connecting to your friend's room</div>
+        </div>
+
         <!-- Squad Roster Grid (8 Styled Slots) -->
         <div class="coop-roster-section">
           <div class="coop-section-label">SQUAD MEMBERS (<span id="coop-count-label">1/8</span>)</div>
@@ -180,14 +187,14 @@ export class LobbyCoop {
               <canvas class="map-preview-canvas" width="120" height="90"></canvas>
               <div class="map-info">
                 <span class="name">Cyber City</span>
-                <span class="difficulty locked-badge">LOCKED (LVL 5)</span>
+                <span class="difficulty locked-badge">🔒 REQ. LVL 5</span>
               </div>
             </button>
             <button class="map-card coop-map-card" data-map-id="fallen_outpost">
               <canvas class="map-preview-canvas" width="120" height="90"></canvas>
               <div class="map-info">
                 <span class="name">Fallen Outpost</span>
-                <span class="difficulty locked-badge">LOCKED (LVL 10)</span>
+                <span class="difficulty locked-badge">🔒 REQ. LVL 10</span>
               </div>
             </button>
           </div>
@@ -234,6 +241,7 @@ export class LobbyCoop {
   }
 
   showSplashState() {
+    this.clearConnectingState();
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     const mapTab = document.querySelector('.tab-btn[data-target="panel-maps"]');
     if (mapTab) mapTab.classList.add('active');
@@ -272,7 +280,86 @@ export class LobbyCoop {
     }
   }
 
+  /**
+   * Shows the multiplayer room UI in a "connecting" state. Used when a player
+   * joins a friend through a CrazyGames invite (or instant multiplayer
+   * auto-host) so they never land on an empty menu panel.
+   * @param {string|null} roomCode  room being joined, or null when hosting
+   */
+  showCoopConnectingState(roomCode) {
+    // Make the Map Select tab + panel the visible ones
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    const mapTab = document.querySelector('.tab-btn[data-target="panel-maps"]');
+    if (mapTab) mapTab.classList.add('active');
+    document.querySelectorAll('.lobby-panel').forEach(p => {
+      p.classList.remove('active');
+      p.style.display = '';
+    });
+    const panelMaps = document.getElementById('panel-maps');
+    if (panelMaps) panelMaps.classList.add('active');
+
+    const splash = document.getElementById('lobby-splash-container');
+    if (splash) {
+      splash.style.setProperty('display', 'none', 'important');
+      splash.classList.add('hidden');
+    }
+    this.lobbyUI.toggleSoloElements(false);
+
+    const coopHeader = document.getElementById('coop-header-panel');
+    if (coopHeader) {
+      coopHeader.classList.remove('hidden');
+      coopHeader.style.setProperty('display', 'flex', 'important');
+    }
+    const setupPhase = document.getElementById('coop-setup-phase');
+    if (setupPhase) {
+      setupPhase.classList.add('hidden');
+      setupPhase.style.setProperty('display', 'none', 'important');
+    }
+    const roomPhase = document.getElementById('coop-room-phase');
+    if (roomPhase) {
+      roomPhase.classList.remove('hidden');
+      roomPhase.classList.add('is-connecting');
+      roomPhase.style.setProperty('display', 'flex', 'important');
+    }
+    const connectingCard = document.getElementById('coop-connecting-card');
+    if (connectingCard) connectingCard.classList.remove('hidden');
+
+    const title = document.getElementById('coop-connecting-title');
+    const sub = document.getElementById('coop-connecting-sub');
+    if (title) title.textContent = roomCode ? 'JOINING SQUAD...' : 'CREATING SQUAD...';
+    if (sub) sub.textContent = roomCode ? `Connecting to room ${roomCode}` : 'Setting up your multiplayer room';
+
+    const labelRoomCode = document.getElementById('label-room-code');
+    if (labelRoomCode) labelRoomCode.textContent = roomCode ? `ROOM: ${roomCode}` : 'ROOM: ------';
+    const labelStatus = document.getElementById('label-lobby-status');
+    if (labelStatus) {
+      labelStatus.textContent = 'CONNECTING...';
+      labelStatus.style.color = 'var(--primary-orange)';
+    }
+    const copyBtn = document.getElementById('btn-copy-code');
+    if (copyBtn) copyBtn.classList.add('hidden');
+    const hostPrivacyBox = document.getElementById('host-privacy-container');
+    if (hostPrivacyBox) {
+      hostPrivacyBox.classList.add('hidden');
+      hostPrivacyBox.style.display = 'none';
+    }
+
+    const btnBack = document.getElementById('btn-lobby-back');
+    if (btnBack) btnBack.style.display = 'block';
+    if (this.lobbyUI.parentUI) this.lobbyUI.parentUI.hidePointer();
+  }
+
+  clearConnectingState() {
+    const roomPhase = document.getElementById('coop-room-phase');
+    if (roomPhase) roomPhase.classList.remove('is-connecting');
+    const connectingCard = document.getElementById('coop-connecting-card');
+    if (connectingCard) connectingCard.classList.add('hidden');
+    const copyBtn = document.getElementById('btn-copy-code');
+    if (copyBtn) copyBtn.classList.remove('hidden');
+  }
+
   showCoopLobbyState() {
+    this.clearConnectingState();
     const splash = document.getElementById('lobby-splash-container');
     if (splash) {
       splash.style.setProperty('display', 'none', 'important');
@@ -329,7 +416,7 @@ export class LobbyCoop {
         clientWaitMsg.style.display = 'none';
       }
       if (labelStatus) {
-        labelStatus.textContent = "HOST (SQUAD LEADER)";
+        labelStatus.textContent = "SQUAD LEADER";
         labelStatus.style.color = "#00ffe0";
       }
       if (sectionTitle) sectionTitle.textContent = "CHOOSE BATTLEGROUND";
@@ -389,8 +476,8 @@ export class LobbyCoop {
       grassland: { name: 'Grassland', diff: 'x1.0 Coins / XP', color: '#2ecc71' },
       desert: { name: 'Desert Outpost', diff: 'x1.25 Coins / XP', color: '#e67e22' },
       tundra: { name: 'Frost Tundra', diff: 'x1.5 Coins / XP', color: '#3498db' },
-      cyber_city: { name: 'Cyber City', diff: 'x2.0 Coins / XP', color: '#9b59b6' },
-      fallen_outpost: { name: 'Fallen Outpost', diff: 'x3.0 Coins / XP', color: '#e74c3c' }
+      cyber_city: { name: 'Cyber City', diff: 'x1.0 Coins / XP', color: '#9b59b6' },
+      fallen_outpost: { name: 'Fallen Outpost', diff: 'x1.0 Coins / XP', color: '#e74c3c' }
     };
 
     const current = meta[mapId] || meta.grassland;
@@ -469,8 +556,8 @@ export class LobbyCoop {
                 </div>
                 <span class="coop-room-meta">MAP: ${mapLabel} &bull; PLAYERS: ${r.players}/${r.maxPlayers}</span>
               </div>
-              <button class="btn-coop-pill-join btn-quick-join" data-code="${r.id}" ${isFull ? 'disabled' : ''} style="height:44px; padding:0 20px; font-size:1rem;">
-                <span>${isFull ? 'FULL' : 'JOIN'}</span>
+              <button class="btn-coop-pill-join btn-quick-join" data-code="${r.id}" ${(isFull || r.inGame) ? 'disabled' : ''} title="${r.inGame ? 'This squad is already in a match' : ''}" style="height:44px; padding:0 20px; font-size:1rem;">
+                <span>${isFull ? 'FULL' : (r.inGame ? 'IN MATCH' : 'JOIN')}</span>
               </button>
             </div>
           `;

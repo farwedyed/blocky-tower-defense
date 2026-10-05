@@ -335,7 +335,8 @@ export class GameUI {
         () => {
           claimBtn.disabled = false;
           claimBtn.innerHTML = `<span style="display:inline-block; border: 2px solid #fff; border-radius: 3px; padding: 1px 5px; font-size: 0.8em; line-height: 1; margin-right: 4px;">▶</span> WATCH AD (+ $${cashCase.reward})`;
-        }
+        },
+          'cash_airdrop'
       );
     });
 
@@ -1479,7 +1480,8 @@ export class GameUI {
           () => {
             reviveBtn.disabled = false;
             reviveBtn.innerHTML = `<span style="display:inline-block; border: 2px solid #fff; border-radius: 3px; padding: 1px 5px; font-size: 0.8em; line-height: 1;">▶</span> WATCH AD TO REVIVE (+50 LIVES)`;
-          }
+          },
+          'defeat_revive'
         );
       });
     }

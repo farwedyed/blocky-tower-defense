@@ -177,6 +177,16 @@ export const Network = {
         }
     },
 
+    /** Drop cursors of players who are no longer in the room (e.g. after someone leaves). */
+    pruneStaleCursors: function() {
+        if (!window.playerCursors || !window.lobbyPlayers) return;
+        for (const pId of Object.keys(window.playerCursors)) {
+            if (!window.lobbyPlayers[pId] || pId === window.myPlayerId) {
+                delete window.playerCursors[pId];
+            }
+        }
+    },
+
     clearConnectionTimers: function() {
         if (this.connectionTimeout) {
             clearTimeout(this.connectionTimeout);
@@ -356,6 +366,7 @@ export const Network = {
         // Lobby Roster Updates (Ensures starting wallets exist and syncs 8/8 capacity with CrazyGames)
         else if (data.type === 'LOBBY_UPDATE') {
             window.lobbyPlayers = data.lobbyPlayers;
+            this.pruneStaleCursors();
             
             this.syncRoomPresence();
 
@@ -383,6 +394,10 @@ export const Network = {
         else if (data.type === 'NEW_LEADER_ANNOUNCED') {
             if (data.assignedId) window.myPlayerId = data.assignedId;
             if (data.lobbyPlayers) window.lobbyPlayers = data.lobbyPlayers;
+            // Slots were reassigned: forget cursors/host lock from the old roster
+            window.playerCursors = {};
+            this.activeStateSender = null;
+            this.lastStateFromActiveSender = 0;
             if (this.game && this.game.ui && this.game.ui.lobby) {
                 this.game.ui.lobby.updateCoopPlayerList();
             }
@@ -396,6 +411,19 @@ export const Network = {
             if (data.lobbyPlayers) window.lobbyPlayers = data.lobbyPlayers;
             if (data.selectedMap) this.game.selectedMap = data.selectedMap;
             if (data.selectedDifficulty) this.game.selectedDifficulty = data.selectedDifficulty;
+            window.playerCursors = {};
+            this.activeStateSender = null;
+
+            // A promoted player was only mirroring the old host, so its local
+            // "click the map to begin" flag and auto-wave timer were never armed.
+            // Without this the match stalled forever between waves.
+            if (this.game.state === 'playing') {
+                this.game.showMapDirections = false;
+                this.game.skipVotes = new Set();
+                if (!this.game.waveInProgress && this.game.autoMode && this.game.wave < this.game.maxWaves) {
+                    this.game.autoStartTimer = 3.0;
+                }
+            }
 
             this.syncRoomPresence();
 
@@ -410,7 +438,7 @@ export const Network = {
 
             const labelStatus = document.getElementById('label-lobby-status');
             if (labelStatus) {
-                labelStatus.textContent = "HOST (SQUAD LEADER)";
+                labelStatus.textContent = "SQUAD LEADER";
                 labelStatus.style.color = "#00ffe0";
             }
 
@@ -527,6 +555,7 @@ export const Network = {
             this.game.playerWallets = data.playerWallets || {};
 
             this.game.state = 'playing';
+            window.dispatchEvent(new CustomEvent('btd:gameplay-start'));
             this.game.tutorialActive = false;
             this.game.showMapDirections = true;
 
@@ -554,6 +583,12 @@ export const Network = {
             this.game.wave = 0;
             this.game.waveInProgress = false;
             this.game.speedMultiplier = 1;
+            this._lastUiGold = undefined;
+            this._lastUiLives = undefined;
+            this._lastUiWave = undefined;
+            this._lastUiWaveInProgress = undefined;
+            this.activeStateSender = data.senderId || null;
+            this.lastStateFromActiveSender = Date.now();
             this.game.enemies = [];
             this.game.bullets = [];
             this.game.spawnQueue = [];
@@ -654,6 +689,22 @@ export const Network = {
 
         // Replicated Game State (Client side)
         else if (data.type === 'GAME_STATE' && this.mode === 'CLIENT') {
+            // Only mirror a match we are actually in (never while sitting in the lobby)
+            if (!this.game || this.game.state === 'lobby') return;
+
+            // Only follow ONE host. During a leader hand-over two players can briefly
+            // both broadcast state; mixing them showed wave 0 with a full map of zombies.
+            const sender = data.senderId || null;
+            const now = Date.now();
+            if (sender) {
+                const lockAlive = this.activeStateSender && (now - (this.lastStateFromActiveSender || 0) < 3000);
+                if (!lockAlive) {
+                    this.activeStateSender = sender;
+                } else if (sender !== this.activeStateSender) {
+                    return;
+                }
+                this.lastStateFromActiveSender = now;
+            }
             this.applyGameState(data);
         }
 
@@ -1068,6 +1119,11 @@ export const Network = {
                 this._lastUiLives = this.game.lives;
                 this._lastUiWave = this.game.wave;
                 this.game.ui.updateHUD(this.game.lives, this.game.gold, this.game.wave, this.game.maxWaves);
+            }
+            // Show "DEFENDING..." during the host's waves instead of a stuck "WAITING FOR HOST"
+            if (this._lastUiWaveInProgress !== this.game.waveInProgress) {
+                this._lastUiWaveInProgress = this.game.waveInProgress;
+                this.game.ui.updateWaveButton(this.game.waveInProgress);
             }
         }
     },

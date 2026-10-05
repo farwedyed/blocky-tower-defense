@@ -350,7 +350,7 @@ export function saveSpeedrunRecord(game) {
   saveStatsToStorage(game);
   
   uploadRecord(game.selectedMap, entry).then(() => {
-    return fetchTopRecords(game.selectedMap);
+    return fetchTopRecords(game.selectedMap, { force: true });
   }).then(records => {
     game.leaderboard[game.selectedMap] = records;
     if (game.ui) game.ui.renderLeaderboard(game.selectedMap);

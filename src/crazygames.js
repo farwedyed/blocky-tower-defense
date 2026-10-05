@@ -2,7 +2,6 @@
 // Defensive Wrapper Module for CrazyGames SDK v3 supporting robust offline/out-of-iframe execution
 
 import { soundManager } from './sound.js';
-import { updateSessionTelemetry } from './firebase.js';
 
 export const CrazyGamesManager = {
   sdk: null,
@@ -158,9 +157,6 @@ export const CrazyGamesManager = {
         nameInput.value = cleanName;
         nameInput.disabled = true; // Do not allow manual modifications
       }
-
-      // Sync user metadata to the active Firestore telemetry session
-      updateSessionTelemetry({ username: cleanName, isLoggedIn: true });
     }
 
     // Trigger registered callback notifications for UI
@@ -279,8 +275,19 @@ export const CrazyGamesManager = {
    * Triggers a standard midgame ad break.
    * Automatically handles global game muting states during video playback.
    */
-  requestMidgameAd: function(onFinished) {
+  /**
+   * Lets the telemetry script count ads that were actually shown.
+   * kind: 'rewarded' | 'midgame', placement: where in the game it was shown.
+   */
+  reportAdWatched: function(kind, placement) {
+    try {
+      window.dispatchEvent(new CustomEvent('btd:ad-watched', { detail: { kind, placement: placement || 'unknown' } }));
+    } catch (e) {}
+  },
+
+  requestMidgameAd: function(onFinished, placement) {
     let finishedCalled = false;
+    let midgameStarted = false;
     const safeFinish = () => {
       if (finishedCalled) return;
       finishedCalled = true;
@@ -300,6 +307,7 @@ export const CrazyGamesManager = {
         this.sdk.ad.requestAd("midgame", {
           adStarted: () => {
             clearTimeout(safetyTimeout);
+            midgameStarted = true;
             soundManager.setEnabled(false); // Mute sound during ads
             if (typeof soundManager.muteMusic === 'function') {
               soundManager.muteMusic();
@@ -312,6 +320,7 @@ export const CrazyGamesManager = {
               soundManager.unmuteMusic();
             }
             console.log('[CrazyGames] Midgame Ad finished.');
+            if (midgameStarted) this.reportAdWatched('midgame', placement);
             safeFinish();
           },
           adError: (error) => {
@@ -340,7 +349,7 @@ export const CrazyGamesManager = {
    * @param {function} onRewardEarned - Callback executed ONLY if user fully watches the video
    * @param {function} onAdError - Callback executed if ad fails or is closed early
    */
-  requestRewardedAd: function(onRewardEarned, onAdError) {
+  requestRewardedAd: function(onRewardEarned, onAdError, placement) {
     let finishedCalled = false;
     let safetyTimeout = null;
 
@@ -383,6 +392,7 @@ export const CrazyGamesManager = {
               soundManager.unmuteMusic();
             }
             console.log('[CrazyGames] Rewarded Ad successfully finished.');
+            if (!finishedCalled) this.reportAdWatched('rewarded', placement);
             safeFinish();
           },
           adError: (error) => {
@@ -405,10 +415,32 @@ export const CrazyGamesManager = {
 
   onRoomJoinReceived: function(callback) {
     this.roomJoinCallbacks.push(callback);
+    // Deliver an invite that arrived before the game registered its listener
+    if (this.pendingRoomJoin) {
+      const pending = this.pendingRoomJoin;
+      this.pendingRoomJoin = null;
+      callback(pending);
+    }
   },
 
   triggerRoomJoin: function(inviteParams) {
+    if (!this.roomJoinCallbacks.length) {
+      this.pendingRoomJoin = inviteParams;
+      return;
+    }
     this.roomJoinCallbacks.forEach(cb => cb(inviteParams));
+  },
+
+  /**
+   * Room id from the invite the game was launched with (CrazyGames invite link), or null.
+   */
+  getStartupInviteRoomId: function() {
+    try {
+      const p = this.sdk && this.sdk.game ? this.sdk.game.inviteParams : null;
+      return p && p.roomId ? String(p.roomId) : null;
+    } catch (e) {
+      return null;
+    }
   },
 
   // Track Gameplay active state for performance throttling

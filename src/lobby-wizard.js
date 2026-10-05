@@ -373,22 +373,19 @@ export class LobbyWizard {
       const done = q.rewarded || q.current >= q.goal;
       return `
         <div class="prep-quest-row ${done ? 'quest-done' : ''}">
-          <div class="quest-row-left">
-            <img src="${q.icon}" class="quest-row-icon" alt="" />
-            <div class="quest-row-info">
-              <div class="quest-title-line">
-                <span class="quest-name">${q.label}</span>
-                <span class="quest-counter">${Math.min(q.current, q.goal)} / ${q.goal}</span>
-              </div>
+          <img src="${q.icon}" class="quest-row-icon" alt="" />
+          <div class="quest-row-info">
+            <span class="quest-name">${q.label}</span>
+            <div class="quest-progress-line">
               <div class="quest-track">
                 <div class="quest-fill" style="width: ${pct}%;"></div>
               </div>
+              <span class="quest-counter">${Math.min(q.current, q.goal)} / ${q.goal}</span>
             </div>
           </div>
-          <div class="quest-reward-pill">
-            <span class="quest-reward-label">Reward:</span>
-            <img src="assets/ui/solo/selectdifficulty/sprite_20.png" class="quest-coin-img" alt="" />
-            <span class="quest-reward-val">${q.reward} Coins</span>
+          <div class="quest-reward-pill" title="Reward: ${q.reward} coins">
+            <img src="assets/ui/solo/selectdifficulty/sprite_20.png" class="quest-coin-img" alt="Coins" />
+            <span class="quest-reward-val">+${q.reward}</span>
           </div>
         </div>
       `;

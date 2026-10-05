@@ -67,6 +67,15 @@ export class LobbyUI {
 
     // Default Lobby UI to clean Splash State on startup
     this.showSplashState();
+
+    // Fit the username once now and again when the web fonts finish loading
+    this.fitUsername();
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => this.fitUsername()).catch(() => {});
+    }
+
+    // Rewarded "+150 coins" ad cooldown ticker (survives tab switches / reloads)
+    this._coinAdCooldownTimer = null;
   }
 
   injectTutorialStyles() {
@@ -101,7 +110,50 @@ export class LobbyUI {
     document.head.appendChild(style);
   }
 
+  /**
+   * Auto-fits the header username so any 6-20 character name stays fully visible
+   * inside the profile pill: no overflow and no "..." truncation.
+   * 1) single line, shrinking from 44px down to 30px (canvas px, see autoScaleGame)
+   * 2) if a very wide name still doesn't fit, wrap it onto two lines.
+   */
+  fitUsername() {
+    const el = this.cgUsername;
+    if (!el || !el.parentElement) return;
+    const box = el.parentElement;
+    const maxW = box.clientWidth - 22; // cluster padding
+    const maxH = box.clientHeight - 8;
+    if (maxW <= 0) return;
+
+    const setSize = (px) => el.style.setProperty('font-size', px + 'px', 'important');
+    el.classList.remove('fit-2line');
+
+    let size = 44;
+    setSize(size);
+    while (el.scrollWidth > maxW && size > 30) {
+      size -= 1;
+      setSize(size);
+    }
+    if (el.scrollWidth <= maxW) return;
+
+    // Very wide names (e.g. 20 x "W"): two lines, still at a readable size
+    el.classList.add('fit-2line');
+    size = 38;
+    setSize(size);
+    while ((el.scrollHeight > maxH || el.scrollWidth > maxW) && size > 28) {
+      size -= 1;
+      setSize(size);
+    }
+  }
+
   updateCgProfileUI(user) {
+    try {
+      this._updateCgProfileUI(user);
+    } finally {
+      this.fitUsername();
+    }
+  }
+
+  _updateCgProfileUI(user) {
     if (user) {
       if (this.cgUsername) this.cgUsername.textContent = user.username;
       if (this.cgAvatar) {
@@ -179,6 +231,41 @@ export class LobbyUI {
     if (btnLobbyBack) {
       btnLobbyBack.addEventListener('click', () => {
         soundManager.playTick();
+        // Leaving the co-op screen (or cancelling a join in progress) disconnects cleanly,
+        // same as the CHANGE MODE / LEAVE SQUAD buttons.
+        const coopHeader = document.getElementById('coop-header-panel');
+        const coopVisible = coopHeader && !coopHeader.classList.contains('hidden') && coopHeader.style.display !== 'none';
+        const panelMaps = document.getElementById('panel-maps');
+        const mapsActive = panelMaps && panelMaps.classList.contains('active');
+        const inRoom = Network.mode !== 'OFFLINE' && (!!Network.roomId || Network.isJoining);
+
+        // In a squad but browsing another tab: "back" returns to the squad room
+        if (inRoom && !mapsActive) {
+          const mapTab = document.querySelector('.tab-btn[data-target="panel-maps"]');
+          if (mapTab) mapTab.click();
+          return;
+        }
+
+        // In a squad on the difficulty/preparation step: "back" returns to the squad room
+        if (inRoom && !coopVisible && !Network.isJoining) {
+          this.coop.showCoopLobbyState();
+          return;
+        }
+
+        if (inRoom && coopVisible) {
+          try {
+            Network.intentionalDisconnect = true;
+            CrazyGamesManager.leaveRoomPresence();
+            const url = new URL(window.location.href);
+            if (url.searchParams.has('roomId')) {
+              url.searchParams.delete('roomId');
+              window.history.replaceState({}, document.title, url.pathname + url.search);
+            }
+            Network.disconnect();
+          } catch (err) {
+            console.warn("Disconnection error handled gracefully:", err);
+          }
+        }
         this.showSplashState();
       });
     }
@@ -290,11 +377,47 @@ export class LobbyUI {
       localStorage.setItem('tds_daily_coin_ads', JSON.stringify({ date: todayStr, count: current + 1 }));
     };
 
+    // ─── 30s COOLDOWN AFTER EACH SUCCESSFUL "+150 COINS" REWARDED AD ───
+    // Stored as an absolute timestamp so switching tabs or reloading can't skip it.
+    // The cooldown only starts when the reward is granted (adFinished), never on adError.
+    const COIN_AD_COOLDOWN_MS = 30000;
+    const COOLDOWN_KEY = 'tds_coin_ad_cooldown_until';
+    let adRequestInFlight = false;
+
+    const getCooldownRemainingMs = () => {
+      let until = 0;
+      try { until = parseInt(localStorage.getItem(COOLDOWN_KEY) || '0', 10) || 0; } catch (e) {}
+      const left = until - Date.now();
+      // Guard against a bogus far-future value (e.g. device clock changed)
+      if (left > COIN_AD_COOLDOWN_MS) {
+        try { localStorage.setItem(COOLDOWN_KEY, String(Date.now() + COIN_AD_COOLDOWN_MS)); } catch (e) {}
+        return COIN_AD_COOLDOWN_MS;
+      }
+      return Math.max(0, left);
+    };
+
+    const startCoinAdCooldown = () => {
+      try { localStorage.setItem(COOLDOWN_KEY, String(Date.now() + COIN_AD_COOLDOWN_MS)); } catch (e) {}
+      ensureCooldownTicker();
+    };
+
+    const ensureCooldownTicker = () => {
+      if (this._coinAdCooldownTimer) return;
+      this._coinAdCooldownTimer = setInterval(() => {
+        updateCoinsTabState();
+        if (getCooldownRemainingMs() <= 0) {
+          clearInterval(this._coinAdCooldownTimer);
+          this._coinAdCooldownTimer = null;
+          updateCoinsTabState();
+        }
+      }, 250);
+    };
+
     const updateCoinsTabState = () => {
       const count = getDailyAdCount();
       const remaining = Math.max(0, 5 - count);
       if (tabCoinsRemaining) {
-        tabCoinsRemaining.textContent = `${remaining} / 5 ADS`;
+        tabCoinsRemaining.textContent = `${remaining} / 5`;
       }
       if (btnTabWatchAd) {
         let rewardSpan = btnTabWatchAd.querySelector('.btn-ad-reward');
@@ -313,12 +436,28 @@ export class LobbyUI {
           rewardSpan = btnTabWatchAd.querySelector('.btn-ad-reward');
         }
 
+        if (adRequestInFlight) {
+          // Keep the "PREPARING AD..." state untouched while the ad is running
+          return;
+        }
+
+        const cooldownMs = getCooldownRemainingMs();
+
         if (remaining <= 0) {
           btnTabWatchAd.disabled = true;
           btnTabWatchAd.classList.add('disabled');
+          btnTabWatchAd.classList.remove('on-cooldown');
           if (headingSpan) headingSpan.textContent = "DAILY LIMIT";
           if (rewardSpan) rewardSpan.textContent = "REACHED";
+        } else if (cooldownMs > 0) {
+          const secs = Math.ceil(cooldownMs / 1000);
+          btnTabWatchAd.disabled = true;
+          btnTabWatchAd.classList.add('disabled', 'on-cooldown');
+          if (headingSpan) headingSpan.textContent = "COOLDOWN";
+          if (rewardSpan) rewardSpan.textContent = `READY IN ${secs}s`;
+          ensureCooldownTicker();
         } else {
+          btnTabWatchAd.classList.remove('on-cooldown');
           btnTabWatchAd.disabled = false;
           btnTabWatchAd.classList.remove('disabled');
           if (headingSpan) headingSpan.textContent = "WATCH AD";
@@ -338,6 +477,8 @@ export class LobbyUI {
       });
     }
 
+    updateCoinsTabState();
+
     // Refresh state whenever tab is clicked
     const coinsTabBtn = document.querySelector('.tab-btn[data-target="panel-coins"]');
     if (coinsTabBtn) {
@@ -350,30 +491,40 @@ export class LobbyUI {
       btnTabWatchAd.addEventListener('click', () => {
         const count = getDailyAdCount();
         if (count >= 5) return;
+        if (adRequestInFlight) return;
+        if (getCooldownRemainingMs() > 0) {
+          updateCoinsTabState();
+          return;
+        }
 
+        adRequestInFlight = true;
         btnTabWatchAd.disabled = true;
 
         // Keep the play icon, styles, and fonts intact while showing clean status
         const headingSpan = btnTabWatchAd.querySelector('.btn-ad-heading');
         const rewardSpan = btnTabWatchAd.querySelector('.btn-ad-reward');
-        if (headingSpan) headingSpan.textContent = "PREPARING AD...";
+        if (headingSpan) headingSpan.textContent = "LOADING";
         if (rewardSpan) rewardSpan.textContent = "PLEASE WAIT...";
 
         CrazyGamesManager.requestRewardedAd(
           () => {
-            // Reward earned: +150 Coins!
+            // Reward earned: +150 Coins! Start the 30s cooldown only on success.
+            adRequestInFlight = false;
             this.game.playerCoins += 150;
             this.game.saveStatsToStorage();
             incrementDailyAdCount();
+            startCoinAdCooldown();
             this.updateLobbyMeta(this.game.playerLevel, this.game.playerXp, this.game.playerCoins);
             soundManager.playVictory();
             this.game.effectManager.spawnText(400, 260, "+150 COINS!", "#f1c40f");
             updateCoinsTabState();
           },
           () => {
-            // Ad error, canceled, or closed early
+            // adError / canceled / timed out: no reward and NO cooldown
+            adRequestInFlight = false;
             updateCoinsTabState();
-          }
+          },
+          'free_coins'
         );
       });
     }
@@ -679,31 +830,31 @@ export class LobbyUI {
       }
     }
 
-    const cyberCard = document.querySelector('[data-map-id="cyber_city"]');
-    if (cyberCard) {
-      if (level < 5) {
-        cyberCard.style.opacity = '0.5';
-        cyberCard.style.pointerEvents = 'none';
-        const info = cyberCard.querySelector('.difficulty');
-        if (info) info.textContent = "LOCKED (REQ. LVL 5)";
-      } else {
-        cyberCard.style.opacity = '1.0';
-        cyberCard.style.pointerEvents = 'auto';
-      }
-    }
-
-    const fallenCard = document.querySelector('[data-map-id="fallen_outpost"]');
-    if (fallenCard) {
-      if (level < 10) {
-        fallenCard.style.opacity = '0.5';
-        fallenCard.style.pointerEvents = 'none';
-        const info = fallenCard.querySelector('.difficulty');
-        if (info) info.textContent = "LOCKED (REQ. LVL 10)";
-      } else {
-        fallenCard.style.opacity = '1.0';
-        cyberCard.style.pointerEvents = 'auto';
-      }
-    }
+    // Map lock state (both the solo and the co-op copies of each card)
+    const mapLocks = [
+      { id: 'cyber_city', req: 5, unlockedText: 'x1.0 Coins / XP' },
+      { id: 'fallen_outpost', req: 10, unlockedText: 'x1.0 Coins / XP' }
+    ];
+    mapLocks.forEach(({ id, req, unlockedText }) => {
+      document.querySelectorAll(`.map-card[data-map-id="${id}"]`).forEach(card => {
+        const info = card.querySelector('.difficulty');
+        if (level < req) {
+          card.style.opacity = '0.5';
+          card.style.pointerEvents = 'none';
+          if (info) {
+            info.textContent = `🔒 REQ. LVL ${req}`;
+            info.className = 'difficulty locked-badge';
+          }
+        } else {
+          card.style.opacity = '1.0';
+          card.style.pointerEvents = 'auto';
+          if (info) {
+            info.textContent = unlockedText;
+            info.className = 'difficulty easy';
+          }
+        }
+      });
+    });
 
     const hcToggle = document.getElementById('hardcore-toggle');
     const hcLabel = document.querySelector('label[for="hardcore-toggle"]');

@@ -5980,3 +5980,628 @@ button.btn-unlocked-pill,
 #wizard-step-prep.hidden {
   display: none !important;
 }
+/* ═══════════════════════════════════════════════════════════════════════════
+   QA READABILITY PASS (CrazyGames QA, Oct 2026)
+   ---------------------------------------------------------------------------
+   The whole UI is laid out on a 2122x1188 canvas and scaled down to fit the
+   window (see autoScaleGame in index.html). At the ~800x420 non-fullscreen
+   CrazyGames frame that scale is ~0.35, so a text must be at least ~25px
+   "effective" on the canvas to stay readable (the header COINS label =
+   13px * 1.92 ≈ 25px, which QA uses as the reference).
+   Rule used below: body text >= 26px, labels/buttons 28-32px, titles 34px+.
+   Everything here is scoped with an id so it overrides the older rules.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── HEADER: LEVEL / XP labels match the COINS label size ─── */
+#lobby-header #label-level,
+#lobby-header #label-xp {
+  font-size: 13px !important;
+  white-space: nowrap !important;
+}
+#lobby-header #label-level { transform: translate(177px, -42px) scale(1.95) !important; }
+#lobby-header #label-xp    { transform: translate(151px, -42px) scale(1.95) !important; width: 110px !important; text-align: center !important; }
+#lobby-header #label-coins { transform: translate(186px, -51px) scale(1.95) !important; }
+
+/* ─── HEADER: USERNAME PILL ───
+   3-slice border-image keeps the avatar ring round while the pill widens, so a
+   6-20 character name fits without overflowing or being cut with "...".
+   The name is auto-fitted by LobbyUI.fitUsername(). */
+#lobby-header #cg-profile-widget {
+  position: absolute !important;
+  left: 468px !important;
+  top: 52px !important;
+  width: 770px !important;
+  height: 116px !important;
+  transform: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  background: none !important;
+  border-style: solid !important;
+  border-color: transparent !important;
+  border-width: 0 36px 0 122px !important;
+  border-image: url('assets/ui/menu/sprite_08.png') 0 60 0 200 fill / 0 36px 0 122px stretch !important;
+  display: flex !important;
+  align-items: center !important;
+  overflow: visible !important;
+  z-index: 30 !important;
+}
+#lobby-header #cg-profile-widget .profile-avatar-wrapper {
+  position: absolute !important;
+  left: -107px !important;
+  top: 12px !important;
+  width: 92px !important;
+  height: 92px !important;
+  transform: none !important;
+}
+#lobby-header #cg-avatar {
+  transform: none !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+#lobby-header #cg-profile-widget .profile-name-cluster {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  padding: 0 4px 0 18px !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}
+#lobby-header #cg-username {
+  transform: none !important;
+  font-size: 44px !important;
+  line-height: 1.1 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+#lobby-header #cg-username.fit-2line {
+  white-space: normal !important;
+  word-break: break-all !important;
+  line-height: 1.02 !important;
+}
+
+/* ─── SPLASH ─── */
+#lobby-panels .splash-subtext { font-size: 30px !important; text-wrap: balance !important; max-width: 1100px !important; width: 82% !important; }
+
+/* ═══════════════ SOLO: CHOOSE MAP ═══════════════ */
+#lobby-panels #wizard-step-maps { gap: 12px !important; padding: 16px 22px !important; }
+#lobby-panels .solo-pill-badge { height: 60px !important; min-width: 190px !important; }
+#lobby-panels .solo-pill-title { font-size: 34px !important; }
+#lobby-panels .solo-user-img-icon { width: 38px !important; height: 38px !important; }
+#lobby-panels .solo-tagline-cluster { font-size: 28px !important; gap: 12px !important; }
+#lobby-panels .solo-tagline-icon { font-size: 28px !important; }
+#lobby-panels .btn-solo-back-action {
+  font-size: 28px !important;
+  height: 60px !important;
+  min-width: 160px !important;
+  padding: 0 24px !important;
+}
+#lobby-panels .solo-hero-card { height: 205px !important; }
+#lobby-panels .solo-hero-overlay { width: 56% !important; padding: 0 34px !important; }
+#lobby-panels .solo-hero-title { font-size: 42px !important; }
+#lobby-panels .solo-hero-swords { width: 42px !important; height: 42px !important; }
+#lobby-panels .solo-hero-desc { font-size: 28px !important; line-height: 1.25 !important; max-width: 720px !important; }
+#lobby-panels .solo-section-tab-bar { margin-bottom: 12px !important; }
+#lobby-panels .solo-section-tab { font-size: 28px !important; height: 50px !important; padding: 0 26px !important; }
+#lobby-panels .solo-map-row { gap: 14px !important; }
+#lobby-panels .solo-map-row .map-card { height: 228px !important; padding: 10px 8px 12px !important; justify-content: flex-start !important; gap: 6px !important; }
+#lobby-panels .solo-map-row .map-preview-canvas { width: 150px !important; height: 100px !important; }
+#lobby-panels .map-card .map-info { display: flex !important; flex-direction: column !important; align-items: center !important; gap: 4px !important; text-align: center !important; }
+#lobby-panels .map-card .map-info .name { font-size: 29px !important; line-height: 1.1 !important; margin-top: 2px !important; white-space: nowrap !important; }
+#lobby-panels .map-card .map-info .difficulty { font-size: 26px !important; line-height: 1.15 !important; margin-top: 0 !important; white-space: nowrap !important; }
+#lobby-panels .map-card .map-info .locked-badge { padding: 2px 10px !important; border-radius: 8px !important; }
+#lobby-panels .btn-solo-green-play { font-size: 32px !important; height: 84px !important; min-width: 520px !important; }
+
+/* ═══════════════ SOLO: CHOOSE DIFFICULTY ═══════════════ */
+#lobby-panels #wizard-step-diff { gap: 14px !important; padding: 16px 22px 18px !important; }
+/* Banner: title badge now sits INSIDE the blue frame (was hanging off the left edge) */
+#lobby-panels .diff-banner-strip {
+  width: 100% !important;
+  height: 124px !important;
+  padding: 0 34px 0 36px !important;
+  flex: 0 0 auto !important;
+  box-sizing: border-box !important;
+}
+#lobby-panels .diff-badge-container {
+  transform: none !important;
+  height: 80px !important;
+  width: auto !important;
+  min-width: 470px !important;
+  padding: 0 56px 0 18px !important;
+  gap: 14px !important;
+}
+#lobby-panels .diff-map-icon { width: 50px !important; height: 50px !important; }
+#lobby-panels .diff-badge-title { font-size: 36px !important; white-space: nowrap !important; }
+#lobby-panels .diff-nav-buttons { gap: 16px !important; }
+#lobby-panels #btn-wizard-back-diff,
+#lobby-panels #btn-wizard-next-diff {
+  transform: none !important;
+  height: 66px !important;
+  width: auto !important;
+  font-size: 28px !important;
+  white-space: nowrap !important;
+  padding: 0 28px !important;
+}
+#lobby-panels #btn-wizard-back-diff { min-width: 160px !important; }
+#lobby-panels #btn-wizard-next-diff { min-width: 280px !important; }
+#lobby-panels .difficulty-wizard-deck {
+  transform: none !important;
+  width: 100% !important;
+  height: auto !important;
+  flex: 1 1 auto !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  padding: 6px 2px 8px !important;
+  box-sizing: border-box !important;
+}
+#lobby-panels .diff-wizard-card,
+#lobby-panels .diff-card-easy,
+#lobby-panels .diff-card-casual,
+#lobby-panels .diff-card-intermediate,
+#lobby-panels .diff-card-molten,
+#lobby-panels .diff-card-fallen {
+  transform: none !important;
+  height: 100% !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+#lobby-panels .diff-card-header {
+  transform: none !important;
+  width: 100% !important;
+  height: 22.5% !important;
+  padding: 6px 10px 0 !important;
+  gap: 2px !important;
+  box-sizing: border-box !important;
+}
+#lobby-panels .diff-title { transform: none !important; font-size: 31px !important; line-height: 1.05 !important; white-space: nowrap !important; }
+#lobby-panels .diff-sub { transform: none !important; font-size: 26px !important; line-height: 1.05 !important; text-align: center !important; }
+#lobby-panels .diff-card-body {
+  transform: none !important;
+  width: 100% !important;
+  height: auto !important;
+  padding: 8px 12px 30px !important;
+  justify-content: space-evenly !important;
+  gap: 10px !important;
+  box-sizing: border-box !important;
+}
+#lobby-panels .diff-boss-preview { transform: none !important; width: 140px !important; height: 140px !important; flex-shrink: 0 !important; }
+#lobby-panels .diff-metrics-list { gap: 8px !important; }
+#lobby-panels .diff-metric { gap: 8px !important; align-items: center !important; }
+#lobby-panels .diff-metric-icon { transform: none !important; width: 26px !important; height: 26px !important; }
+#lobby-panels .diff-metric-text {
+  transform: none !important;
+  width: auto !important;
+  height: auto !important;
+  font-size: 26px !important;
+  line-height: 1.05 !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  min-width: 0 !important;
+}
+
+/* ═══════════════ SOLO: PREPARATION ═══════════════ */
+#lobby-panels #wizard-step-prep { gap: 12px !important; padding: 14px 18px !important; }
+#lobby-panels .prep-top-banner { height: 70px !important; padding: 0 30px !important; }
+#lobby-panels .prep-badge-title { font-size: 34px !important; }
+#lobby-panels .prep-swords-icon { width: 44px !important; height: 44px !important; }
+#lobby-panels .prep-hero-card { height: 104px !important; padding-bottom: 10px !important; }
+#lobby-panels .prep-hardcore-pill { padding: 8px 24px !important; max-width: 96% !important; }
+#lobby-panels .prep-hc-checkbox { width: 26px !important; height: 26px !important; }
+#lobby-panels .prep-hc-label { font-size: 26px !important; line-height: 1.2 !important; }
+#lobby-panels .prep-hc-flame { font-size: 28px !important; }
+#lobby-panels .prep-action-row { height: 74px !important; }
+#lobby-panels .btn-prep-back { flex: 0 0 380px !important; font-size: 28px !important; }
+#lobby-panels .prep-back-arrow { font-size: 32px !important; }
+#lobby-panels .btn-prep-deploy { font-size: 38px !important; }
+#lobby-panels .prep-deploy-swords { width: 44px !important; height: 44px !important; }
+#lobby-panels .prep-deck-card { padding: 12px 16px !important; }
+#lobby-panels .prep-deck-header { gap: 12px !important; padding-bottom: 10px !important; margin-bottom: 10px !important; }
+#lobby-panels .prep-header-icon { width: 34px !important; height: 34px !important; }
+#lobby-panels .prep-deck-title { font-size: 30px !important; }
+#lobby-panels .prep-records-list { gap: 8px !important; }
+#lobby-panels .prep-leaderboard-row { padding: 6px 16px !important; min-height: 52px !important; box-sizing: border-box !important; }
+#lobby-panels .rank-name-cluster { gap: 14px !important; min-width: 0 !important; }
+#lobby-panels .rank-icon-slot { font-size: 30px !important; width: 38px !important; }
+#lobby-panels .rank-blue-badge { font-size: 26px !important; width: 38px !important; height: 38px !important; border-radius: 8px !important; }
+#lobby-panels .rank-player-name { font-size: 28px !important; white-space: nowrap !important; }
+#lobby-panels .rank-time-text { font-size: 28px !important; }
+#lobby-panels .prep-quests-list { gap: 8px !important; }
+#lobby-panels .prep-quest-row { padding: 6px 14px !important; gap: 14px !important; }
+#lobby-panels .quest-row-icon { width: 36px !important; height: 36px !important; }
+#lobby-panels .quest-row-info { gap: 6px !important; min-width: 0 !important; }
+#lobby-panels .quest-title-line { gap: 10px !important; }
+#lobby-panels .quest-name { font-size: 26px !important; line-height: 1.1 !important; }
+#lobby-panels .quest-counter { font-size: 26px !important; white-space: nowrap !important; }
+#lobby-panels .quest-track { height: 12px !important; border-radius: 6px !important; }
+#lobby-panels .quest-reward-pill { gap: 6px !important; flex-direction: row !important; align-items: center !important; background: #fff7d6 !important; border: 2px solid #f1c40f !important; border-radius: 12px !important; padding: 4px 12px !important; }
+#lobby-panels .quest-reward-label { font-size: 26px !important; color: #64748b !important; line-height: 1 !important; }
+#lobby-panels .quest-coin-img { width: 28px !important; height: 28px !important; }
+#lobby-panels .quest-reward-val { font-size: 28px !important; white-space: nowrap !important; line-height: 1 !important; }
+#lobby-panels .quest-progress-line { display: flex !important; align-items: center !important; gap: 12px !important; width: 100% !important; }
+#lobby-panels .quest-progress-line .quest-track { flex: 1 1 auto !important; }
+
+/* ═══════════════ AGENT SHOP ═══════════════ */
+#lobby-panels #panel-shop { padding: 20px 22px 24px !important; }
+#lobby-panels .shop-header-banner { padding: 14px 22px !important; gap: 24px !important; margin-bottom: 18px !important; }
+#lobby-panels .shop-header-left { gap: 16px !important; min-width: 0 !important; flex: 1 1 auto !important; }
+#lobby-panels .shop-header-icon-disc { width: 66px !important; height: 66px !important; }
+#lobby-panels .shop-header-icon { width: 42px !important; height: 42px !important; }
+#lobby-panels .shop-header-title { font-size: 38px !important; line-height: 1.1 !important; }
+#lobby-panels .shop-header-subtitle { font-size: 26px !important; line-height: 1.2 !important; margin-top: 4px !important; }
+#lobby-panels .shop-header-tagline { font-size: 26px !important; white-space: nowrap !important; flex-shrink: 0 !important; }
+
+/* Category strip: title pill + tag badge on the strip, description as a caption under it */
+#lobby-panels .shop-category-wrapper { gap: 14px !important; margin-bottom: 26px !important; }
+#lobby-panels .cat-banner-strip {
+  height: 66px !important;
+  border-radius: 34px !important;
+  overflow: visible !important;
+  margin-bottom: 42px !important;
+}
+#lobby-panels .cat-pill-badge { border-radius: 30px !important; padding: 0 26px 0 18px !important; gap: 12px !important; }
+#lobby-panels .cat-star-icon { font-size: 30px !important; }
+#lobby-panels .cat-icon-small { width: 34px !important; height: 34px !important; }
+#lobby-panels .cat-title-text { font-size: 30px !important; white-space: nowrap !important; }
+#lobby-panels .cat-middle-desc {
+  position: absolute !important;
+  left: 18px !important;
+  right: 18px !important;
+  top: calc(100% + 6px) !important;
+  margin: 0 !important;
+  font-size: 26px !important;
+  line-height: 1.2 !important;
+  color: #d6e9ff !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6) !important;
+  white-space: nowrap !important;
+}
+#lobby-panels .cat-slanted-badge {
+  font-size: 26px !important;
+  padding: 0 34px 0 30px !important;
+  border-radius: 0 30px 30px 0 !important;
+  white-space: nowrap !important;
+}
+
+/* Every agent card uses one readable horizontal layout, 2 per row */
+#lobby-panels .starter-wide-grid,
+#lobby-panels .intermediate-vertical-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 16px !important;
+}
+#lobby-panels .shop-wide-card { padding: 16px 18px !important; gap: 18px !important; align-items: center !important; }
+#lobby-panels .troop-disc-avatar { width: 112px !important; height: 112px !important; border-width: 3px !important; }
+#lobby-panels .troop-disc-avatar .agent-preview-canvas { width: 86px !important; height: 86px !important; }
+#lobby-panels .wide-card-right { gap: 8px !important; }
+#lobby-panels .wide-name-row { gap: 12px !important; }
+#lobby-panels .wide-troop-name { font-size: 34px !important; line-height: 1.1 !important; }
+#lobby-panels .wide-tag-starter { font-size: 26px !important; padding: 2px 12px !important; border-radius: 8px !important; }
+#lobby-panels .wide-stat-row { font-size: 26px !important; gap: 10px !important; flex-wrap: wrap !important; white-space: nowrap !important; }
+#lobby-panels .stat-unit { gap: 6px !important; }
+#lobby-panels .stat-icon { width: 26px !important; height: 26px !important; }
+#lobby-panels .wide-desc-row { font-size: 26px !important; gap: 10px !important; line-height: 1.2 !important; align-items: flex-start !important; }
+#lobby-panels .ability-icon { width: 28px !important; height: 28px !important; margin-top: 2px !important; }
+
+#lobby-panels .shop-vert-card {
+  display: grid !important;
+  grid-template-columns: 112px minmax(0, 1fr) auto !important;
+  grid-template-areas:
+    "av name cost"
+    "av stats stats"
+    "av desc desc"
+    "av btn btn" !important;
+  column-gap: 18px !important;
+  row-gap: 8px !important;
+  align-items: center !important;
+  justify-items: start !important;
+  height: auto !important;
+  padding: 16px 18px !important;
+  text-align: left !important;
+}
+#lobby-panels .shop-vert-card .agent-preview-canvas {
+  grid-area: av !important;
+  align-self: center !important;
+  width: 112px !important;
+  height: 112px !important;
+  padding: 12px !important;
+  box-sizing: border-box !important;
+  border-radius: 50% !important;
+  border: 3px solid #00d2ff !important;
+  background: radial-gradient(circle at 35% 35%, #ffffff 0%, #cce9ff 60%, #9cd3ff 100%) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.12), 0 3px 6px rgba(0, 0, 0, 0.15) !important;
+}
+#lobby-panels .shop-vert-card .vert-name { grid-area: name !important; font-size: 34px !important; line-height: 1.1 !important; margin: 0 !important; }
+#lobby-panels .shop-vert-card .cost-text { grid-area: cost !important; justify-self: end !important; font-size: 30px !important; white-space: nowrap !important; display: inline-flex !important; align-items: center !important; gap: 6px !important; }
+#lobby-panels .shop-vert-card .vert-stats { grid-area: stats !important; font-size: 26px !important; color: #475569 !important; white-space: normal !important; margin: 0 !important; line-height: 1.2 !important; }
+#lobby-panels .shop-vert-card .vert-desc { grid-area: desc !important; font-size: 26px !important; line-height: 1.2 !important; gap: 10px !important; margin: 0 !important; }
+#lobby-panels .shop-vert-card .vert-ability-icon { width: 28px !important; height: 28px !important; margin-top: 2px !important; }
+#lobby-panels .shop-vert-card .btn-shop-action,
+#lobby-panels .shop-vert-card .btn-unlocked-pill { grid-area: btn !important; }
+#lobby-panels .coin-icon-mini { width: 30px !important; height: 30px !important; margin-right: 4px !important; }
+
+#lobby-panels .btn-shop-action,
+#lobby-panels .btn-unlocked-pill {
+  height: 54px !important;
+  font-size: 28px !important;
+  border-radius: 14px !important;
+  white-space: nowrap !important;
+}
+/* Hover: glow only. Scaling big cards made the list jitter under the cursor. */
+#lobby-panels .shop-card:hover,
+#lobby-panels .shop-wide-card:hover,
+#lobby-panels .shop-vert-card:hover {
+  scale: none !important;
+  transform: none !important;
+  filter: brightness(1.05) drop-shadow(0 4px 10px rgba(0, 210, 255, 0.35)) !important;
+}
+
+/* ═══════════════ LOADOUT ═══════════════ */
+#lobby-panels .loadout-main-panel { padding: 20px 22px !important; gap: 18px !important; }
+#lobby-panels .loadout-header-banner { padding: 14px 22px !important; gap: 20px !important; }
+#lobby-panels .loadout-header-left { gap: 16px !important; min-width: 0 !important; flex: 1 1 auto !important; }
+#lobby-panels .loadout-header-icon-disc { width: 66px !important; height: 66px !important; }
+#lobby-panels .loadout-header-icon { width: 42px !important; height: 42px !important; }
+#lobby-panels .loadout-header-title { font-size: 38px !important; line-height: 1.1 !important; }
+#lobby-panels .loadout-header-subtitle { font-size: 26px !important; line-height: 1.2 !important; margin-top: 4px !important; }
+#lobby-panels .loadout-counter-pill { font-size: 30px !important; padding: 10px 24px !important; white-space: nowrap !important; flex-shrink: 0 !important; }
+#lobby-panels .loadout-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 18px !important; }
+#lobby-panels .loadout-card-v2 { padding: 14px 14px 16px !important; min-height: 0 !important; gap: 6px !important; }
+#lobby-panels .loadout-card-top-tag { height: auto !important; }
+#lobby-panels .tag-equipped-badge,
+#lobby-panels .tag-ready-badge { font-size: 26px !important; padding: 3px 12px !important; border-radius: 8px !important; }
+#lobby-panels .loadout-disc-avatar { width: 112px !important; height: 112px !important; border-width: 3px !important; }
+#lobby-panels .loadout-disc-avatar canvas { width: 84px !important; height: 84px !important; }
+#lobby-panels .loadout-info-cluster { gap: 4px !important; width: 100% !important; }
+#lobby-panels .loadout-agent-name { font-size: 32px !important; line-height: 1.1 !important; }
+#lobby-panels .loadout-stat-line { font-size: 26px !important; gap: 4px 10px !important; flex-wrap: wrap !important; white-space: nowrap !important; margin: 4px 0 6px !important; }
+#lobby-panels .loadout-skin-container { font-size: 26px !important; gap: 8px !important; }
+#lobby-panels .custom-skin-dropdown { font-size: 26px !important; }
+#lobby-panels .skin-dropdown-selected { font-size: 26px !important; padding: 4px 12px !important; }
+#lobby-panels .skin-option { font-size: 26px !important; padding: 6px 12px !important; }
+#lobby-panels .btn-loadout-equip,
+#lobby-panels .btn-loadout-unequip { height: 56px !important; font-size: 28px !important; }
+
+/* ═══════════════ CRATES ═══════════════ */
+#lobby-panels #crates-unlocked-view { padding: 20px 22px !important; gap: 18px !important; }
+#lobby-panels #crates-unlocked-view .shop-header-banner { margin-bottom: 0 !important; }
+#lobby-panels .crates-unlocked-deck { max-width: 1320px !important; gap: 24px !important; margin-top: 4px !important; }
+#lobby-panels .crate-shop-card { padding: 18px 20px 20px !important; min-height: 0 !important; gap: 6px !important; }
+#lobby-panels .crate-rarity-pill { font-size: 26px !important; padding: 4px 14px !important; border-radius: 8px !important; margin-bottom: 2px !important; }
+#lobby-panels .crate-img-preview { width: 120px !important; height: 120px !important; margin: 4px 0 !important; }
+#lobby-panels .crate-card-title { font-size: 36px !important; line-height: 1.1 !important; }
+#lobby-panels .crate-card-desc { font-size: 26px !important; line-height: 1.25 !important; color: #475569 !important; margin: 4px 0 12px !important; }
+#lobby-panels .btn-buy-crate {
+  height: 62px !important;
+  font-size: 30px !important;
+  gap: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+#lobby-panels .btn-buy-crate .crate-coin-icon {
+  width: 34px !important;
+  height: 34px !important;
+  object-fit: contain !important;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3)) !important;
+}
+/* Locked crates view (player level < 5) */
+#lobby-panels .crates-locked-pill { font-size: 34px !important; }
+#lobby-panels .crates-locked-subtexts { font-size: 28px !important; }
+#lobby-panels .btn-crates-shop { font-size: 30px !important; height: 82px !important; }
+
+/* ═══════════════ FREE COINS ═══════════════ */
+/* Daily limit = information, not a button: flat translucent panel, dashed outline,
+   no 3D sprite, no shadow, no pointer. */
+#lobby-panels .ad-daily-limit-badge {
+  transform: none !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  padding: 14px 26px 14px 20px !important;
+  gap: 16px !important;
+  background: rgba(4, 16, 48, 0.78) !important;
+  border: 3px dashed rgba(186, 214, 255, 0.6) !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+  filter: none !important;
+  cursor: default !important;
+  pointer-events: none !important;
+  margin-right: 6px !important;
+}
+#lobby-panels .ad-limit-clapper-icon { width: 58px !important; height: 58px !important; filter: none !important; opacity: 0.95 !important; }
+#lobby-panels .ad-limit-text-group { gap: 2px !important; }
+#lobby-panels .ad-limit-label { font-size: 26px !important; color: #b9d4ff !important; text-shadow: none !important; letter-spacing: 1px !important; white-space: nowrap !important; }
+#lobby-panels .ad-limit-count { font-size: 42px !important; line-height: 1.05 !important; text-shadow: 2px 2px 0 #000 !important; white-space: nowrap !important; }
+#lobby-panels .btn-ad-heading,
+#lobby-panels .btn-ad-reward { white-space: nowrap !important; }
+
+/* ═══════════════ CO-OP: SQUAD BROWSER ═══════════════ */
+#lobby-panels #coop-header-panel { padding: 16px 20px !important; }
+#lobby-panels .coop-phase-view { gap: 12px !important; }
+#lobby-panels .coop-header-icon { width: 56px !important; height: 56px !important; }
+#lobby-panels .coop-header-title-img { height: 50px !important; }
+#lobby-panels .coop-btn-change-mode { height: 60px !important; font-size: 28px !important; padding: 0 24px !important; gap: 10px !important; }
+#lobby-panels .coop-gear-icon { font-size: 28px !important; }
+#lobby-panels .coop-controls-row { gap: 16px !important; }
+#lobby-panels .coop-field-block { gap: 6px !important; min-width: 0 !important; }
+#lobby-panels .coop-field-label { font-size: 26px !important; }
+#lobby-panels .coop-input-pill { height: 66px !important; padding: 0 16px !important; }
+#lobby-panels .coop-pencil-icon,
+#lobby-panels .coop-code-icon { font-size: 28px !important; margin-right: 10px !important; }
+#lobby-panels .coop-input-pill input { font-size: 28px !important; min-width: 0 !important; }
+#lobby-panels .btn-coop-pill-host,
+#lobby-panels .btn-coop-pill-join { height: 70px !important; font-size: 30px !important; }
+#lobby-panels .btn-coop-host-icon { width: 38px !important; height: 38px !important; }
+#lobby-panels .btn-coop-join-icon { width: 34px !important; height: 34px !important; }
+#lobby-panels .coop-browser-header { height: 66px !important; padding: 0 18px !important; }
+#lobby-panels .coop-browser-title-left { font-size: 30px !important; gap: 12px !important; }
+#lobby-panels .coop-browser-header-icon { width: 36px !important; height: 36px !important; }
+#lobby-panels .btn-coop-refresh { height: 50px !important; font-size: 26px !important; padding: 0 20px !important; gap: 8px !important; }
+#lobby-panels .btn-coop-refresh-icon { width: 26px !important; height: 26px !important; }
+#lobby-panels .coop-empty-heading { font-size: 34px !important; }
+#lobby-panels .coop-empty-caption { font-size: 28px !important; color: #9fd0ff !important; }
+#lobby-panels .coop-rooms-deck { gap: 10px !important; padding: 14px !important; }
+#lobby-panels .coop-room-row { padding: 12px 18px !important; gap: 16px !important; }
+#lobby-panels .coop-room-title-line { gap: 14px !important; flex-wrap: wrap !important; }
+#lobby-panels .coop-room-code { font-size: 30px !important; }
+#lobby-panels .coop-room-host { font-size: 28px !important; }
+#lobby-panels .coop-room-status { font-size: 26px !important; padding: 2px 10px !important; border-radius: 6px !important; }
+#lobby-panels .coop-room-meta { font-size: 26px !important; margin-top: 4px !important; }
+#lobby-panels .btn-quick-join { height: 58px !important; font-size: 28px !important; padding: 0 26px !important; }
+
+/* ═══════════════ CO-OP: SQUAD ROOM ═══════════════ */
+#lobby-panels .coop-room-header-strip { padding: 10px 18px !important; gap: 16px !important; }
+#lobby-panels .coop-room-badge-cluster { gap: 16px !important; }
+#lobby-panels .coop-code-display { font-size: 34px !important; white-space: nowrap !important; }
+#lobby-panels .btn-coop-copy-code { font-size: 26px !important; padding: 8px 16px !important; gap: 8px !important; white-space: nowrap !important; }
+#lobby-panels .copy-icon-img { width: 28px !important; height: 28px !important; }
+#lobby-panels .coop-privacy-toggle { font-size: 26px !important; gap: 8px !important; white-space: nowrap !important; }
+#lobby-panels .coop-privacy-toggle input { width: 26px !important; height: 26px !important; }
+#lobby-panels .coop-room-right-cluster { gap: 16px !important; }
+#lobby-panels .coop-status-tag { font-size: 28px !important; white-space: nowrap !important; }
+#lobby-panels .btn-coop-leave-room { font-size: 26px !important; padding: 8px 18px !important; white-space: nowrap !important; }
+#lobby-panels .coop-roster-section { gap: 8px !important; }
+#lobby-panels .coop-section-label { font-size: 28px !important; }
+#lobby-panels .coop-slots-grid { gap: 10px !important; }
+#lobby-panels .coop-slot-card { height: 102px !important; padding: 0 14px !important; gap: 14px !important; }
+#lobby-panels .slot-avatar-wrapper { width: 54px !important; height: 54px !important; }
+#lobby-panels .slot-id-pill { font-size: 26px !important; line-height: 1 !important; padding: 1px 6px !important; bottom: -6px !important; right: -16px !important; }
+#lobby-panels .slot-info-col { min-width: 0 !important; gap: 2px !important; }
+#lobby-panels .slot-name {
+  font-size: 26px !important;
+  line-height: 1.0 !important;
+  white-space: normal !important;
+  word-break: break-all !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+#lobby-panels .slot-role-badge { font-size: 26px !important; line-height: 1.1 !important; white-space: nowrap !important; }
+#lobby-panels .slot-empty-icon { font-size: 32px !important; }
+#lobby-panels .slot-empty-text { font-size: 26px !important; }
+#lobby-panels .coop-map-section { gap: 8px !important; }
+#lobby-panels .coop-map-row { gap: 12px !important; }
+#lobby-panels .coop-map-card { gap: 4px !important; padding: 8px !important; justify-content: flex-start !important; }
+#lobby-panels .coop-map-card .map-preview-canvas { width: 140px !important; height: 92px !important; }
+#lobby-panels .coop-client-live-deck { max-width: 1240px !important; gap: 28px !important; padding-top: 14px !important; }
+#lobby-panels .coop-client-live-deck .coop-single-live-card { max-width: 600px !important; padding: 22px 22px 16px !important; gap: 20px !important; }
+#lobby-panels .live-card-badge { font-size: 26px !important; top: -20px !important; padding: 2px 16px !important; white-space: nowrap !important; }
+#lobby-panels .live-map-title { font-size: 36px !important; }
+#lobby-panels .live-map-sub { font-size: 28px !important; }
+#lobby-panels .coop-bottom-action-bar { height: 76px !important; }
+#lobby-panels .btn-coop-launch { font-size: 32px !important; width: 520px !important; }
+#lobby-panels .coop-waiting-pill { font-size: 28px !important; padding: 14px 34px !important; }
+/* Connecting state while joining a friend's squad from an invite */
+#lobby-panels .coop-connecting-card {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  text-align: center;
+}
+#lobby-panels .coop-connecting-card.hidden { display: none !important; }
+#lobby-panels .coop-connecting-spinner {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 10px solid rgba(0, 210, 255, 0.25);
+  border-top-color: #00ffe0;
+  animation: coopSpin 0.9s linear infinite;
+}
+#lobby-panels .coop-connecting-title { font-family: var(--font-title); font-size: 40px; font-weight: 900; color: #ffffff; text-shadow: 2px 2px 0 #000; }
+#lobby-panels .coop-connecting-sub { font-family: var(--font-title); font-size: 28px; font-weight: 800; color: #9fd0ff; }
+@keyframes coopSpin { to { transform: rotate(360deg); } }
+#lobby-panels #coop-room-phase.is-connecting > .coop-roster-section,
+#lobby-panels #coop-room-phase.is-connecting > .coop-map-section,
+#lobby-panels #coop-room-phase.is-connecting > .coop-bottom-action-bar {
+  display: none !important;
+}
+
+/* Stat chips wrap cleanly: spacing instead of "|" separators that could dangle at a line end */
+#lobby-panels .stat-divider,
+#lobby-panels .stat-sep { display: none !important; }
+#lobby-panels .wide-stat-row { gap: 6px 22px !important; }
+#lobby-panels .loadout-stat-line { gap: 2px 18px !important; justify-content: center !important; }
+/* Empty squad list heading was picking up the dark ".lobby-panel h2" style (dark on navy) */
+#lobby-panels .coop-empty-heading { color: #ffffff !important; border: none !important; padding: 0 !important; font-size: 34px !important; }
+/* Free coins subtitle: a bit wider so it never runs under the WATCH AD button */
+#lobby-panels .coins-ad-subtext { width: 372px !important; }
+#lobby-panels .shop-vert-card .vert-stats { display: flex !important; flex-wrap: wrap !important; gap: 2px 22px !important; }
+#lobby-panels .shop-vert-card .vert-stat { white-space: nowrap !important; }
+/* Co-op lobby is designed for a navy panel (light text). An older generic rule
+   painted it white, which made labels like "PLAYER NAME" / "SQUAD MEMBERS" unreadable. */
+#lobby-panels #coop-header-panel { background: #00225e !important; }
+#lobby-panels .btn-coop-copy-code.hidden,
+#lobby-panels .coop-privacy-toggle.hidden { display: none !important; }
+#lobby-panels #coop-live-diff-boss { color: #c9e4ff !important; }
+
+/* ─── CRATE OPENING / REVEAL (inside the scaled app canvas) ─── */
+#app-container .crate-opening-container { width: 960px !important; height: 640px !important; }
+#app-container #crate-opening-canvas { width: 960px !important; height: 640px !important; }
+#app-container #crate-reveal-card { width: 560px !important; padding: 34px 36px !important; gap: 18px !important; border-width: 5px !important; border-radius: 26px !important; }
+#app-container #crate-reveal-rarity { font-size: 40px !important; padding: 4px 24px !important; }
+#app-container #crate-reveal-agent-canvas { width: 180px !important; height: 180px !important; }
+#app-container #crate-reveal-name { font-size: 46px !important; line-height: 1.1 !important; }
+#app-container #crate-reveal-unlocked { font-size: 30px !important; line-height: 1.2 !important; }
+#app-container #btn-equip-revealed,
+#app-container #btn-close-reveal { font-size: 32px !important; height: 72px !important; padding: 0 20px !important; border-radius: 16px !important; margin-top: 4px !important; }
+
+/* Header stats: the app box is really 1920 wide (max-width) while the scaler fits 2122,
+   so at 16:9 / 4:3 fullscreen the "+" coins button was cut off at the right edge.
+   Shift the LEVEL / XP / COINS cluster left so everything stays on screen. */
+#lobby-header .player-meta-box { transform: translateX(-104px) !important; }
+#lobby-panels .shop-wide-card .wide-card-right { text-align: left !important; align-items: flex-start !important; }
+#lobby-panels .shop-wide-card .wide-desc-row { justify-content: flex-start !important; text-align: left !important; }
+
+/* Difficulty cards: keep everything inside the panel with the real Fredoka font.
+   - selected/hovered cards no longer grow (scale pushed them past the panel edges)
+   - titles a bit smaller so "INTERMEDIATE" fits inside the card header */
+#lobby-panels .difficulty-wizard-deck {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  padding: 10px 10px 14px !important;
+  gap: 12px !important;
+}
+#lobby-panels .diff-wizard-card:hover,
+#lobby-panels .diff-wizard-card.active,
+#lobby-panels .diff-wizard-card.active:hover {
+  scale: none !important;
+  transform: none !important;
+}
+#lobby-panels .diff-wizard-card:hover { filter: brightness(1.06) !important; }
+#lobby-panels .diff-wizard-card.active { filter: drop-shadow(0 0 8px #00ffe0) drop-shadow(0 0 2px #00ffe0) !important; }
+#lobby-panels .diff-title { font-size: 28px !important; letter-spacing: 0.2px !important; max-width: 100% !important; }
+#lobby-panels .diff-sub { font-size: 26px !important; letter-spacing: 0 !important; }
+#lobby-panels .diff-card-header { padding: 6px 12px 0 !important; overflow: hidden !important; }
+
+/* Difficulty card body: slightly smaller text/icons, kept inside the frame's inner area and centered */
+#lobby-panels .diff-card-body {
+  padding: 10px 26px 30px !important;
+  align-items: center !important;
+}
+#lobby-panels .diff-boss-preview { width: 120px !important; height: 120px !important; }
+#lobby-panels .diff-metrics-list {
+  width: auto !important;
+  max-width: 100% !important;
+  align-self: center !important;
+  align-items: flex-start !important;
+  gap: 6px !important;
+  margin: 0 auto !important;
+}
+#lobby-panels .diff-metric { width: auto !important; max-width: 100% !important; gap: 7px !important; }
+#lobby-panels .diff-metric-icon { width: 22px !important; height: 22px !important; }
+#lobby-panels .diff-metric-text { font-size: 25px !important; }
+#lobby-panels .diff-title { font-size: 27px !important; }
+#lobby-panels .diff-sub { font-size: 25px !important; }
+#lobby-panels .diff-card-header { padding: 6px 22px 0 !important; }
+#lobby-panels .btn-quick-join:disabled { filter: grayscale(1) brightness(0.8) !important; opacity: 0.7 !important; cursor: not-allowed !important; scale: none !important; }
