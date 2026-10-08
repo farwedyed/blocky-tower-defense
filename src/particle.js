@@ -1,4 +1,6 @@
 // Cartoon Particle and Visual Effects Module for Blocky TDS 2D
+import { FX, addTrauma } from './fx/fx.js';
+import { FXUI } from './fx/fx-ui.js';
 
 // Cloud Particle for Placement dust puffs
 export class DustCloudParticle {
@@ -306,25 +308,14 @@ export class ScreenShake {
     this.decay = 0.85;
   }
 
+  // Legacy API kept for callers: now feeds the smooth, budgeted trauma shake in fx.js
   shake(amount) {
-    this.intensity = Math.min(this.intensity + amount, 15);
+    addTrauma(Math.min(0.4, amount * 0.035));
   }
 
-  update(dt) {
-    if (this.intensity > 0.1) {
-      this.intensity *= Math.pow(this.decay, dt * 60);
-    } else {
-      this.intensity = 0;
-    }
-  }
+  update(dt) {}
 
-  apply(ctx) {
-    if (this.intensity > 0.3) {
-      const dx = (Math.random() - 0.5) * this.intensity;
-      const dy = (Math.random() - 0.5) * this.intensity;
-      ctx.translate(dx, dy);
-    }
-  }
+  apply(ctx) {}
 }
 
 export class EffectManager {
@@ -359,26 +350,11 @@ export class EffectManager {
   }
 
   spawnPlacementSparks(x, y, cellSize = 40) {
-    // Spawn dust cloud puff around the tower block boundaries
-    const count = 10;
-    for (let i = 0; i < count; i++) {
-      const angle = (i / count) * Math.PI * 2;
-      const vx = Math.cos(angle) * 35;
-      const vy = Math.sin(angle) * 35;
-      const size = 6 + Math.random() * 6;
-      this.particles.push(new DustCloudParticle(x, y, vx, vy, size));
-    }
+    FX.dust(x, y, cellSize);
   }
 
   spawnImpact(x, y, color, count = 4, speedScale = 1.0) {
-    for (let i = 0; i < count; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = (30 + Math.random() * 50) * speedScale;
-      const vx = Math.cos(angle) * speed;
-      const vy = Math.sin(angle) * speed;
-      const size = 4 + Math.random() * 4;
-      this.particles.push(new CartoonFlame(x, y, vx, vy, size));
-    }
+    FX.impact(x, y, color);
   }
 
   spawnMusicNote(x, y) {
@@ -394,27 +370,8 @@ export class EffectManager {
   }
 
   spawnExplosion(x, y, radius) {
-    this.screenShake.shake(5);
-
-    // Cartoon fiery spikes
-    const count = 16;
-    for (let i = 0; i < count; i++) {
-      const angle = (i / count) * Math.PI * 2;
-      const speed = radius * 1.8 * (0.8 + Math.random() * 0.3);
-      const vx = Math.cos(angle) * speed;
-      const vy = Math.sin(angle) * speed;
-      const size = 6 + Math.random() * 6;
-      const color = Math.random() < 0.6 ? '#f39c12' : '#e74c3c';
-      this.particles.push(new ExplosionSpike(x, y, vx, vy, size, color));
-    }
-
-    // Centered dust ring
-    for (let i = 0; i < 8; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const vx = Math.cos(angle) * radius * 0.8;
-      const vy = Math.sin(angle) * radius * 0.8;
-      this.particles.push(new DustCloudParticle(x, y, vx, vy, 10));
-    }
+    // Layered cartoon boom: flash, shockwave, fireball cubes, debris, smoke, scorch, shake, sound
+    FX.explosion(x, y, radius);
   }
 
   spawnSwingArc(x, y, angle, range) {
@@ -422,6 +379,11 @@ export class EffectManager {
   }
 
   spawnWaveText(text, color = '#f1c40f') {
+    // Crisp DOM banner (canvas text is blurry and could be deleted by the particle cap)
+    if (FXUI.banner(text, color)) {
+      if (/^WAVE/.test(text) && FX.horn) FX.horn();
+      return;
+    }
     // Remove any previous wave banner so they do not overlap
     this.particles = this.particles.filter(p => !(p instanceof WaveText));
     this.particles.push(new WaveText(400, 300, text, color));

@@ -8,7 +8,93 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=1.2">
-  
+
+  <!-- ERROR CATCHER: queues uncaught errors from the very first moment so the
+       telemetry script can save them to Firebase (desktop only, a few per session). -->
+  <script>
+    (function () {
+      var MAX_PER_SESSION = 5;
+      var seen = {};
+      var count = 0;
+      window.__btdErrors = [];
+      function short(s, n) { s = String(s == null ? '' : s); return s.length > n ? s.slice(0, n) : s; }
+      // Only OUR code's errors are logged. Errors raised by other origins (CrazyGames' ad partners,
+      // consent/CMP scripts, browser extensions) are not game bugs, so they are skipped.
+      // CrazyGames SDK messages ARE kept: they mean the game used the SDK wrongly.
+      var OUR_SDK_MSG = /CrazySDK|HTML5 SDK/i;
+      function isForeign(url) {
+        if (!url) return false;
+        if (/^(chrome|moz|safari|ms-browser)-extension:|^extension:/i.test(url)) return true;
+        try { return new URL(url, location.href).origin !== location.origin; } catch (e) { return false; }
+      }
+      function urlsIn(stack) { return String(stack || '').match(/(?:https?|chrome-extension|moz-extension|safari-extension):\/\/[^\s)]+/g) || []; }
+      function stripPos(u) { return u.replace(/:\d+(:\d+)?$/, ''); }
+      function push(kind, message, file, line, col, stack, callerUrl) {
+        try {
+          message = short(message, 300);
+          if (!message || /ResizeObserver loop/i.test(message)) return;
+          if (!OUR_SDK_MSG.test(message)) {
+            if (/^Script error\.?$/i.test(message)) return; // cross-origin script: no details, not ours
+            if (isForeign(file) || isForeign(callerUrl)) return;
+            var firstUrl = urlsIn(stack)[0];
+            if (firstUrl && isForeign(stripPos(firstUrl))) return;
+          }
+          // Firestore's own messages (offline, quota exceeded, backoff) are about our stats backend, not the game
+          if (/@firebase\/|FirebaseError|resource-exhausted|Quota exceeded|maximum backoff delay|Could not reach Cloud Firestore backend/i.test(message)) return;
+          // Backup patterns for ad / consent partner logs that don't carry a source URL
+          if (/ox_esp|Call to OX failed|\[LoadScript\]|googletag|doubleclick|prebid|imasdk|SYNC\.JS|__tcfapi|TCF IFRAME|\bCMP\b|adsbygoogle|apstag|amazon-adsystem/i.test(message)) return;
+          file = short(String(file || '').replace(/^https?:\/\/[^/]+/, '').replace(/[?#].*$/, ''), 120);
+          var key = kind + '|' + message + '|' + file + '|' + (line || 0);
+          if (seen[key] || count >= MAX_PER_SESSION) return;
+          seen[key] = 1; count++;
+          var g = window.game;
+          var ctx = {};
+          try {
+            if (g) {
+              ctx.state = g.state; ctx.map = g.selectedMap; ctx.difficulty = g.selectedDifficulty; ctx.wave = g.wave;
+            }
+            if (window.lobbyPlayers) {
+              ctx.players = Object.keys(window.lobbyPlayers).filter(function (k) { return window.lobbyPlayers[k]; }).length;
+            }
+            ctx.slot = window.myPlayerId || '';
+            ctx.secondsIn = Math.round(performance.now() / 1000);
+          } catch (e) {}
+          var item = { kind: kind, message: message, file: file, line: line || 0, col: col || 0, stack: short(stack, 1200), ctx: ctx, key: key };
+          window.__btdErrors.push(item);
+          if (typeof window.__btdOnError === 'function') window.__btdOnError(item);
+        } catch (e) {}
+      }
+      window.addEventListener('error', function (e) {
+        if (!e || e.target && e.target !== window) return; // ignore failed image/script loads here
+        push('error', e.message || (e.error && e.error.message), e.filename, e.lineno, e.colno, e.error && e.error.stack);
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        var r = e && e.reason;
+        push('promise', (r && (r.message || r.toString())) || 'Unhandled rejection', '', 0, 0, r && r.stack);
+      });
+      // Errors the game catches itself ("Defensive Guard") still point at real bugs
+      var origError = console.error;
+      console.error = function () {
+        try {
+          var parts = [], stack = '';
+          for (var i = 0; i < arguments.length; i++) {
+            var a = arguments[i];
+            if (a && a.stack) { parts.push(a.message || String(a)); stack = a.stack; }
+            else parts.push(typeof a === 'string' ? a : (function () { try { return JSON.stringify(a); } catch (x) { return String(a); } })());
+          }
+          // Who called console.error? (1st stack URL is this wrapper in index.html, the next one is the caller)
+          var callerUrl = '';
+          try {
+            var us = urlsIn(new Error().stack);
+            if (us.length > 1) callerUrl = stripPos(us[1]);
+          } catch (x) {}
+          push('caught', parts.join(' '), '', 0, 0, stack, callerUrl);
+        } catch (e) {}
+        return origError.apply(console, arguments);
+      };
+    })();
+  </script>
+
   <!-- CrazyGames SDK v3 Import -->
   <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
 </head>
@@ -36,9 +122,6 @@
   </div>
 
   <div id="app-container">
-    <!-- Live Reference Overlay for the Visual Editor -->
-    <img id="ui-editor-ref-overlay" src="assets/ui/refrence.png" alt="Mockup Reference" />
-
     <!-- 1. LOBBY / MAIN MENU VIEW -->
     <div id="lobby-view" class="">
       <header id="lobby-header">
@@ -411,6 +494,16 @@
                 <button id="btn-deploy" class="btn-prep-deploy">
                   <span>DEPLOY TO MATCH</span>
                   <img src="assets/ui/solo/sprite_02.png" class="prep-deploy-swords" alt="" />
+                </button>
+                <!-- Solo only: rewarded ad for extra starting cash, docked on DEPLOY (LobbyUI.refreshPrepBoost) -->
+                <button id="btn-prep-boost" class="prep-boost-dock" style="display:none"
+                        title="Watch an ad: your next solo match starts with +$150. Boosted runs don't count on the speedrun board.">
+                  <img class="prep-boost-cash" src="assets/sprites/CashCase.png" alt="" />
+                  <span class="prep-boost-check">✓</span>
+                  <span class="prep-boost-text">
+                    <b id="prep-boost-label">+$150 CASH</b>
+                    <i id="prep-boost-sub">▶ WATCH AD</i>
+                  </span>
                 </button>
               </div>
 
@@ -958,6 +1051,27 @@
 
     <!-- 2. GAME / MATCH VIEW -->
     <div id="game-view" class="hidden">
+      <!-- HUD V2: TOP BAR (map name, wave plaque + enemies left, health, cash, quit) -->
+      <header id="hud-topbar">
+        <div class="tb-left">
+          <svg class="hud2-mapico" viewBox="0 0 64 64" aria-hidden="true"><path d="M6 16 L22 10 L42 16 L58 10 L58 50 L42 56 L22 50 L6 56Z" fill="#7bc043" stroke="#1b1b1b" stroke-width="4" stroke-linejoin="round"/><path d="M22 10 L22 50 M42 16 L42 56" stroke="#1b1b1b" stroke-width="3"/><path d="M12 40 Q24 30 32 38 T52 26" stroke="#f3d29a" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M44 4 C38 4 35 8 35 12 C35 18 44 26 44 26 C44 26 53 18 53 12 C53 8 50 4 44 4Z" fill="#e53935" stroke="#1b1b1b" stroke-width="3"/><circle cx="44" cy="12" r="3" fill="#fff"/></svg>
+          <div class="current-map-badge" id="hud-map-name">GRASSLAND</div>
+        </div>
+        <div class="tb-wave">
+          <div class="tb-wave-plaque">WAVE <span id="hud-wave"><span id="hud-wave-val">0 / 10</span></span></div>
+          <div class="tb-wave-bar"><div id="hud-wave-fill"></div><span id="hud-enemies-left">GET READY</span></div>
+        </div>
+        <div class="tb-right">
+          <div class="tb-stat">
+            <span id="hud-lives" class="value"><svg class="hud-icon hud2-ico" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 57 C8 40 4 28 4 20 C4 10 12 4 20 4 C26 4 30 8 32 12 C34 8 38 4 44 4 C52 4 60 10 60 20 C60 28 56 40 32 57Z" fill="#e53935" stroke="#1b1b1b" stroke-width="5" stroke-linejoin="round"/><ellipse cx="19" cy="18" rx="7" ry="4.5" fill="#ff9a9a" transform="rotate(-30 19 18)"/></svg><span class="tb-stat-text"><span class="label">BASE HEALTH</span><span id="hud-lives-val">20</span></span></span>
+          </div>
+          <div class="tb-stat">
+            <span id="hud-gold" class="value"><svg class="hud-icon hud2-ico" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="27" fill="#e09b00" stroke="#1b1b1b" stroke-width="5"/><circle cx="32" cy="30" r="20" fill="#ffd23f"/><text x="32" y="41" text-anchor="middle" font-family="Fredoka,Arial" font-weight="900" font-size="28" fill="#b06f00">$</text><ellipse cx="22" cy="20" rx="6" ry="3.5" fill="#fff7c2" transform="rotate(-35 22 20)"/></svg><span class="tb-stat-text"><span class="label">CASH</span><span id="hud-gold-val">$400</span></span></span>
+          </div>
+          <button id="btn-return-lobby" class="btn btn-exit">QUIT</button>
+        </div>
+      </header>
+
       <!-- CINEMATIC TUTORIAL DIM SHADOW OVERLAY -->
       <div id="tutorial-dim-overlay" class="hidden">
         <svg id="tutorial-dim-svg" width="100%" height="100%" style="width: 100%; height: 100%; display: block;">
@@ -1010,47 +1124,23 @@
       </div>
 
       <aside id="game-sidebar">
-        <header>
-          <div class="current-map-badge" id="hud-map-name">GRASSLAND</div>
-          <button id="btn-return-lobby" class="btn btn-exit">QUIT TO LOBBY</button>
-        </header>
-
-        <section id="game-hud">
-          <div class="hud-box">
-            <span class="label">BASE HEALTH</span>
-            <span id="hud-lives" class="value red-val"><img src="https://img.icons8.com/color/48/hearts.png" class="hud-icon" /> <span id="hud-lives-val">20</span></span>
-          </div>
-          <div class="hud-box">
-            <span class="label">CASH</span>
-            <span id="hud-gold" class="value green-val"><img src="https://img.icons8.com/color/48/stack-of-money.png" class="hud-icon" /> <span id="hud-gold-val">$400</span></span>
-          </div>
-          <div class="hud-box">
-            <span class="label">WAVE</span>
-            <span id="hud-wave" class="value yellow-val"><img src="https://img.icons8.com/color/48/tsunami.png" class="hud-icon" /> <span id="hud-wave-val">0 / 10</span></span>
-          </div>
-        </section>
-
         <section id="game-controls">
-          <div class="control-row">
+          <div class="control-row hud2-row-main">
             <button id="btn-next-wave" class="btn btn-primary">START WAVE</button>
-            <button id="btn-skip-wave" class="btn btn-secondary hidden" style="background: #e67e22; color: #fff;">SKIP WAVE</button>
+            <button id="btn-skip-wave" class="btn btn-secondary hidden">SKIP WAVE</button>
           </div>
-          <div class="control-row">
-            <button id="btn-auto-wave" class="btn btn-secondary" style="background: #27ae60; color: #fff;">AUTO WAVE: ON</button>
-            <button id="btn-speed" class="btn btn-secondary">SPEED x1</button>
+          <div class="control-row hud2-row-sub">
+            <button id="btn-auto-wave" class="btn btn-secondary is-on"><span class="hud2-toggle"><i></i></span><span class="hud2-auto-label">AUTO</span></button>
+            <button id="btn-speed" class="btn btn-secondary"><span class="hud2-speed-label">SPEED</span><b class="hud2-spd on">x1</b><b class="hud2-spd">x2</b></button>
           </div>
         </section>
 
         <section id="placement-shop">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <h3 style="margin: 0;">PLACE AGENTS</h3>
-            <span id="placement-limit-badge" style="font-size: 0.72rem; font-weight: 900; background: var(--primary-orange); color: #fff; padding: 2px 6px; border-radius: 4px; border: 1.5px solid var(--border-color); line-height: 1;">0 / 40 PLACED</span>
-          </div>
+          <div class="hud2-shop-head"><span id="placement-limit-badge">0 / 40 PLACED</span></div>
           <div id="equipped-agents-list"></div>
         </section>
-      </aside>
 
-      <!-- ZERO-SCROLL DETACHED UPGRADE MODIFICATION PANEL -->
+      <!-- SELECTED AGENT PANEL (docked at the bottom of the sidebar) -->
       <section id="selection-panel" class="hidden">
         <div class="selection-panel-inner">
           <div id="selection-info">
@@ -1077,6 +1167,11 @@
           </div>
         </div>
       </section>
+      <section id="selection-empty">
+        <div class="hud2-empty-portrait"></div>
+        <div class="hud2-empty-text">SELECT AN AGENT<small>Click one of your agents on the map to upgrade or sell it</small></div>
+      </section>
+      </aside>
 
     </div>
 
@@ -1137,10 +1232,11 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
   <!-- ─── SESSION TIME TELEMETRY (desktop only) ─── -->
-  <!-- Records one session document per page load with how long the player stayed.
-       Mobile players are not tracked. Writes per session: 3 on start (+1 on a new player's first visit or a day 1/2/7 return) + 1 when they first start a match + 1 every 5 min + 1 when the tab is hidden. -->
+  <!-- Everything per player is on devices/{id}: totalPlaySeconds, sessionSeconds, gameplaySessions, ad totals.
+       Records one session document per page load with how long the player stayed.
+       Mobile players are not tracked. Writes per session: 2 on start (+1 on a new player's first visit or a day 1/2/7 return), then every 10 min and when the tab is hidden: 1 (device) + 1 (daily, only if ads/conversion happened since the last save). Ad and conversion counters are buffered in memory until then. -->
   <script type="module">
-    import { startSessionTelemetry, updateSessionTelemetry, trackGameplayConversion, trackAdWatched } from './src/firebase.js';
+    import { startSessionTelemetry, saveSessionProgress, trackGameplayConversion, trackAdWatched, trackAdRequest, reportClientError } from './src/firebase.js';
 
     const sessionStartTime = Date.now();
     const ua = navigator.userAgent;
@@ -1148,7 +1244,7 @@
     const isTracking = !isMobileOrTablet; // 100% desktop, 0% mobile/tablet
 
     let ready = false;
-    let lastSavedSeconds = -1;
+    let lastSavedSeconds = 0;
     let reachedGameplay = false;
     let pendingConversion = false;
     let rewardedAdsThisSession = 0;
@@ -1157,15 +1253,16 @@
     function saveSessionTime() {
       if (!isTracking || !ready) return;
       const seconds = Math.round((Date.now() - sessionStartTime) / 1000);
-      if (seconds === lastSavedSeconds) return; // nothing new to save
+      if (seconds <= lastSavedSeconds) return; // nothing new to save
+      const deltaSeconds = seconds - lastSavedSeconds;
       lastSavedSeconds = seconds;
       const g = window.game;
-      const update = { totalSessionTime: seconds, reachedGameplay, rewardedAds: rewardedAdsThisSession, midgameAds: midgameAdsThisSession };
+      const update = { seconds, deltaSeconds, reachedGameplay };
       if (g) {
         update.level = g.playerLevel;
         update.coins = g.playerCoins;
       }
-      updateSessionTelemetry(update).catch(() => {});
+      saveSessionProgress(update).catch(() => {});
     }
 
     // Ads actually watched (fired by CrazyGamesManager)
@@ -1175,6 +1272,15 @@
       if (kind === 'rewarded') rewardedAdsThisSession++;
       else if (kind === 'midgame') midgameAdsThisSession++;
       if (ready) trackAdWatched(kind, e.detail.placement);
+    });
+
+    // Every ad request and how it ended (shown / refused + reason)
+    const pendingAdRequests = [];
+    window.addEventListener('btd:ad-request', (e) => {
+      if (!isTracking || !e.detail) return;
+      const d = e.detail;
+      if (ready) trackAdRequest(d.kind, d.placement, d.outcome);
+      else if (pendingAdRequests.length < 10) pendingAdRequests.push(d);
     });
 
     // Gameplay conversion: first time this page load the player enters a match
@@ -1197,7 +1303,11 @@
       }
       if (ready) {
         if (pendingConversion) trackGameplayConversion();
-        setInterval(saveSessionTime, 5 * 60 * 1000);
+        pendingAdRequests.splice(0).forEach((d) => trackAdRequest(d.kind, d.placement, d.outcome));
+        setInterval(saveSessionTime, 10 * 60 * 1000); // also saves the buffered ad / conversion counters
+        // Errors: send the ones caught so far, then each new one as it happens
+        (window.__btdErrors || []).forEach((item) => reportClientError(item));
+        window.__btdOnError = (item) => reportClientError(item);
       }
     });
 

@@ -170,6 +170,7 @@ export class DJMusicWave {
   }
 
   draw(ctx) {
+    if (!(this.radius > 0)) return; // arc() throws on a negative radius
     ctx.save();
     ctx.strokeStyle = 'rgba(155, 89, 182, 0.4)'; 
     ctx.lineWidth = 4;
@@ -224,8 +225,7 @@ export class Rocket extends Bullet {
   }
 
   explode(effectManager, enemies) { // Corrected parameter order
-    effectManager.spawnExplosion(this.x, this.y, this.splashRadius);
-    soundManager.playShoot();
+    effectManager.spawnExplosion(this.x, this.y, this.splashRadius);   // includes the boom sound
 
     for (const enemy of enemies) {
       if (enemy.health <= 0) continue;

@@ -349,6 +349,58 @@ export class LobbyCoop {
     if (this.lobbyUI.parentUI) this.lobbyUI.parentUI.hidePointer();
   }
 
+  /**
+   * Big "RECONNECT" prompt shown on login when the co-op match this player dropped out of is
+   * still being played (the server checked: same match, not back in lobby, not finished).
+   */
+  showRejoinPrompt(info, status) {
+    this.hideRejoinPrompt();
+    const app = document.getElementById('app-container');
+    if (!app || !info) return;
+
+    const mapNames = { grassland: 'Grassland', desert: 'Desert Outpost', tundra: 'Frost Tundra', cyber_city: 'Cyber City', fallen_outpost: 'Fallen Outpost' };
+    const mapName = mapNames[status && status.selectedMap] || 'your map';
+    const players = status && status.players ? status.players : 0;
+    const diff = status && status.selectedDifficulty ? String(status.selectedDifficulty).toUpperCase() : '';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'rejoin-prompt-overlay';
+    overlay.innerHTML = `
+      <div class="rejoin-card" role="dialog" aria-labelledby="rejoin-title">
+        <div class="rejoin-pulse-dot"></div>
+        <div id="rejoin-title" class="rejoin-title">YOUR MATCH IS STILL ON!</div>
+        <div class="rejoin-sub">You got disconnected from your squad. They're still fighting on <b>${mapName}</b>${diff ? ` (${diff})` : ''}${players ? ` with ${players} player${players === 1 ? '' : 's'}` : ''}.</div>
+        <button id="btn-rejoin-match" class="btn-rejoin-big">
+          <img src="assets/ui/solo/sprite_02.png" class="btn-rejoin-swords" alt="" />
+          <span>RECONNECT</span>
+        </button>
+        <button id="btn-rejoin-dismiss" class="btn-rejoin-dismiss">No thanks, go to menu</button>
+      </div>
+    `;
+    app.appendChild(overlay);
+
+    overlay.querySelector('#btn-rejoin-match').addEventListener('click', () => {
+      soundManager.playTick();
+      this.hideRejoinPrompt();
+      this.showCoopConnectingState(info.roomId);
+      const title = document.getElementById('coop-connecting-title');
+      const sub = document.getElementById('coop-connecting-sub');
+      if (title) title.textContent = 'RECONNECTING...';
+      if (sub) sub.textContent = `Getting you back into room ${info.roomId}`;
+      Network.rejoinMatch(info);
+    });
+    overlay.querySelector('#btn-rejoin-dismiss').addEventListener('click', () => {
+      soundManager.playTick();
+      Network.clearRejoinInfo();
+      this.hideRejoinPrompt();
+    });
+  }
+
+  hideRejoinPrompt() {
+    const old = document.getElementById('rejoin-prompt-overlay');
+    if (old) old.remove();
+  }
+
   clearConnectingState() {
     const roomPhase = document.getElementById('coop-room-phase');
     if (roomPhase) roomPhase.classList.remove('is-connecting');

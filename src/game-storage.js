@@ -20,7 +20,10 @@ import {
 function getStorageItem(key) {
   if (CrazyGamesManager.isAvailable() && window.CrazyGames?.SDK?.data) {
     try {
-      return window.CrazyGames.SDK.data.getItem(key);
+      const cloud = window.CrazyGames.SDK.data.getItem(key);
+      // Nothing in the Data Module yet (e.g. older sessions where the SDK wasn't ready and only
+      // localStorage got the save): fall back to the local copy instead of resetting progress.
+      if (cloud !== null && cloud !== undefined) return cloud;
     } catch (e) {
       // Fallback silently without throwing errors
     }
@@ -206,10 +209,10 @@ export function saveStatsToStorage(game) {
  * @returns {object} { coinsEarned, xpEarned }
  */
 export function awardMatchRewards(game) {
-  if (game._rewardsClaimed) {
-    return { coinsEarned: 0, xpEarned: 0 };
-  }
-  game._rewardsClaimed = true;
+  // Rewards are paid incrementally: each call pays only what was earned since the
+  // last payout of this match. This keeps double calls harmless (summary + quit)
+  // and still pays for the waves played after a revive.
+  if (!game._rewardsGiven) game._rewardsGiven = { coins: 0, xp: 0 };
 
   // 1. NEVER give cash or XP from tutorial matches
   if (game.isTutorialMatch || game.tutorialActive) {
@@ -239,6 +242,13 @@ export function awardMatchRewards(game) {
       xpEarned *= 3;
     }
   }
+
+  // Only pay what has not been paid yet this match
+  const totalCoins = coinsEarned, totalXp = xpEarned;
+  coinsEarned = Math.max(0, totalCoins - game._rewardsGiven.coins);
+  xpEarned = Math.max(0, totalXp - game._rewardsGiven.xp);
+  game._rewardsGiven.coins = Math.max(totalCoins, game._rewardsGiven.coins);
+  game._rewardsGiven.xp = Math.max(totalXp, game._rewardsGiven.xp);
 
   if (coinsEarned <= 0 && xpEarned <= 0) {
     return { coinsEarned: 0, xpEarned: 0 };
@@ -325,6 +335,8 @@ export function checkQuestCompletion(game) {
  * @param {object} game - The main game instance
  */
 export function saveSpeedrunRecord(game) {
+  // Runs started with the rewarded start boost are unranked (keeps the leaderboard fair)
+  if (game.startBoostUsed) return;
   const minutes = Math.floor(game.matchTime / 60);
   const seconds = Math.floor(game.matchTime % 60);
   const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;

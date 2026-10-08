@@ -3,6 +3,8 @@
 
 import { Network } from './network.js';
 import { getTowerRange } from './game-config.js';
+import { getVariants, fxState, fxApplyShake, fxDrawDecals, fxDrawParticles, fxSettings } from './fx/fx.js';
+import { drawPathIntro } from './fx/path-intro.js';
 import { 
   Scout, Minigunner, Commander, DJUnit, Pyromancer, Farm, Gladiator, 
   Soldier, Sniper, Medic, Rocketeer, Demoman, Freezer, Shotgunner, 
@@ -239,6 +241,59 @@ export function preloadAllAssets(onProgress, onComplete) {
 }
 
 // ─── 4. CRISP PREVIEW DRAWING UTILITIES ───
+// ─── Crisp, tightly framed agent portraits for the HUD ───
+// The sprite PNGs are large (250-1250px) with wide transparent margins. We find the visible
+// bounding box once per sprite and draw just that area, smoothly downscaled, so portraits are
+// sharp and nothing (like the Scout's gun) gets cut off.
+const portraitBoxCache = new Map();
+function spriteBox(img) {
+  let box = portraitBoxCache.get(img.src);
+  if (box) return box;
+  const S = 256, c = document.createElement('canvas');
+  c.width = S; c.height = S;
+  const x = c.getContext('2d');
+  x.drawImage(img, 0, 0, S, S);
+  let minX = S, minY = S, maxX = -1, maxY = -1;
+  try {
+    const d = x.getImageData(0, 0, S, S).data;
+    for (let yy = 0; yy < S; yy++) {
+      for (let xx = 0; xx < S; xx++) {
+        if (d[(yy * S + xx) * 4 + 3] > 20) {
+          if (xx < minX) minX = xx; if (xx > maxX) maxX = xx;
+          if (yy < minY) minY = yy; if (yy > maxY) maxY = yy;
+        }
+      }
+    }
+  } catch (e) {}
+  if (maxX < 0) { minX = 0; minY = 0; maxX = S - 1; maxY = S - 1; }
+  box = { x: minX / S, y: minY / S, w: (maxX - minX + 1) / S, h: (maxY - minY + 1) / S };
+  portraitBoxCache.set(img.src, box);
+  return box;
+}
+
+export function drawAgentPortrait(canvas, agentType, level = 1, pad = 0.08) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const meta = TOWER_SPRITE_MAP[agentType];
+  if (!meta) return;
+  const img = getAgentSprite(meta.sheet, meta.row, Math.max(0, Math.min(4, level - 1)));
+  if (!img.complete || !img.naturalWidth) {
+    img.addEventListener('load', () => drawAgentPortrait(canvas, agentType, level, pad), { once: true });
+    return;
+  }
+  const b = spriteBox(img);
+  const W = canvas.width, H = canvas.height;
+  const sx = b.x * img.naturalWidth, sy = b.y * img.naturalHeight;
+  const sw = b.w * img.naturalWidth, sh = b.h * img.naturalHeight;
+  const avail = Math.min(W, H) * (1 - pad * 2);
+  const k = avail / Math.max(sw, sh);
+  const dw = sw * k, dh = sh * k;
+  ctx.clearRect(0, 0, W, H);
+  ctx.imageSmoothingEnabled = true;
+  try { ctx.imageSmoothingQuality = 'high'; } catch (e) {}
+  ctx.drawImage(img, sx, sy, sw, sh, (W - dw) / 2, (H - dh) / 2, dw, dh);
+}
+
 export function drawAgentPreviewOnCanvas(canvas, agentType, level = 1) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -329,13 +384,20 @@ export function drawAgent(game, agent) {
   }
 
   const time = agent.timeAccumulator || 0;
-  const bob = Math.sin(time * 8.0) * 1.2;
+  const fx = fxState(agent);
+  // Juice: slow breathing instead of a fast bob, drop-in on placement, squash spring on land/upgrade
+  const phase = (agent.gridX || 0) * 1.7 + (agent.gridY || 0) * 0.9;
+  const breathe = 1 + Math.sin(time * 3.4 + phase) * 0.025;
+  const dropZ = fx.drop > 0 ? fx.drop * fx.drop * 30 : 0;
+  const sx = breathe * (1 + fx.p) * (fx.drop > 0 ? 1 + fx.drop * 0.15 : 1);
+  const sy = breathe * (1 - fx.p * 0.7) * (fx.drop > 0 ? 1 + fx.drop * 0.15 : 1);
 
-  ctx.translate(agent.x, agent.y + bob);
+  ctx.translate(agent.x, agent.y - dropZ);
 
   if (agent.type !== 'farm' && agent.type !== 'military_base') {
     ctx.rotate(agent.angle);
   }
+  ctx.scale(sx, sy);
 
   const recoilX = -agent.recoilOffset;
 
@@ -343,11 +405,14 @@ export function drawAgent(game, agent) {
   const bodyOffsetX = (agent.type === 'farm' || agent.type === 'military_base') ? 0 : 5;
 
   const drawSize = agent.cellSize * 1.15;
-  ctx.drawImage(
-    img,
-    recoilX - drawSize / 2 + bodyOffsetX, -drawSize / 2,
-    drawSize, drawSize
-  );
+  const v = getVariants(img, drawSize);
+  const dx = recoilX - drawSize / 2 + bodyOffsetX, dy = -drawSize / 2;
+  ctx.drawImage(v ? v.base : img, dx, dy, drawSize, drawSize);
+  if (v && fx.flash > 0) {
+    ctx.globalAlpha = fx.flash * (fxSettings.reduceFlash ? 0.45 : 0.9);
+    ctx.drawImage(v.white, dx, dy, drawSize, drawSize);
+    ctx.globalAlpha = 1;
+  }
 
   ctx.restore();
 }
@@ -416,42 +481,58 @@ export function drawEnemy(game, zombie) {
     ctx.globalAlpha = 0.55;
   }
 
-  // Draw flat ground shadow
+  const fx = fxState(zombie);
+  const frozen = zombie.slowDuration > 0;
+  const deepFreeze = frozen && (zombie.slowFactor === undefined || zombie.slowFactor <= 0.4);
+
+  // Walk cycle: step hop + side wobble, frequency follows walk speed (frozen = shiver instead)
+  const time = zombie.timeAccumulator || 0;
+  const stepHz = Math.max(1.2, (zombie.speed || 30) / 18);
+  const stepPhase = Math.sin(Math.PI * stepHz * time + (zombie.id || 0));
+  let hop = deepFreeze ? 0 : Math.abs(stepPhase) * (zombie.isBoss ? 3.5 : 2.5);
+  let wobble = deepFreeze ? 0 : stepPhase * (zombie.isBoss ? 0.05 : 0.09);
+  if (zombie.burnDuration > 0 && !deepFreeze) wobble += Math.sin(time * 15 + (zombie.id || 0)) * 0.1;   // panic
+  const shiverX = deepFreeze ? Math.sin(time * 110) * 0.6 : 0;
+
+  // Draw flat ground shadow (shrinks a little at the top of each hop)
   ctx.fillStyle = 'rgba(0, 0, 0, 0.16)';
   ctx.beginPath();
-  ctx.ellipse(zombie.x, zombie.y + 10, zombie.radius * 0.9, zombie.radius * 0.35, 0, 0, Math.PI * 2);
+  ctx.ellipse(zombie.x, zombie.y + 10, zombie.radius * 0.9 * (1 - hop * 0.03), zombie.radius * 0.35, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Walk bobbing frequency scales with walk speed
-  const speedFactor = zombie.speed > 0 ? zombie.speed * 0.12 : 5.0;
-  const time = zombie.timeAccumulator || 0;
-  const bob = Math.sin(time * speedFactor) * 1.1;
-
-  let renderY = zombie.y + bob;
+  let renderY = zombie.y - hop + fx.ky;
   if (zombie.isFlying) {
-    renderY = zombie.y - 18 + bob;
+    renderY = zombie.y - 18 + Math.sin(time * 7.5) * 2 + fx.ky;
   }
 
-  ctx.translate(zombie.x, renderY);
+  ctx.translate(zombie.x + fx.kx + shiverX, renderY);
 
-  // Rotate to match moving angle along path nodes
-  let angle = 0;
+  // Smoothly turn toward the path direction (no more instant 90 degree snaps at corners)
+  let angle = fx.ra !== null ? fx.ra : 0;
   if (game.grid && game.grid.pixelPath.length > 0) {
     const path = game.grid.pixelPath;
     if (zombie.targetNodeIndex >= 0 && zombie.targetNodeIndex < path.length) {
       const target = path[zombie.targetNodeIndex];
-      angle = Math.atan2(target.y - zombie.y, target.x - zombie.x);
+      const want = Math.atan2(target.y - zombie.y, target.x - zombie.x);
+      if (fx.ra === null) angle = want;
+      else {
+        let d = want - angle;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        angle += d * Math.min(1, (game._fxRealDt || 0.016) * 12);
+      }
     }
   }
-  ctx.rotate(angle);
+  fx.ra = angle;
+  ctx.rotate(angle + wobble);
 
-  // Enraged fire aura
+  // Enraged fire aura (pulses smoothly)
   if (zombie.enraged) {
     ctx.save();
-    ctx.globalAlpha = 0.25;
+    ctx.globalAlpha = 0.18 + 0.1 * Math.sin(time * 6);
     ctx.fillStyle = '#e74c3c';
     ctx.beginPath();
-    ctx.arc(0, 0, zombie.radius * 1.5, 0, Math.PI * 2);
+    ctx.arc(0, 0, zombie.radius * (1.45 + 0.1 * Math.sin(time * 6)), 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -464,12 +545,52 @@ export function drawEnemy(game, zombie) {
     drawSize = Math.max(85, drawSize); // Bosses are always imposing and massive
   }
 
-  // Draw cropped sprite centered
-  ctx.drawImage(
-    img,
-    -drawSize / 2, -drawSize / 2,
-    drawSize, drawSize
-  );
+  // Squash & stretch from the hit spring
+  const sq = fx.p;
+  ctx.scale(1 + sq, 1 - sq * 0.7);
+
+  const v = getVariants(img, drawSize);
+  fx.v = v; fx.size = drawSize;
+  const h = drawSize / 2;
+  ctx.drawImage(v ? v.base : img, -h, -h, drawSize, drawSize);
+  if (v) {
+    const baseAlpha = ctx.globalAlpha;
+    // Status tints
+    if (frozen) {
+      ctx.globalAlpha = baseAlpha * (deepFreeze ? 0.5 : 0.32);
+      ctx.drawImage(v.ice, -h, -h, drawSize, drawSize);
+    } else if (zombie.burnDuration > 0) {
+      ctx.globalAlpha = baseAlpha * (0.25 + 0.12 * Math.sin(time * 9 + (zombie.id || 0)));
+      ctx.drawImage(v.fire, -h, -h, drawSize, drawSize);
+    } else if (zombie.enraged) {
+      ctx.globalAlpha = baseAlpha * (0.22 + 0.12 * Math.sin(time * 4));
+      ctx.drawImage(v.red, -h, -h, drawSize, drawSize);
+    }
+    // Hit flash
+    if (fx.flash > 0) {
+      ctx.globalAlpha = baseAlpha * fx.flash * (fxSettings.reduceFlash ? 0.45 : 0.95);
+      ctx.drawImage(v.white, -h, -h, drawSize, drawSize);
+    }
+    ctx.globalAlpha = baseAlpha;
+  }
+
+  // Ice block encasement on deep freeze
+  if (deepFreeze) {
+    const pop = fx.iceIn > 0 ? 1 + fx.iceIn * 0.35 : 1;
+    const b = drawSize * 0.4 * pop;
+    ctx.globalAlpha = 0.38;
+    ctx.fillStyle = '#bfefff';
+    ctx.fillRect(-b, -b, b * 2, b * 2);
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-b + 3, -b + 3, b * 0.9, 3);
+    ctx.fillRect(-b + 3, -b + 3, 3, b * 0.7);
+    ctx.fillRect(b * 0.35, b * 0.2, 3, b * 0.45);
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#1e5a8c';
+    ctx.strokeRect(-b, -b, b * 2, b * 2);
+  }
 
   ctx.restore();
 
@@ -486,8 +607,9 @@ export function draw(game) {
   game.ctx.clearRect(0, 0, game.canvas.width, game.canvas.height);
 
   if (game.state === 'playing' || game.state === 'victory' || game.state === 'gameover') {
-    game.effectManager.screenShake.apply(game.ctx);
+    fxApplyShake(game.ctx);
     game.grid.draw(game.ctx);
+    fxDrawDecals(game.ctx);
 
     // Draw active towers using sprites
     for (const agent of game.grid.towers.values()) {
@@ -558,82 +680,10 @@ export function draw(game) {
     }
 
     game.effectManager.draw(game.ctx);
+    fxDrawParticles(game.ctx);
 
-    if (game.showMapDirections) {
-      game.ctx.save();
-      const arrowBounce = Math.sin(Date.now() / 150) * 8;
-      
-      let startPt = game.grid.pixelPath[0];
-      let startX = startPt.x < 0 ? 10 : startPt.x;
-      let startY = startPt.y;
-      
-      let endPt = game.grid.pixelPath[game.grid.pixelPath.length - 1];
-      let endX = endPt.x > game.canvas.width ? game.canvas.width - 25 : endPt.x;
-      let endY = endPt.y;
-
-      game.ctx.fillStyle = '#ff3333';
-      game.ctx.strokeStyle = '#000';
-      game.ctx.lineWidth = 4;
-      game.ctx.font = "bold 14px 'Fredoka', 'Nunito', sans-serif";
-      game.ctx.textAlign = 'left';
-      
-      game.ctx.strokeText("ENTRANCE - ZOMBIES SPAWN HERE!", startX + 25, startY - 45 + arrowBounce);
-      game.ctx.fillText("ENTRANCE - ZOMBIES SPAWN HERE!", startX + 25, startY - 45 + arrowBounce);
-
-      game.ctx.fillStyle = '#ff3333';
-      game.ctx.beginPath();
-      game.ctx.moveTo(startX, startY - 35 + arrowBounce);
-      game.ctx.lineTo(startX - 10, startY - 55 + arrowBounce);
-      game.ctx.lineTo(startX - 4, startY - 55 + arrowBounce);
-      game.ctx.lineTo(startX - 4, startY - 70 + arrowBounce);
-      game.ctx.lineTo(startX + 4, startY - 70 + arrowBounce);
-      game.ctx.lineTo(startX + 4, startY - 55 + arrowBounce);
-      game.ctx.lineTo(startX + 10, startY - 55 + arrowBounce);
-      game.ctx.closePath();
-      game.ctx.fill();
-      game.ctx.stroke();
-
-      game.ctx.fillStyle = '#2ecc71';
-      game.ctx.strokeStyle = '#000';
-      game.ctx.lineWidth = 4;
-      game.ctx.font = "bold 14px 'Fredoka', 'Nunito', sans-serif";
-      game.ctx.textAlign = 'right';
-      
-      game.ctx.strokeText("BASE - KEEP THE ZOMBIES OUT!", endX - 25, endY - 45 + arrowBounce);
-      game.ctx.fillText("BASE - KEEP THE ZOMBIES OUT!", endX - 25, endY - 45 + arrowBounce);
-
-      game.ctx.fillStyle = '#2ecc71';
-      game.ctx.beginPath();
-      game.ctx.moveTo(endX, endY - 35 + arrowBounce);
-      game.ctx.lineTo(endX - 10, endY - 55 + arrowBounce);
-      game.ctx.lineTo(endX - 4, endY - 55 + arrowBounce);
-      game.ctx.lineTo(endX - 4, endY - 70 + arrowBounce);
-      game.ctx.lineTo(endX + 4, endY - 70 + arrowBounce);
-      game.ctx.lineTo(endX + 4, endY - 55 + arrowBounce);
-      game.ctx.lineTo(endX + 10, endY - 55 + arrowBounce);
-      game.ctx.closePath();
-      game.ctx.fill();
-      game.ctx.stroke();
-
-      game.ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-      game.ctx.fillRect(0, 260, game.canvas.width, 80);
-      game.ctx.strokeStyle = '#f1c40f';
-      game.ctx.lineWidth = 3;
-      game.ctx.beginPath();
-      game.ctx.moveTo(0, 260);
-      game.ctx.lineTo(game.canvas.width, 260);
-      game.ctx.moveTo(0, 340);
-      game.ctx.lineTo(game.canvas.width, 340);
-      game.ctx.stroke();
-
-      game.ctx.fillStyle = '#fff';
-      game.ctx.font = "bold 20px 'Fredoka', 'Nunito', sans-serif";
-      game.ctx.textAlign = 'center';
-      game.ctx.strokeText("CLICK ANYWHERE ON THE MAP TO BEGIN MATCH", 400, 308);
-      game.ctx.fillText("CLICK ANYWHERE ON THE MAP TO BEGIN MATCH", 400, 308);
-
-      game.ctx.restore();
-    }
+    // Pre-match intro: glowing road, marching arrows, spawn/base markers, click-to-begin card
+    drawPathIntro(game, game.ctx);
 
     if (game.isHardcore) {
       game.ctx.save();
@@ -1020,7 +1070,7 @@ export function drawConfetti(game) {
   }
 
   game.ctx.save();
-  const dt = 0.016;
+  const dt = Math.min(0.05, game._fxRealDt || 0.016);   // real frame time: same speed at 60/144 Hz
   for (const p of game._confettiParticles) {
     p.y += p.speedY * dt;
     p.x += p.speedX * dt;

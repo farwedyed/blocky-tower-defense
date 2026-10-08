@@ -5,6 +5,7 @@ import { Network } from './network.js';
 import { soundManager } from './sound.js';
 import { getTowerCost } from './game-config.js';
 import { checkQuestCompletion } from './game-storage.js';
+import { FXUI } from './fx/fx-ui.js';
 import { 
   Runner, Quick, Slow, Hidden, Lead, Shadow, Goliath, Templar, 
   Brute, GraveDigger, HazardGiant, MoltenTitan, FallenGuardian, FallenKing, VoidReaver 
@@ -70,10 +71,10 @@ export function evaluateSupportBuffs(game) {
  * Places an agent at specified tile coordinate, checking limits and wallets.
  */
 export function placeShopAgent(game, posX, posY, ownerId = 'p1', towerType = null) {
-  // Support both pixel positions (posX > 30) and legacy tile indices (col, row)
-  const isPixel = posX > 25 || posY > 25;
-  const x = isPixel ? posX : posX * game.grid.cellSize + game.grid.cellSize / 2;
-  const y = isPixel ? posY : posY * game.grid.cellSize + game.grid.cellSize / 2;
+  // Always pixel positions. (It used to guess "tile index" when both values were <= 25, which
+  // moved a tower placed in the top-left corner far off its spot.) Callers convert tiles themselves.
+  const x = posX;
+  const y = posY;
 
   const totalPlacedTowers = game.grid.towers.size;
   if (totalPlacedTowers >= 40) {
@@ -95,6 +96,7 @@ export function placeShopAgent(game, posX, posY, ownerId = 'p1', towerType = nul
 
   if (wallet < cost) {
     game.effectManager.spawnText(x, y, "CASH INSUFFICIENT!", '#e74c3c');
+    if (ownerId === (window.myPlayerId || 'p1')) { try { FXUI.shakeGold(); } catch (e) {} }
     return;
   }
 
@@ -190,6 +192,7 @@ export function upgradeSelectedTower(game) {
   const cost = tower.getUpgradeCost();
   if (game.gold < cost) {
     game.effectManager.spawnText(tower.x, tower.y - 15, "NEED CASH!", '#e74c3c');
+    try { FXUI.shakeGold(); } catch (e) {}
     return;
   }
 

@@ -41,6 +41,7 @@ import {
 } from './game-combat.js';
 
 import { draw, preloadAllAssets, preloadUIAssets } from './game-renderer.js';
+import { fxUpdate } from './fx/fx.js';
 
 class Game {
   constructor() {
@@ -279,6 +280,9 @@ class Game {
               if (this.ui && this.ui.lobby) {
                 this.ui.lobby.showSplashState();
               }
+              // Dropped out of a co-op match last time? Offer to jump back in (only if that
+              // exact match is still running on the server).
+              Network.checkForRejoin();
             }
 
             if (this.ui && this.ui.lobby) {
@@ -742,7 +746,7 @@ class Game {
       this._bgWorker.onmessage = () => {
         if (document.hidden && this.state === 'playing') {
           const now = performance.now();
-          const dt = Math.min(0.1, (now - (this.lastTime || now)) / 1000.0) * this.speedMultiplier;
+          const dt = Math.max(0, Math.min(0.1, (now - (this.lastTime || now)) / 1000.0)) * this.speedMultiplier;
           this.lastTime = now;
           this.update(dt);
         }
@@ -774,7 +778,8 @@ class Game {
     // Automatically clean up multiplayer rooms when closing or refreshing the tab
     const handleTabExit = () => {
       if (typeof Network !== 'undefined' && Network.mode !== 'OFFLINE' && Network.roomId) {
-        Network.disconnect();
+        // Closing/refreshing the tab is NOT leaving on purpose: keep the reconnect info
+        Network.disconnect({ keepRejoin: true });
       }
     };
     window.addEventListener('beforeunload', handleTabExit);
@@ -845,9 +850,14 @@ class Game {
       return;
     }
 
-    // Avoid calling midgame ads for first-time players entering the tutorial match
-    if (Network.mode === 'OFFLINE' && !isTutorial) {
+    // Avoid calling midgame ads for first-time players entering the tutorial match,
+    // and right after the player chose to watch the start-boost rewarded ad
+    if (Network.mode === 'OFFLINE' && !isTutorial && !(this.pendingStartBoost > 0)) {
+      // Ignore extra DEPLOY clicks while the ad is being requested (otherwise two matches start)
+      if (this._deployAdPending) return;
+      this._deployAdPending = true;
       CrazyGamesManager.requestMidgameAd(() => {
+        this._deployAdPending = false;
         this.continueDeployment(isTutorial);
       }, 'match_start');
     } else {
@@ -857,7 +867,7 @@ class Game {
 
   continueDeployment(isTutorial = false) {
     try {
-      this._rewardsClaimed = false; // Reset rewards claim flag for new match
+      this._rewardsGiven = { coins: 0, xp: 0 }; // Nothing paid out yet for this new match
       this.completedWaves = 0;      // Track waves survived with effort
       this.isTutorialMatch = isTutorial || (this.tutorialActive && (typeof Network === 'undefined' || Network.mode === 'OFFLINE'));
       this.state = 'playing';
@@ -897,6 +907,22 @@ class Game {
 
       this.grid.clear();
       this.effectManager.clear();
+
+      // Solo start boost (rewarded ad watched in the prep screen). Boosted runs are unranked.
+      this.startBoostUsed = false;
+      if (this.pendingStartBoost > 0 && Network.mode === 'OFFLINE' && !this.isTutorialMatch) {
+        this.gold += this.pendingStartBoost;
+        this.startBoostUsed = true;
+        const boost = this.pendingStartBoost;
+        this.pendingStartBoost = 0;
+        try { localStorage.removeItem('tds_start_boost'); } catch (e) {}
+        setTimeout(() => {
+          if (this.state === 'playing' && this.effectManager) {
+            this.effectManager.spawnText(this.canvas.width / 2, this.canvas.height / 2 - 40, `START BOOST +$${boost}`, '#f1c40f');
+          }
+        }, 600);
+        if (this.ui && this.ui.lobby && typeof this.ui.lobby.refreshPrepBoost === 'function') this.ui.lobby.refreshPrepBoost();
+      }
 
       const isTutorialMatch = isTutorial || (this.tutorialActive && Network.mode === 'OFFLINE');
 
@@ -958,6 +984,8 @@ class Game {
   }
 
   quitToLobby(forceDisconnect = false) {
+    // Leaving the match on purpose: never offer to reconnect to it
+    Network.clearRejoinInfo();
     this.tutorialActive = false; 
     this.tutorialCompleted = true;
     this.waveInProgress = false; // CRITICAL: Reset wave state so isJoinable stays true in lobby
@@ -1087,7 +1115,12 @@ class Game {
     }
 
     if (!this.lastTime) this.lastTime = timestamp;
-    const dt = Math.min(0.1, (timestamp - this.lastTime) / 1000.0) * this.speedMultiplier;
+    // Never negative: lastTime is sometimes set from performance.now() (tab switch), which can be a
+    // bit later than the rAF timestamp. A negative dt ran the match backwards for a frame and made
+    // DJ waves draw with a negative radius (IndexSizeError in DJMusicWave.draw).
+    const realDt = Math.max(0, Math.min(0.1, (timestamp - this.lastTime) / 1000.0));
+    this._fxRealDt = realDt;
+    const dt = realDt * this.speedMultiplier;
     this.lastTime = timestamp;
 
     if (this.state === 'playing') {
@@ -1108,12 +1141,31 @@ class Game {
       }
     }
 
-    if (this.state === 'playing' || this.state === 'victory' || this.state === 'gameover') {
-      if (this.state === 'playing') {
-        this.matchTime += dt;
+    try {
+      if (this.state === 'playing' || this.state === 'victory' || this.state === 'gameover') {
+        // Solo: the match is frozen while an ad video is on screen (co-op can't pause for one player)
+        const adFreeze = CrazyGamesManager.adPlaying && Network.mode === 'OFFLINE';
+        if (!adFreeze) {
+          if (this.state === 'playing') {
+            this.matchTime += dt;
+          }
+          this.update(dt);
+        }
+        // Game juice: derive hits/deaths/coins/etc from state changes (host, solo and co-op clients)
+        try { fxUpdate(this, adFreeze ? 0 : dt, realDt); } catch (fxErr) {
+          if (!this._fxErrorReported) { this._fxErrorReported = true; console.warn('[FX] effect update failed:', fxErr); }
+        }
+        this.draw(); 
+      } else {
+        // Outside a match: lets the FX layer notice we left the match (resets coins/HUD state)
+        try { fxUpdate(this, 0, realDt); } catch (fxErr) {}
       }
-      this.update(dt);
-      this.draw(); 
+    } catch (e) {
+      // One bad frame must never freeze the whole game: report it once and keep the loop alive
+      if (!this._loopErrorReported) {
+        this._loopErrorReported = true;
+        console.error('Game loop error (recovered):', e);
+      }
     }
 
     this._rafId = requestAnimationFrame((t) => this.loop(t));
@@ -1235,7 +1287,7 @@ class Game {
             this.playerWallets[pId] = (this.playerWallets[pId] || 0) + reward;
           }
         }
-        this.effectManager.spawnText(zombie.x, zombie.y - 10, `+$${reward}`, '#f1c40f');
+        // (the "+$" text is replaced by coins flying into the cash counter, see fx.js)
         this.ui.updateHUD(this.lives, this.gold, this.wave, this.maxWaves);
 
         this.questProgress.kills++;
@@ -1247,7 +1299,7 @@ class Game {
       if (zombie.targetNodeIndex >= this.grid.pixelPath.length) {
         const damage = zombie.baseDamage || 1;
         this.lives -= damage;
-        this.effectManager.spawnText(zombie.x, zombie.y - 18, `-${damage} HP`, '#e74c3c');
+        // (the "-N HP" text is replaced by the red vignette + lives HUD shake, see fx.js)
         this.enemies.splice(i, 1);
         
         if (this.lives <= 0) {
@@ -1270,6 +1322,11 @@ class Game {
 
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const projectile = this.bullets[i];
+      if (!projectile || typeof projectile.update !== 'function') {
+        // Draw-only copy from multiplayer sync (e.g. after becoming host mid-match)
+        this.bullets.splice(i, 1);
+        continue;
+      }
       const isDead = projectile.update(this.effectManager, this.enemies, dt);
       if (isDead) {
         this.bullets.splice(i, 1);

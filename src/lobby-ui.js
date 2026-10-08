@@ -10,6 +10,8 @@ import { soundManager } from './sound.js';
 import { CrazyGamesManager } from './crazygames.js';
 import { Network } from './network.js';
 
+const PREP_BOOST_CASH = 150; // solo-only rewarded start cash
+
 export class LobbyUI {
   constructor(game, parentUI) {
     window.lobbyPlayers = window.lobbyPlayers || { p1: "", p2: "", p3: "", p4: "", p5: "", p6: "", p7: "", p8: "" };
@@ -534,6 +536,76 @@ export class LobbyUI {
         this.game.deployToMatch();
       });
     }
+
+    // ─── SOLO START BOOST (rewarded ad): +$150 cash for the next solo match ───
+    // Gold segment docked on the right end of DEPLOY. It has its own click target; after the ad
+    // it merges into DEPLOY ("+$150 READY") and clicking it simply deploys.
+    const btnBoost = document.getElementById('btn-prep-boost');
+    const boostLabel = document.getElementById('prep-boost-label');
+    const boostSub = document.getElementById('prep-boost-sub');
+    const actionRow = btnBoost ? btnBoost.parentElement : null;
+    let boostAdInFlight = false;
+    let boostMsgTimer = null;
+    try {
+      const saved = parseInt(localStorage.getItem('tds_start_boost') || '0', 10);
+      if (saved > 0) this.game.pendingStartBoost = saved;
+    } catch (e) {}
+
+    this.refreshPrepBoost = () => {
+      if (!btnBoost || !boostLabel || !boostSub) return;
+      const solo = Network.mode === 'OFFLINE';
+      btnBoost.style.display = solo ? 'flex' : 'none';
+      if (actionRow) actionRow.classList.toggle('has-boost', solo);
+      if (!solo || boostAdInFlight || boostMsgTimer) return;
+      const ready = (this.game.pendingStartBoost || 0) > 0;
+      btnBoost.classList.toggle('is-ready', ready);
+      if (actionRow) actionRow.classList.toggle('boost-ready', ready);
+      btnBoost.classList.remove('is-busy', 'is-error');
+      btnBoost.disabled = false;
+      boostLabel.textContent = ready ? `+$${this.game.pendingStartBoost} READY` : `+$${PREP_BOOST_CASH} CASH`;
+      boostSub.textContent = '▶ WATCH AD';
+      btnBoost.title = ready
+        ? 'Start cash boost is ready: your next solo match starts with +$' + this.game.pendingStartBoost + ' (unranked).'
+        : 'Watch an ad: your next solo match starts with +$' + PREP_BOOST_CASH + '. Boosted runs don\'t count on the speedrun board.';
+    };
+
+    if (btnBoost) {
+      btnBoost.addEventListener('click', () => {
+        if (Network.mode !== 'OFFLINE' || boostAdInFlight || boostMsgTimer) return;
+        // Already claimed: the segment is part of DEPLOY now
+        if ((this.game.pendingStartBoost || 0) > 0) {
+          this.game.deployToMatch();
+          return;
+        }
+        soundManager.playTick();
+        boostAdInFlight = true;
+        btnBoost.disabled = true;
+        btnBoost.classList.add('is-busy');
+        boostSub.textContent = 'LOADING AD...';
+        CrazyGamesManager.requestRewardedAd(
+          () => {
+            boostAdInFlight = false;
+            this.game.pendingStartBoost = PREP_BOOST_CASH;
+            try { localStorage.setItem('tds_start_boost', String(PREP_BOOST_CASH)); } catch (e) {}
+            soundManager.playUpgrade();
+            this.refreshPrepBoost();
+          },
+          () => {
+            // adError / timeout: no reward, keep the offer
+            boostAdInFlight = false;
+            btnBoost.classList.remove('is-busy');
+            btnBoost.classList.add('is-error');
+            boostSub.textContent = 'AD UNAVAILABLE';
+            boostMsgTimer = setTimeout(() => {
+              boostMsgTimer = null;
+              this.refreshPrepBoost();
+            }, 2500);
+          },
+          'start_boost'
+        );
+      });
+    }
+    this.refreshPrepBoost();
 
     const btnCloseReveal = document.getElementById('btn-close-reveal');
     if (btnCloseReveal) {

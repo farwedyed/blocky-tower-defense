@@ -52,7 +52,10 @@ export class UI {
   initPointerUpdateLoop() {
     const updatePointerLoop = () => {
       if (this.gameUI && this.gameUI.activePointerTarget) {
-        if (this.gameUI.activePointerTarget.isConnected) {
+        if (typeof this.gameUI.repositionPointer !== 'function') {
+          // GameUI has no repositionPointer: don't throw 60 times a second, just drop the target
+          this.gameUI.activePointerTarget = null;
+        } else if (this.gameUI.activePointerTarget.isConnected) {
           this.gameUI.repositionPointer(this.gameUI.activePointerTarget, this.gameUI.activePointerDirection);
         } else {
           this.gameUI.hidePointer();

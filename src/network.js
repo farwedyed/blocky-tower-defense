@@ -34,6 +34,32 @@ export const Network = {
     connectionTimeout: null,
     connectionWatchdog: null,
 
+    // Socket dropped mid co-op match: back to the menu and offer to reconnect.
+    // (This used to sit inside the conn shim below, so the call in ws.onclose threw
+    // "handleUnexpectedMatchDrop is not a function".)
+    handleUnexpectedMatchDrop: function() {
+        this.clearConnectionTimers();
+        this.ws = null;
+        this.mode = 'OFFLINE';
+        this.roomId = null;
+        window.lobbyPlayers = { p1: "Host Survivor", p2: "", p3: "", p4: "", p5: "", p6: "", p7: "", p8: "" };
+        window.myPlayerId = "p1";
+        window.playerCursors = {};
+        const g = this.game;
+        try { CrazyGamesManager.gameplayStop(); } catch (e) {}
+        if (!g) { setTimeout(() => this.checkForRejoin(), 800); return; }
+        g.state = 'lobby';
+        g.waveInProgress = false;
+        if (g.ui) {
+            const summaryCard = document.getElementById('match-summary-card');
+            if (summaryCard) summaryCard.remove();
+            g.ui.hideOverlay();
+            g.ui.showLobbyLayout();
+            if (g.ui.lobby) g.ui.lobby.showSplashState();
+        }
+        setTimeout(() => this.checkForRejoin(), 800);
+    },
+
     // Backward compatibility shim for Network.conn.send(...)
     conn: {
         send: function(data) {
@@ -66,7 +92,8 @@ export const Network = {
         }
 
         try {
-            this.ws = new WebSocket(this.serverUrl);
+            const sock = new WebSocket(this.serverUrl);
+            this.ws = sock;
 
             this.ws.onopen = () => {
                 console.log("[Network] Connected to Game Server!");
@@ -86,8 +113,15 @@ export const Network = {
 
             this.ws.onclose = () => {
                 console.log("[Network] Cloud socket closed.");
+                if (this.ws !== sock) return; // an old socket we already replaced / closed on purpose
                 if (this.isJoining) {
                     this.handleJoinError('CONNECTION_FAILED');
+                    return;
+                }
+                // Connection dropped in the middle of a co-op match: go back to the menu and
+                // offer to reconnect to the same match.
+                if (this.mode !== 'OFFLINE' && this.game && this.game.state !== 'lobby' && this.getRejoinInfo()) {
+                    this.handleUnexpectedMatchDrop();
                 }
             };
         } catch (err) {
@@ -111,7 +145,7 @@ export const Network = {
         const publicFlag = typeof isPublic === 'boolean' ? isPublic : true;
 
         const sendHost = () => {
-            this.send({ type: 'HOST_ROOM', name: playerName, isPublic: publicFlag });
+            this.send({ type: 'HOST_ROOM', name: playerName, isPublic: publicFlag, token: this.getPlayerToken() });
         };
 
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
@@ -130,7 +164,7 @@ export const Network = {
         this.onConnectedCallback = onConnected;
 
         const sendJoin = () => {
-            this.send({ type: 'JOIN_ROOM', roomId: this.attemptedRoomCode, name: playerName });
+            this.send({ type: 'JOIN_ROOM', roomId: this.attemptedRoomCode, name: playerName, token: this.getPlayerToken() });
         };
 
         // 8-second watchdog timer matching CrazyGames QA checklist
@@ -148,8 +182,10 @@ export const Network = {
         }
     },
 
-    disconnect: function() {
+    disconnect: function(opts) {
         const leavingRoomId = this.roomId;
+        if (!(opts && opts.keepRejoin)) this.clearRejoinInfo(); // left on purpose: no reconnect prompt later
+        this.isRejoining = false;
         this.clearConnectionTimers();
         this.mode = 'OFFLINE';
         this.roomId = null;
@@ -175,6 +211,120 @@ export const Network = {
             } catch(e) {}
             this.ws = null;
         }
+    },
+
+    // ─── MATCH RECONNECT ───
+    // A per-device secret lets the server recognise this player when they come back after a
+    // disconnect. The match they were in is remembered until it is left on purpose.
+    REJOIN_KEY: 'tds_mp_rejoin',
+    REJOIN_MAX_AGE_MS: 3 * 60 * 60 * 1000,
+
+    getPlayerToken: function() {
+        try {
+            let t = localStorage.getItem('tds_mp_token');
+            if (!t || !/^[A-Za-z0-9_-]{8,64}$/.test(t)) {
+                t = 'tk_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+                localStorage.setItem('tds_mp_token', t);
+            }
+            return t;
+        } catch (e) {
+            if (!this._memToken) this._memToken = 'tk_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+            return this._memToken;
+        }
+    },
+
+    saveRejoinInfo: function(matchId) {
+        if (!matchId || !this.roomId) return;
+        try {
+            localStorage.setItem(this.REJOIN_KEY, JSON.stringify({ roomId: this.roomId.toUpperCase(), matchId, savedAt: Date.now() }));
+        } catch (e) {}
+    },
+
+    clearRejoinInfo: function() {
+        try { localStorage.removeItem(this.REJOIN_KEY); } catch (e) {}
+    },
+
+    getRejoinInfo: function() {
+        try {
+            const info = JSON.parse(localStorage.getItem(this.REJOIN_KEY) || 'null');
+            if (!info || !info.roomId || !info.matchId) return null;
+            if (Date.now() - (info.savedAt || 0) > this.REJOIN_MAX_AGE_MS) {
+                this.clearRejoinInfo();
+                return null;
+            }
+            return info;
+        } catch (e) {
+            return null;
+        }
+    },
+
+    /**
+     * Ask the server whether the match this player dropped out of is still being played.
+     * Shows the big RECONNECT prompt only if it is (same match, not lobby, not finished).
+     */
+    checkForRejoin: function() {
+        const info = this.getRejoinInfo();
+        if (!info || this.mode !== 'OFFLINE' || this.roomId) return;
+        this._rejoinCheckPending = info;
+        const ask = () => this.send({ type: 'CHECK_REJOIN', roomId: info.roomId, matchId: info.matchId, token: this.getPlayerToken() });
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) ask();
+        else this.init(this.game, ask);
+    },
+
+    rejoinMatch: function(info) {
+        if (!info) return;
+        this.clearConnectionTimers();
+        this.mode = 'CLIENT';
+        this.isJoining = true;
+        this.isInviteLinkJoin = false;
+        this.isRejoining = true;
+        this.attemptedRoomCode = info.roomId;
+        this.onConnectedCallback = null;
+
+        const nameInput = document.getElementById('input-player-name');
+        const name = (CrazyGamesManager.currentUser && CrazyGamesManager.currentUser.username)
+            || (nameInput && nameInput.value.trim()) || localStorage.getItem('tds_player_username') || 'Guest';
+
+        this.connectionTimeout = setTimeout(() => {
+            if (this.isJoining) this.handleJoinError('MATCH_ENDED');
+        }, 10000);
+
+        const go = () => this.send({ type: 'REJOIN_MATCH', roomId: info.roomId, matchId: info.matchId, token: this.getPlayerToken(), name });
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) go();
+        else this.init(this.game, go);
+    },
+
+    /** Host: move a player's cash and tower ownership from one id to another. */
+    moveOwnership: function(fromId, toId) {
+        if (!this.game || !fromId || !toId || fromId === toId) return;
+        const w = this.game.playerWallets || (this.game.playerWallets = {});
+        if (w[fromId] !== undefined) {
+            w[toId] = w[fromId];
+            delete w[fromId];
+        }
+        for (const t of this.game.grid.towers.values()) {
+            if (t.ownerId === fromId) t.ownerId = toId;
+        }
+    },
+
+    /** Host: apply the server's slot renumbering (players shift up when someone leaves). */
+    applySlotRemap: function(remap) {
+        if (!this.game || !remap) return;
+        const oldW = this.game.playerWallets || {};
+        const newW = {};
+        for (const [k, v] of Object.entries(oldW)) {
+            if (/^p[1-8]$/.test(k)) {
+                if (remap[k]) newW[remap[k]] = v; // remaining player, maybe renumbered
+                // slots not in the remap belonged to someone who left the lobby
+            } else {
+                newW[k] = v; // parked seats of disconnected players ("gone_...")
+            }
+        }
+        for (const t of this.game.grid.towers.values()) {
+            if (t.ownerId && /^p[1-8]$/.test(t.ownerId) && remap[t.ownerId]) t.ownerId = remap[t.ownerId];
+        }
+        this.game.playerWallets = newW;
+        if (newW.p1 !== undefined) this.game.gold = newW.p1;
     },
 
     /** Drop cursors of players who are no longer in the room (e.g. after someone leaves). */
@@ -251,6 +401,9 @@ export const Network = {
                 title = "ROOM NOT FOUND ⚠️";
                 message = `No active squad was found with room code: ${roomCode}. Please verify the code and try again.`;
             }
+        } else if (reason === 'MATCH_ENDED') {
+            title = "MATCH ENDED ⚠️";
+            message = "That match has already ended, so it can't be rejoined. Host or join a new squad to keep playing!";
         } else if (reason === 'MATCH_IN_PROGRESS') {
             title = "BATTLE IN PROGRESS ⚠️";
             message = "That squad is already in battle! You can only join open squads in the lobby.";
@@ -347,6 +500,70 @@ export const Network = {
             }
         }
 
+        // ─── MATCH RECONNECT ───
+        else if (data.type === 'REJOIN_STATUS') {
+            const pending = this._rejoinCheckPending;
+            this._rejoinCheckPending = null;
+            if (!pending || (data.matchId && data.matchId !== pending.matchId)) return;
+            if (data.available && this.mode === 'OFFLINE' && this.game && this.game.state === 'lobby') {
+                if (this.game.ui && this.game.ui.lobby && this.game.ui.lobby.coop) {
+                    this.game.ui.lobby.coop.showRejoinPrompt(pending, data);
+                }
+            } else if (!data.available) {
+                this.clearRejoinInfo();
+            }
+        }
+        else if (data.type === 'REJOIN_FAILED') {
+            this.isRejoining = false;
+            this.handleJoinError(data.reason === 'ROOM_FULL' ? 'ROOM_FULL' : 'MATCH_ENDED');
+        }
+        else if (data.type === 'REJOIN_WELCOME') {
+            this.roomId = data.roomId;
+            this.mode = 'CLIENT';
+            window.myPlayerId = data.assignedId;
+            window.lobbyPlayers = data.lobbyPlayers;
+            window.playerCursors = {};
+            this.game.selectedMap = data.selectedMap || this.game.selectedMap;
+            this.game.selectedDifficulty = data.selectedDifficulty || this.game.selectedDifficulty;
+            this.game.isHardcore = !!data.isHardcore;
+            this.saveRejoinInfo(data.matchId);
+            // Still "joining" until the host's snapshot (REJOIN_START) arrives
+        }
+        else if (data.type === 'REJOIN_START' && this.mode === 'CLIENT') {
+            if (data.targetId && data.targetId !== window.myPlayerId) return;
+            this.isJoining = false;
+            this.isRejoining = false;
+            this.clearConnectionTimers();
+            this.applyMatchStart(data);
+            // Jump straight into the running match
+            this.game.wave = data.wave || 0;
+            this.game.waveInProgress = !!data.waveInProgress;
+            this.game.showMapDirections = false;
+            this.game.matchTime = data.matchTime || 0;
+            this.saveRejoinInfo(data.matchId);
+            try { CrazyGamesManager.gameplayStart(); } catch (e) {}
+            this._lastUiWave = undefined;
+            this.game.ui.updateWaveButton(this.game.waveInProgress);
+            this.game.ui.updateHUD(this.game.lives, this.game.gold, this.game.wave, this.game.maxWaves);
+            this.syncRoomPresence();
+            if (this.game.effectManager && this.game.effectManager.spawnWaveText) {
+                this.game.effectManager.spawnWaveText('RECONNECTED!', '#2ecc71');
+            }
+        }
+        else if (data.type === 'PLAYER_LEFT_MATCH') {
+            // Host: park the dropped player's cash & towers until they come back
+            if (this.mode === 'HOST') this.moveOwnership(data.oldPlayerId, 'gone_' + data.seatId);
+        }
+        else if (data.type === 'PLAYER_REJOINED') {
+            if (this.mode === 'HOST' && this.game) {
+                const parked = 'gone_' + data.seatId;
+                const w = this.game.playerWallets || (this.game.playerWallets = {});
+                if (w[parked] !== undefined) this.moveOwnership(parked, data.playerId);
+                else if (w[data.playerId] === undefined) w[data.playerId] = this.game.isHardcore ? 250 : 400;
+                if (this.game.state !== 'lobby') this.sendRejoinSnapshot(data.playerId);
+            }
+        }
+
         // Client Joined Confirmation
         else if (data.type === 'LOBBY_WELCOME') {
             this.isJoining = false;
@@ -366,6 +583,8 @@ export const Network = {
         // Lobby Roster Updates (Ensures starting wallets exist and syncs 8/8 capacity with CrazyGames)
         else if (data.type === 'LOBBY_UPDATE') {
             window.lobbyPlayers = data.lobbyPlayers;
+            if (data.yourId) window.myPlayerId = data.yourId;
+            if (this.mode === 'HOST' && data.slotRemap) this.applySlotRemap(data.slotRemap);
             this.pruneStaleCursors();
             
             this.syncRoomPresence();
@@ -420,6 +639,9 @@ export const Network = {
             if (this.game.state === 'playing') {
                 this.game.showMapDirections = false;
                 this.game.skipVotes = new Set();
+                // Client-side bullets are draw-only copies of the old host's shots (no update()).
+                // The new host's towers fire real ones, so drop the copies.
+                this.game.bullets = (this.game.bullets || []).filter(b => b && typeof b.update === 'function');
                 if (!this.game.waveInProgress && this.game.autoMode && this.game.wave < this.game.maxWaves) {
                     this.game.autoStartTimer = 3.0;
                 }
@@ -549,66 +771,13 @@ export const Network = {
 
         // Match Start
         else if (data.type === 'START') {
-            this.game.selectedMap = data.selectedMap;
-            this.game.selectedDifficulty = data.selectedDifficulty || 'easy';
-            this.game.isHardcore = data.isHardcore;
-            this.game.playerWallets = data.playerWallets || {};
-
-            this.game.state = 'playing';
-            window.dispatchEvent(new CustomEvent('btd:gameplay-start'));
-            this.game.tutorialActive = false;
-            this.game.showMapDirections = true;
-
-            // Disable joining once active match begins
-            if (this.roomId) {
-                CrazyGamesManager.updateRoomPresence(this.roomId.toLowerCase(), false);
-            }
-            this.game.grid.selectMap(data.selectedMap);
-
-            if (data.obstacles) this.game.grid.obstacles = data.obstacles;
-
-            const startingCash = data.gold !== undefined ? data.gold : (data.isHardcore ? 250 : 600);
-            this.game.playerWallets = data.playerWallets || {};
-            for (const slot of ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8']) {
-              if (this.game.playerWallets[slot] === undefined) {
-                this.game.playerWallets[slot] = startingCash;
-              }
-            }
-            this.game.lives = data.lives !== undefined ? data.lives : (data.isHardcore ? 10 : 150);
-            this.game.gold = (this.game.playerWallets[window.myPlayerId] !== undefined)
-              ? this.game.playerWallets[window.myPlayerId]
-              : startingCash;
-            this.game.maxWaves = data.maxWaves !== undefined ? data.maxWaves : 30;
-
-            this.game.wave = 0;
-            this.game.waveInProgress = false;
-            this.game.speedMultiplier = 1;
-            this._lastUiGold = undefined;
-            this._lastUiLives = undefined;
-            this._lastUiWave = undefined;
-            this._lastUiWaveInProgress = undefined;
-            this.activeStateSender = data.senderId || null;
-            this.lastStateFromActiveSender = Date.now();
-            this.game.enemies = [];
-            this.game.bullets = [];
-            this.game.spawnQueue = [];
-            this.game.matchTime = 0;
-
-            this.game.grid.clear();
-            this.game.effectManager.clear();
-            this.game.setSelectedPlacedTower(null);
-            this.game.selectedShopTower = (this.game.equippedAgents && this.game.equippedAgents.length > 0) ? this.game.equippedAgents[0] : 'scout';
-
-            let mapName = data.selectedMap.replace('_', ' ').toUpperCase();
-            this.game.ui.showGameLayout(mapName);
-            this.game.ui.renderPlacementShop();
-            this.game.ui.updateSpeedButton(1);
-            this.game.ui.updateWaveButton(false);
-            this.game.ui.updateHUD(this.game.lives, this.game.gold, this.game.wave, this.game.maxWaves);
+            this.applyMatchStart(data);
+            if (data.matchId) this.saveRejoinInfo(data.matchId);
         }
 
         // Return to Lobby
         else if (data.type === 'RETURN_TO_LOBBY') {
+            this.clearRejoinInfo(); // squad is back in the lobby: nothing to reconnect to
             if (this.game) {
                 this.game.state = 'lobby';
                 this.game.waveInProgress = false;
@@ -636,6 +805,7 @@ export const Network = {
             if (this.game && this.game.state === 'playing') {
                 this.game.state = data.isVictory ? 'victory' : 'gameover';
                 this.game.wave = data.wave !== undefined ? data.wave : this.game.wave;
+                this.applyCompletedWaves(data);
                 
                 CrazyGamesManager.gameplayStop();
 
@@ -714,6 +884,92 @@ export const Network = {
         }
     },
 
+    /** Shared by START and REJOIN_START: put this player into the match. */
+    applyMatchStart: function(data) {
+        this.game.selectedMap = data.selectedMap;
+        this.game.selectedDifficulty = data.selectedDifficulty || 'easy';
+        this.game.isHardcore = data.isHardcore;
+        this.game.playerWallets = data.playerWallets || {};
+
+        this.game.state = 'playing';
+        window.dispatchEvent(new CustomEvent('btd:gameplay-start'));
+        this.game.tutorialActive = false;
+        // Fresh reward bookkeeping for joined players (they never run continueDeployment)
+        this.game.isTutorialMatch = false;
+        this.game._rewardsGiven = { coins: 0, xp: 0 };
+        this.game.completedWaves = data.completedWaves || 0;
+        this.game.startBoostUsed = false;
+        this.game.showMapDirections = true;
+
+        // Disable joining once active match begins
+        if (this.roomId) {
+            CrazyGamesManager.updateRoomPresence(this.roomId.toLowerCase(), false);
+        }
+        this.game.grid.selectMap(data.selectedMap);
+
+        if (data.obstacles) this.game.grid.obstacles = data.obstacles;
+
+        const startingCash = data.gold !== undefined ? data.gold : (data.isHardcore ? 250 : 600);
+        this.game.playerWallets = data.playerWallets || {};
+        for (const slot of ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8']) {
+          if (this.game.playerWallets[slot] === undefined) {
+            this.game.playerWallets[slot] = startingCash;
+          }
+        }
+        this.game.lives = data.lives !== undefined ? data.lives : (data.isHardcore ? 10 : 150);
+        this.game.gold = (this.game.playerWallets[window.myPlayerId] !== undefined)
+          ? this.game.playerWallets[window.myPlayerId]
+          : startingCash;
+        this.game.maxWaves = data.maxWaves !== undefined ? data.maxWaves : 30;
+
+        this.game.wave = 0;
+        this.game.waveInProgress = false;
+        this.game.speedMultiplier = 1;
+        this._lastUiGold = undefined;
+        this._lastUiLives = undefined;
+        this._lastUiWave = undefined;
+        this._lastUiWaveInProgress = undefined;
+        this.activeStateSender = data.senderId || null;
+        this.lastStateFromActiveSender = Date.now();
+        this.game.enemies = [];
+        this.game.bullets = [];
+        this.game.spawnQueue = [];
+        this.game.matchTime = 0;
+
+        this.game.grid.clear();
+        this.game.effectManager.clear();
+        this.game.setSelectedPlacedTower(null);
+        this.game.selectedShopTower = (this.game.equippedAgents && this.game.equippedAgents.length > 0) ? this.game.equippedAgents[0] : 'scout';
+
+        let mapName = data.selectedMap.replace('_', ' ').toUpperCase();
+        this.game.ui.showGameLayout(mapName);
+        this.game.ui.renderPlacementShop();
+        this.game.ui.updateSpeedButton(1);
+        this.game.ui.updateWaveButton(false);
+        this.game.ui.updateHUD(this.game.lives, this.game.gold, this.game.wave, this.game.maxWaves);
+    },
+
+    /** Host -> reconnecting player: everything they need to drop back into the running match. */
+    sendRejoinSnapshot: function(targetId) {
+        const g = this.game;
+        this.broadcastToAll({
+            type: 'REJOIN_START',
+            targetId: targetId,
+            selectedMap: g.selectedMap,
+            selectedDifficulty: g.selectedDifficulty,
+            isHardcore: g.isHardcore,
+            playerWallets: g.playerWallets,
+            obstacles: g.grid.obstacles,
+            lives: g.lives,
+            gold: (g.playerWallets && g.playerWallets[targetId] !== undefined) ? g.playerWallets[targetId] : 400,
+            maxWaves: g.maxWaves,
+            wave: g.wave,
+            completedWaves: g.completedWaves || 0,
+            waveInProgress: g.waveInProgress,
+            matchTime: g.matchTime
+        });
+    },
+
     handleClientActionOnHost: function(data) {
         const cPlayerId = data.senderId;
 
@@ -737,8 +993,10 @@ export const Network = {
                 }
                 const wallet = this.game.playerWallets[cPlayerId];
 
-                const posX = data.x !== undefined ? data.x : data.col;
-                const posY = data.y !== undefined ? data.y : data.row;
+                // Pixel position; very old clients only sent the tile (col,row), so convert that to the tile centre
+                const cs = (this.game.grid && this.game.grid.cellSize) || 40;
+                const posX = data.x !== undefined ? data.x : data.col * cs + cs / 2;
+                const posY = data.y !== undefined ? data.y : data.row * cs + cs / 2;
                 const check = this.game.grid.isPositionValidForPlacement ? this.game.grid.isPositionValidForPlacement(posX, posY, 18) : { valid: true };
 
                 if (wallet >= cost && check.valid) {
@@ -857,6 +1115,7 @@ export const Network = {
         this.game.wave = data.wave;
         if (data.maxWaves !== undefined) this.game.maxWaves = data.maxWaves;
         this.game.waveInProgress = data.waveInProgress;
+        this.applyCompletedWaves(data);
         this.game.speedMultiplier = data.speedMultiplier !== undefined ? data.speedMultiplier : 1;
 
         // Synchronize Victory/Defeat states even if tab was in background
@@ -1034,6 +1293,7 @@ export const Network = {
             enemy.isFlying = eData.isFlying;
             enemy.enraged = eData.enraged;
             enemy.slowDuration = eData.slowDuration;
+            if (eData.sf !== undefined) enemy.slowFactor = eData.sf;   // lets clients show the ice block on deep freeze
             enemy.burnDuration = eData.burnDuration;
 
             if (eData.baseDamage !== undefined) enemy.baseDamage = eData.baseDamage;
@@ -1137,8 +1397,26 @@ export const Network = {
         this.broadcastToAll({
             type: 'GAME_OVER',
             isVictory: isVictory,
-            wave: wave
+            wave: wave,
+            completedWaves: this.game ? (this.game.completedWaves || 0) : 0
         });
+    },
+
+    /** Joined players don't simulate waves, so they take the host's count (rewards depend on it). */
+    applyCompletedWaves: function(data) {
+        if (!this.game || this.mode !== 'CLIENT') return;
+        let done;
+        if (data.completedWaves !== undefined) {
+            done = data.completedWaves;
+        } else {
+            // Older host without the field: estimate from the wave counter
+            const w = data.wave !== undefined ? data.wave : this.game.wave;
+            const midWave = data.type === 'GAME_OVER' ? !data.isVictory : !!data.waveInProgress;
+            done = Math.max(0, (w || 0) - (midWave ? 1 : 0));
+        }
+        if (typeof done === 'number' && done > (this.game.completedWaves || 0)) {
+            this.game.completedWaves = done;
+        }
     },
 
     broadcastState: function() {
@@ -1169,6 +1447,7 @@ export const Network = {
             lives: this.game.lives,
             gold: this.game.gold,
             wave: this.game.wave,
+            completedWaves: this.game.completedWaves || 0,
             maxWaves: this.game.maxWaves, // Synchronize max waves
             gameState: this.game.state,   // Synchronize match state
             waveInProgress: this.game.waveInProgress,
@@ -1210,6 +1489,7 @@ export const Network = {
                 isFlying: e.isFlying,
                 enraged: e.enraged,
                 slowDuration: e.slowDuration,
+                sf: Math.round((e.slowFactor !== undefined ? e.slowFactor : 1) * 100) / 100,
                 burnDuration: e.burnDuration,
                 baseDamage: e.baseDamage,
                 targetNodeIndex: e.targetNodeIndex

@@ -105,6 +105,9 @@ export class LobbyWizard {
             : '<span>DEPLOY TO MATCH</span><img src="assets/ui/solo/sprite_02.png" class="prep-deploy-swords" alt="" />';
         }
 
+        // Solo-only rewarded start boost button
+        if (this.lobbyUI && typeof this.lobbyUI.refreshPrepBoost === 'function') this.lobbyUI.refreshPrepBoost();
+
         // Clients stay in squad room waiting for Host to deploy
       });
     }

@@ -5,6 +5,14 @@ import { soundManager } from './sound.js';
 import { Network } from './network.js';
 import { CrazyGamesManager } from './crazygames.js';
 import { awardMatchRewards } from './game-storage.js';
+import { FXUI } from './fx/fx-ui.js';
+import { drawAgentPortrait } from './game-renderer.js';
+
+const HUD2_ICONS = {
+  dmg: '<svg viewBox="0 0 32 32"><path d="M6 26 L20 12 M18 6 L26 6 L26 14 L14 26 L6 26 L6 18Z" fill="#e53935" stroke="#1b1b1b" stroke-width="3" stroke-linejoin="round"/></svg>',
+  rng: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11" fill="#5dade2" stroke="#1b1b1b" stroke-width="3"/><circle cx="16" cy="16" r="5" fill="#fff" stroke="#1b1b1b" stroke-width="2.5"/><path d="M16 2 V8 M16 24 V30 M2 16 H8 M24 16 H30" stroke="#1b1b1b" stroke-width="3"/></svg>',
+  rate: '<svg viewBox="0 0 32 32"><path d="M19 3 L7 18 L15 18 L12 29 L25 12 L17 12Z" fill="#ffd23f" stroke="#1b1b1b" stroke-width="2.5" stroke-linejoin="round"/></svg>'
+};
 
 export class GameUI {
   constructor(game, parentUI) {
@@ -639,18 +647,14 @@ export class GameUI {
         const cost = this.game.getTowerCost(type);
 
         btn.innerHTML = `
-          <div class="icon"><canvas width="45" height="45"></canvas></div>
-          <div class="info">
-            <span class="name" style="text-transform: uppercase;">${name}</span>
-            <span class="cost">$${cost}</span>
-          </div>
+          <span class="name">${name}</span>
+          <div class="icon"><canvas width="220" height="220"></canvas></div>
+          <span class="cost"><i class="hud2-coin"></i>$${cost}</span>
         `;
 
         const cvs = btn.querySelector('canvas');
         
-        if (this.parentUI.lobby) {
-          this.parentUI.lobby.drawAgentPreview(cvs, type);
-        }
+        drawAgentPortrait(cvs, type, 1, 0.06);
 
         btn.addEventListener('click', () => {
           soundManager.playTick();
@@ -690,7 +694,8 @@ export class GameUI {
       if (!this._valWaveEl) this._valWaveEl = document.getElementById('hud-wave-val');
 
       if (this._valLivesEl) this._valLivesEl.textContent = Math.max(0, lives);
-      if (this._valGoldEl) this._valGoldEl.textContent = `$${gold}`;
+      // Gold counts up/down smoothly while coins fly into the counter (fx-ui.js writes the text)
+      try { FXUI.setGoldTarget(gold); } catch (e) { if (this._valGoldEl) this._valGoldEl.textContent = `$${gold}`; }
       if (this._valWaveEl) this._valWaveEl.textContent = `${wave} / ${maxWaves}`;
 
       const placementBtns = this.equippedAgentsList ? this.equippedAgentsList.children : [];
@@ -698,14 +703,14 @@ export class GameUI {
         const btn = placementBtns[i];
         const type = btn.getAttribute('data-type');
         const cost = this.game.getTowerCost(type);
-        btn.style.opacity = gold < cost ? '0.4' : '1.0';
+        btn.classList.toggle('unaffordable', gold < cost);
       }
 
       if (this.btnSkipWave) {
         // Only allow showing Skip Wave controls on the Host machine
         const showSkip = this.game.waveInProgress && this.game.wave < this.game.maxWaves && Network.mode !== 'CLIENT';
         if (showSkip) {
-          this.btnSkipWave.style.display = 'block';
+          this.btnSkipWave.style.display = '';
           this.btnSkipWave.classList.remove('hidden');
 
           if (this.game.skipCooldown > 0) {
@@ -745,7 +750,7 @@ export class GameUI {
           this.btnAutoWave.style.display = 'none';
           this.btnAutoWave.classList.add('hidden');
         } else {
-          this.btnAutoWave.style.display = 'block';
+          this.btnAutoWave.style.display = '';
           this.btnAutoWave.classList.remove('hidden');
         }
       }
@@ -805,9 +810,24 @@ export class GameUI {
     else if (agent.type === 'military_base') displayName = 'Military Base';
     else if (agent.type === 'dj') displayName = 'DJ Booth';
 
+    let stars = '';
+    for (let s = 1; s <= 5; s++) stars += `<i class="${s <= agent.level ? 'on' : ''}"></i>`;
+    const statRange = Math.round(agent.range * (agent.djRangeBuffed ? 1.15 : 1.0));
+    const statRate = (agent.fireRate * (agent.commanderSpeedBuffed ? 1.35 : 1.0)).toFixed(1);
     let detailsHtml = `
-      <p class="unit-name" style="text-transform: uppercase;">${displayName} <span style="color: #f39c12">Lvl ${agent.level} / 5</span></p>
-      <p class="unit-stats">Damage: ${Math.round(agent.damage)} | Range: ${Math.round(agent.range * (agent.djRangeBuffed ? 1.15 : 1.0))}px | Rate: ${(agent.fireRate * (agent.commanderSpeedBuffed ? 1.35 : 1.0)).toFixed(1)}/s</p>
+      <div class="sp-head">
+        <canvas class="sp-portrait" width="180" height="180"></canvas>
+        <div class="sp-title">
+          <p class="unit-name">${displayName}</p>
+          <div class="sp-stars">${stars}</div>
+        </div>
+        <span class="sp-lv">LV ${agent.level}</span>
+      </div>
+      <div class="sp-stats">
+        <div class="sp-row">${HUD2_ICONS.dmg}<span>DAMAGE</span><b>${Math.round(agent.damage)}</b></div>
+        <div class="sp-row">${HUD2_ICONS.rng}<span>RANGE</span><b>${statRange}</b></div>
+        <div class="sp-row">${HUD2_ICONS.rate}<span>RATE</span><b>${statRate}/s</b></div>
+      </div>
     `;
 
     // Specialized Agent details description
@@ -857,6 +877,10 @@ export class GameUI {
     }
 
     this.selectionInfo.innerHTML = detailsHtml;
+    try {
+      const pc = this.selectionInfo.querySelector('.sp-portrait');
+      if (pc) drawAgentPortrait(pc, agent.type, Math.max(1, Math.min(5, agent.level)), 0.1);
+    } catch (e) {}
 
     // Detect if device is a standard computer (non-touch/mouse-pointer Fine)
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
@@ -864,11 +888,11 @@ export class GameUI {
     const hotkeySuffixSell = !isMobile ? ' [S]' : '';
 
     if (agent.level >= 5) {
-      this.btnUpgrade.textContent = "MAX LEVEL";
+      this.btnUpgrade.innerHTML = '<span class="b1">MAX LEVEL</span>';
       this.btnUpgrade.disabled = true;
       this.btnUpgrade.style.opacity = '0.5';
     } else {
-      this.btnUpgrade.textContent = `UPGRADE ($${upgradeCost})${hotkeySuffixUpgrade}`;
+      this.btnUpgrade.innerHTML = `<span class="b1">UPGRADE</span><span class="b2">$${upgradeCost}</span>${hotkeySuffixUpgrade ? '<small>U</small>' : ''}`;
       if (this.game.gold < upgradeCost) {
         this.btnUpgrade.disabled = true;
         this.btnUpgrade.style.opacity = '0.5';
@@ -878,16 +902,16 @@ export class GameUI {
       }
     }
 
-    this.btnSell.textContent = `SELL ($${sellValue})${hotkeySuffixSell}`;
+    this.btnSell.innerHTML = `<span class="b1">SELL</span><span class="b2">$${sellValue}</span>${hotkeySuffixSell ? '<small>S</small>' : ''}`;
 
     let btnAbility = document.getElementById('btn-ability');
     if (!btnAbility) {
       btnAbility = document.createElement('button');
       btnAbility.id = 'btn-ability';
       btnAbility.className = 'btn btn-secondary';
-      btnAbility.style.marginTop = '8px';
-      btnAbility.style.width = '100%';
-      this.selectionPanel.appendChild(btnAbility);
+      // Sits next to UPGRADE / SELL so the panel stays short and the agent cards stay visible
+      const actionsRow = this.selectionPanel.querySelector('.selection-actions');
+      (actionsRow || this.selectionPanel).appendChild(btnAbility);
     }
 
     if (agent.type === 'commander' || agent.type === 'gladiator' || agent.type === 'medic') {
@@ -945,7 +969,7 @@ export class GameUI {
 
   updateSpeedButton(multiplier) {
     if (this.btnSpeed) {
-      this.btnSpeed.textContent = `SPEED x${multiplier}`;
+      this.btnSpeed.innerHTML = `<span class="hud2-speed-label">SPEED</span><b class="hud2-spd ${multiplier === 1 ? 'on' : ''}">x1</b><b class="hud2-spd ${multiplier !== 1 ? 'on' : ''}">x2</b>`;
     }
   }
 
@@ -958,21 +982,12 @@ export class GameUI {
       return;
     }
 
-    if (isOn) {
-      this.btnAutoWave.textContent = 'AUTO WAVE: ON';
-      this.btnAutoWave.style.background = '#27ae60';
-      this.btnAutoWave.style.color = '#fff';
-      this.btnAutoWave.style.opacity = '1.0';
-      this.btnAutoWave.style.display = 'block';      // Ensure visible for Host
-      this.btnAutoWave.classList.remove('hidden');
-    } else {
-      this.btnAutoWave.textContent = 'AUTO WAVE: OFF';
-      this.btnAutoWave.style.background = '#7f8c8d';
-      this.btnAutoWave.style.color = '#fff';
-      this.btnAutoWave.style.opacity = '0.85';
-      this.btnAutoWave.style.display = 'block';      // Ensure visible for Host
-      this.btnAutoWave.classList.remove('hidden');
-    }
+    // Toggle switch look (styled in the HUD V2 CSS block)
+    this.btnAutoWave.innerHTML = '<span class="hud2-toggle"><i></i></span><span class="hud2-auto-label">AUTO</span>';
+    this.btnAutoWave.classList.toggle('is-on', !!isOn);
+    this.btnAutoWave.title = isOn ? 'Auto wave: ON' : 'Auto wave: OFF';
+    this.btnAutoWave.style.display = '';      // Ensure visible for Host
+    this.btnAutoWave.classList.remove('hidden');
   }
 
   showAutoCountdown(seconds) {
@@ -1249,8 +1264,17 @@ export class GameUI {
     const durationS = Math.floor(this.game.matchTime % 60);
     const durationStr = `${String(durationM).padStart(2, '0')}:${String(durationS).padStart(2, '0')}`;
 
-    const baseCoins = rewards.coinsEarned;
+    let baseCoins = rewards.coinsEarned;
     const baseXP = rewards.xpEarned;
+
+    // Victory only: rewarded ad doubles the coins from this match (once per match, every mode)
+    let doubleButtonHtml = '';
+    const rewardState = this.game._rewardsGiven || (this.game._rewardsGiven = { coins: 0, xp: 0 });
+    if (isVictory && baseCoins > 0 && !rewardState.doubled) {
+      doubleButtonHtml = `
+        <button id="btn-summary-double" class="btn"><span style="display:inline-block; border: 2px solid currentColor; border-radius: 3px; padding: 1px 5px; font-size: 0.8em; line-height: 1;">▶</span> <span id="summary-double-label">WATCH AD: 2X COINS (+${baseCoins})</span></button>
+      `;
+    }
 
     let reviveButtonHtml = '';
     if (!isVictory && !this.game.hasRevivedThisMatch) {
@@ -1369,6 +1393,7 @@ export class GameUI {
         </div>
       </div>
       ${reviveButtonHtml}
+      ${doubleButtonHtml}
       ${likePromptHtml}
       ${feedbackFormHtml}
       ${returnButtonsHtml}
@@ -1463,6 +1488,8 @@ export class GameUI {
 
         CrazyGamesManager.requestRewardedAd(
           () => {
+            // A late ad can finish after the player already left the defeat screen: nothing to revive then
+            if (!summaryCard.isConnected) return;
             cleanupCallout();
             if (Network.mode === 'CLIENT') {
               Network.conn.send({ type: 'REQUEST_TEAM_REVIVE' });
@@ -1482,6 +1509,48 @@ export class GameUI {
             reviveBtn.innerHTML = `<span style="display:inline-block; border: 2px solid #fff; border-radius: 3px; padding: 1px 5px; font-size: 0.8em; line-height: 1;">▶</span> WATCH AD TO REVIVE (+50 LIVES)`;
           },
           'defeat_revive'
+        );
+      });
+    }
+
+    const doubleBtn = document.getElementById('btn-summary-double');
+    if (doubleBtn) {
+      const doubleLabel = document.getElementById('summary-double-label');
+      const bonus = baseCoins;
+      doubleBtn.addEventListener('click', () => {
+        if (doubleBtn.disabled || rewardState.doubled) return;
+        doubleBtn.disabled = true;
+        doubleLabel.textContent = 'LOADING AD...';
+        CrazyGamesManager.requestRewardedAd(
+          () => {
+            if (rewardState.doubled) return;
+            rewardState.doubled = true;
+            this.game.playerCoins = (Number(this.game.playerCoins) || 0) + bonus;
+            this.game.saveStatsToStorage();
+            if (this.game.ui && this.game.ui.lobby) {
+              this.game.ui.lobby.updateLobbyMeta(this.game.playerLevel, this.game.playerXp, this.game.playerCoins);
+            }
+            baseCoins = bonus * 2; // the coin tally (running or finished) shows the doubled amount
+            const coinsEl = document.getElementById('tally-coins');
+            if (coinsEl && coinsTallyDone) {
+              coinsEl.innerHTML = `+<img src="https://img.icons8.com/color/48/coins.png" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 2px;" /> ${baseCoins}`;
+            }
+            soundManager.playUpgrade();
+            const play = doubleBtn.querySelector('span');
+            if (play && play !== doubleLabel) play.style.display = 'none';
+            doubleBtn.classList.add('is-done');
+            doubleLabel.textContent = `✓ COINS DOUBLED! (+${bonus})`;
+          },
+          () => {
+            // adError / timeout: no reward; allow another try after a moment
+            doubleLabel.textContent = 'NO AD RIGHT NOW - TRY AGAIN';
+            setTimeout(() => {
+              if (rewardState.doubled || !document.body.contains(doubleBtn)) return;
+              doubleBtn.disabled = false;
+              doubleLabel.textContent = `WATCH AD: 2X COINS (+${bonus})`;
+            }, 2500);
+          },
+          'double_coins'
         );
       });
     }
@@ -1510,6 +1579,7 @@ export class GameUI {
       });
     }
 
+    let coinsTallyDone = false;
     setTimeout(() => {
       let currentWave = 0;
       let currentCoins = 0;
@@ -1542,6 +1612,7 @@ export class GameUI {
               soundManager.playTick();
             } else {
               clearInterval(coinsTally);
+              coinsTallyDone = true;
 
               const xpTally = setInterval(() => {
                 if (currentXP < baseXP) {
